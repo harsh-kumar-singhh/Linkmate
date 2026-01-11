@@ -3,22 +3,23 @@
 import { motion, type HTMLMotionProps } from "framer-motion"
 import { cn } from "@/lib/utils"
 
-export type AnimatedCardProps = HTMLMotionProps<"div"> & {
-  className?: string
-}
+export type AnimatedCardProps = HTMLMotionProps<"div">
 
 export function AnimatedCard({
   children,
   className,
-  ...motionProps
+  initial = { opacity: 0, scale: 0.98 },
+  animate = { opacity: 1, scale: 1 },
+  transition = { duration: 0.3 },
+  ...rest
 }: AnimatedCardProps) {
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.98 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.3 }}
+      initial={initial}
+      animate={animate}
+      transition={transition}
       className={cn(className)}
-      {...motionProps}
+      {...rest}
     >
       {children}
     </motion.div>
