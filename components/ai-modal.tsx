@@ -45,6 +45,7 @@ export function AIModal({ isOpen, onClose, onGenerate }: AIModalProps) {
                             initial={{ scale: 0.98, opacity: 0, y: 10 }}
                             animate={{ scale: 1, opacity: 1, y: 0 }}
                             exit={{ scale: 0.98, opacity: 0, y: 10 }}
+                            transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
                             onClick={(e) => e.stopPropagation()}
                             className="bg-card rounded-[32px] shadow-premium w-full max-w-lg overflow-hidden border border-border transition-colors relative"
                         >

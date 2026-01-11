@@ -91,6 +91,7 @@ export default function DashboardPage() {
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
           className="bg-secondary/50 p-10 rounded-[40px] border border-primary/10 flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden group"
         >
           <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -mr-32 -mt-32 blur-3xl transition-transform group-hover:scale-110" />
@@ -117,7 +118,7 @@ export default function DashboardPage() {
               key={stat.title}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
+              transition={{ delay: i * 0.1, duration: 0.3, ease: "easeOut" }}
             >
               <Card className="border-none bg-secondary/30 shadow-none rounded-[24px] hover:bg-secondary/40 transition-colors">
                 <CardContent className="p-8">
@@ -140,7 +141,7 @@ export default function DashboardPage() {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
+          transition={{ delay: 0.3, duration: 0.3, ease: "easeOut" }}
         >
           <Card className="border-none bg-blue-100 shadow-blue-glow rounded-[24px] relative overflow-hidden group border-t-2 border-blue-600">
             <CardContent className="p-8">

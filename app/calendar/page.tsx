@@ -135,6 +135,7 @@ export default function CalendarPage() {
                                                     <motion.div
                                                         initial={{ opacity: 0, scale: 0.98 }}
                                                         animate={{ opacity: 1, scale: 1 }}
+                                                        transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
                                                         className={cn(
                                                             "group/item relative p-3 rounded-xl border border-transparent shadow-sm cursor-pointer transition-all duration-300",
                                                             post.status === "PUBLISHED"
