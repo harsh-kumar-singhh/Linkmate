@@ -278,19 +278,21 @@ function EditorContent() {
                                     <div className="w-14 h-14 rounded-2xl bg-secondary flex items-center justify-center text-muted-foreground">
                                         <ImageIcon className="w-6 h-6" />
                                     </div>
-                                    <div className="space-y-1">
-                                        <div className="h-4 w-32 bg-secondary rounded-full" />
-                                        <div className="h-3 w-20 bg-secondary/50 rounded-full" />
+                                    <div className="space-y-0.5">
+                                        <div className="text-sm font-semibold text-site-fg">Your Name</div>
+                                        <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                            Posting now <span className="text-[10px]">•</span> 🌐
+                                        </div>
                                     </div>
                                 </div>
 
                                 <div className="min-h-[200px] mb-12">
                                     <p className="text-lg font-light leading-relaxed text-site-fg whitespace-pre-wrap">
-                                        {content || <span className="opacity-20 italic">The distribution of ideas begins with a single line...</span>}
+                                        {content || <span className="text-muted-foreground italic">The distribution of ideas begins with a single line...</span>}
                                     </p>
                                 </div>
 
-                                <div className="flex items-center justify-between border-t border-border pt-6 opacity-30">
+                                <div className="flex items-center justify-between border-t border-border pt-6 text-muted-foreground/60">
                                     {['Like', 'Comment', 'Share'].map((action) => (
                                         <div key={action} className="text-[13px] font-bold uppercase tracking-widest">{action}</div>
                                     ))}
