@@ -1,0 +1,125 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Linkmate: Professional, calm, LinkedIn-inspired */
+    --background: 210 30% 99%;
+    --foreground: 215 25% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 15%;
+    --primary: 210 90% 40%;
+    /* LinkedIn Blue */
+    --primary-foreground: 210 30% 99%;
+    --secondary: 210 25% 96%;
+    --secondary-foreground: 215 25% 15%;
+    --muted: 210 20% 94%;
+    --muted-foreground: 215 15% 45%;
+    --accent: 210 90% 40%;
+    --accent-foreground: 210 30% 99%;
+    --destructive: 0 75% 50%;
+    --destructive-foreground: 210 30% 99%;
+    --border: 210 20% 90%;
+    --input: 210 20% 90%;
+    --ring: 210 90% 40%;
+    --radius: 0.75rem;
+
+    /* LinkedIn Blue Ramp */
+    --blue-100: 210 70% 96%;
+    --blue-300: 210 60% 70%;
+    --blue-600: 210 90% 40%;
+  }
+
+  .dark {
+    /* Linkmate Dark: Refined, deep midnight */
+    --background: 220 30% 4%;
+    --foreground: 210 20% 98%;
+    --card: 220 30% 6%;
+    --card-foreground: 210 20% 98%;
+    --popover: 220 30% 4%;
+    --popover-foreground: 210 20% 98%;
+    --primary: 210 90% 45%;
+    --primary-foreground: 210 20% 98%;
+    --secondary: 220 20% 12%;
+    --secondary-foreground: 210 20% 98%;
+    --muted: 220 20% 10%;
+    --muted-foreground: 215 15% 65%;
+    --accent: 210 90% 45%;
+    --accent-foreground: 210 20% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 20% 15%;
+    --input: 220 20% 15%;
+    --ring: 210 90% 45%;
+
+    /* LinkedIn Blue Ramp Dark */
+    --blue-100: 210 30% 15%;
+    --blue-300: 210 50% 35%;
+    --blue-600: 210 90% 45%;
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  body::selection {
+    background-color: hsla(var(--blue-600), 0.15);
+    color: hsl(var(--blue-600));
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background-color: hsl(var(--background));
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted));
+    border-radius: 9999px;
+    border: 2px solid;
+    border-color: hsl(var(--background));
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: hsla(var(--muted-foreground), 0.3);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .glass {
+    background-color: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .shadow-premium {
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 10px 30px -10px rgba(0, 0, 0, 0.1);
+  }
+
+  .shadow-blue-glow {
+    box-shadow: 0 0 40px -10px hsla(var(--blue-600), 0.15);
+  }
+
+  .dark .shadow-premium {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 10px 30px -10px rgba(0, 0, 0, 0.3);
+  }
+
+  .blue-gradient-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, hsla(var(--blue-300), 0.3), transparent);
+  }
+}

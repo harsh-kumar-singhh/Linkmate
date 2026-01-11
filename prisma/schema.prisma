@@ -1,0 +1,98 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// User model
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  emailVerified DateTime?
+  image         String?
+  writingStyle  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  accounts      Account[]
+  sessions      Session[]
+  posts         Post[]
+  schedule      Schedule?
+}
+
+// OAuth Account (LinkedIn connection)
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String  // "linkedin"
+  providerAccountId String  // LinkedIn user ID
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+// NextAuth session
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+}
+
+// Post content and metadata
+model Post {
+  id             String     @id @default(cuid())
+  userId         String
+  content        String
+  status         String     @default("DRAFT")
+  scheduledFor   DateTime?
+  publishedAt    DateTime?
+  linkedinPostId String?    // LinkedIn's post ID after publishing
+  failureReason  String?
+  retryCount     Int        @default(0)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, status])
+  @@index([scheduledFor])
+}
+
+
+
+// User scheduling preferences
+model Schedule {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  preferredTime String    // "09:00" in user's timezone
+  timezone      String    // "America/New_York"
+  frequency     String    @default("DAILY")
+  weekdaysOnly  Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+
