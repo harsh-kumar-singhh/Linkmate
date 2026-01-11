@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, LazyMotion, domAnimation, m } from "framer-motion";
 import { X, Sparkles, Loader2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,15 +33,15 @@ export function AIModal({ isOpen, onClose, onGenerate }: AIModalProps) {
     return (
         <AnimatePresence>
             {isOpen && (
-                <>
-                    <motion.div
+                <LazyMotion features={domAnimation}>
+                    <m.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
                         className="fixed inset-0 bg-site-fg/20 backdrop-blur-md z-50 flex items-center justify-center p-4"
                     >
-                        <motion.div
+                        <m.div
                             initial={{ scale: 0.98, opacity: 0, y: 10 }}
                             animate={{ scale: 1, opacity: 1, y: 0 }}
                             exit={{ scale: 0.98, opacity: 0, y: 10 }}
@@ -115,9 +115,9 @@ export function AIModal({ isOpen, onClose, onGenerate }: AIModalProps) {
                                     </div>
                                 </form>
                             </div>
-                        </motion.div>
-                    </motion.div>
-                </>
+                        </m.div>
+                    </m.div>
+                </LazyMotion>
             )}
         </AnimatePresence>
     );
