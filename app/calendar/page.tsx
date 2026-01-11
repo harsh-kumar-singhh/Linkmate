@@ -133,30 +133,32 @@ export default function CalendarPage() {
                                             <div className="space-y-2">
                                                 {datePosts.map((post) => (
                                                     <Link key={post.id} href={`/posts/new?id=${post.id}`}>
-                                                        <m.div
-                                                            initial={{ opacity: 0, scale: 0.98 }}
-                                                            animate={{ opacity: 1, scale: 1 }}
-                                                            transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
-                                                            className={cn(
-                                                                "group/item relative p-3 rounded-xl border border-transparent shadow-sm cursor-pointer transition-all duration-300",
-                                                                post.status === "PUBLISHED"
-                                                                    ? "bg-emerald-50 text-emerald-700 hover:border-emerald-200"
-                                                                    : post.status === "SCHEDULED"
-                                                                        ? "bg-blue-100 text-blue-600 hover:bg-blue-100/80 hover:border-blue-600/20"
-                                                                        : "bg-secondary/50 text-muted-foreground hover:bg-secondary hover:border-border"
-                                                            )}
-                                                        >
-                                                            <div className="text-[12px] font-bold truncate leading-tight mb-1">
-                                                                {post.content}
-                                                            </div>
-                                                            <div className="flex items-center gap-2 opacity-50">
-                                                                <div className={cn("w-1.5 h-1.5 rounded-full",
-                                                                    post.status === "PUBLISHED" ? "bg-emerald-400" :
-                                                                        post.status === "SCHEDULED" ? "bg-blue-600" : "bg-muted-foreground"
-                                                                )} />
-                                                                <span className="text-[10px] font-bold uppercase tracking-widest">{post.status}</span>
-                                                            </div>
-                                                        </m.div>
+                                                        <div className="w-full">
+                                                            <m.div
+                                                                initial={{ opacity: 0, scale: 0.98 }}
+                                                                animate={{ opacity: 1, scale: 1 }}
+                                                                transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
+                                                                className={cn(
+                                                                    "group/item relative p-3 rounded-xl border border-transparent shadow-sm cursor-pointer transition-all duration-300",
+                                                                    post.status === "PUBLISHED"
+                                                                        ? "bg-emerald-50 text-emerald-700 hover:border-emerald-200"
+                                                                        : post.status === "SCHEDULED"
+                                                                            ? "bg-blue-100 text-blue-600 hover:bg-blue-100/80 hover:border-blue-600/20"
+                                                                            : "bg-secondary/50 text-muted-foreground hover:bg-secondary hover:border-border"
+                                                                )}
+                                                            >
+                                                                <div className="text-[12px] font-bold truncate leading-tight mb-1">
+                                                                    {post.content}
+                                                                </div>
+                                                                <div className="flex items-center gap-2 opacity-50">
+                                                                    <div className={cn("w-1.5 h-1.5 rounded-full",
+                                                                        post.status === "PUBLISHED" ? "bg-emerald-400" :
+                                                                            post.status === "SCHEDULED" ? "bg-blue-600" : "bg-muted-foreground"
+                                                                    )} />
+                                                                    <span className="text-[10px] font-bold uppercase tracking-widest">{post.status}</span>
+                                                                </div>
+                                                            </m.div>
+                                                        </div>
                                                     </Link>
                                                 ))}
                                             </div>
