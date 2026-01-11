@@ -1,20 +1,26 @@
-"use client";
+"use client"
 
-import { motion, type HTMLMotionProps } from "framer-motion";
+import { motion, type HTMLMotionProps } from "framer-motion"
+import { cn } from "@/lib/utils"
 
-interface AnimatedCardProps extends HTMLMotionProps<"div"> {
-    children: React.ReactNode;
+export type AnimatedCardProps = HTMLMotionProps<"div"> & {
+  className?: string
 }
 
-export function AnimatedCard({ children, ...props }: AnimatedCardProps) {
-    return (
-        <motion.div
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
-            {...props}
-        >
-            {children}
-        </motion.div>
-    );
+export function AnimatedCard({
+  children,
+  className,
+  ...motionProps
+}: AnimatedCardProps) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.3 }}
+      className={cn(className)}
+      {...motionProps}
+    >
+      {children}
+    </motion.div>
+  )
 }
