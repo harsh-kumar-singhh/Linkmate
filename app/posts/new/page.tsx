@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, Suspense } from "react"
-import { LazyMotion, domAnimation, m } from "framer-motion"
+import { AnimatedCard } from "@/components/animated/AnimatedCard"
 import TextareaAutosize from "react-textarea-autosize"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -137,172 +137,172 @@ function EditorContent() {
     }
 
     return (
-        <LazyMotion features={domAnimation}>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 h-full py-12">
-                <AIModal
-                    isOpen={showAIDialog}
-                    onClose={() => setShowAIDialog(false)}
-                    onGenerate={handleGenerate}
-                />
 
-                {/* Editor Column */}
-                <div className="space-y-12">
-                    <div className="flex items-end justify-between">
-                        <div className="space-y-1">
-                            <h1 className="text-[12px] font-bold tracking-[0.2em] text-muted-foreground uppercase">Composition</h1>
-                            <h2 className="text-4xl font-bold tracking-tight text-site-fg">
-                                {postId ? "Refine publication" : "New publication"}
-                            </h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 h-full py-12">
+            <AIModal
+                isOpen={showAIDialog}
+                onClose={() => setShowAIDialog(false)}
+                onGenerate={handleGenerate}
+            />
+
+            {/* Editor Column */}
+            <div className="space-y-12">
+                <div className="flex items-end justify-between">
+                    <div className="space-y-1">
+                        <h1 className="text-[12px] font-bold tracking-[0.2em] text-muted-foreground uppercase">Composition</h1>
+                        <h2 className="text-4xl font-bold tracking-tight text-site-fg">
+                            {postId ? "Refine publication" : "New publication"}
+                        </h2>
+                    </div>
+
+                    {postId && (
+                        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive transition-colors" onClick={handleDelete}>
+                            <Trash2 className="w-5 h-5" />
+                        </Button>
+                    )}
+                </div>
+
+                <div className="space-y-8">
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between px-1">
+                            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Post Content</span>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 gap-2 text-blue-600 hover:bg-blue-100 rounded-full px-4"
+                                onClick={() => setShowAIDialog(true)}
+                                disabled={isGenerating}
+                            >
+                                <Sparkles className="w-3.5 h-3.5" />
+                                <span className="text-[12px] font-bold tracking-tight">AI Assistant</span>
+                            </Button>
+                        </div>
+                        <div className="relative group">
+                            <TextareaAutosize
+                                minRows={10}
+                                placeholder="What's worth sharing today?"
+                                className="w-full resize-none text-2xl font-light leading-relaxed text-site-fg placeholder:text-muted-foreground/30 bg-transparent focus:outline-none transition-all pr-12"
+                                value={content}
+                                onChange={(e) => setContent(e.target.value)}
+                                autoFocus
+                            />
+                            <div className="absolute right-0 bottom-0 text-[11px] font-bold text-muted-foreground/40 tabular-nums uppercase tracking-widest">
+                                {content.length} / 3000
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="pt-8 space-y-8">
+                        <div className="flex items-center gap-4">
+                            <Button
+                                variant="outline"
+                                className={cn("h-14 px-6 rounded-2xl gap-3 transition-all", showScheduler && "border-blue-600 text-blue-600 bg-blue-100 shadow-none")}
+                                onClick={() => setShowScheduler(!showScheduler)}
+                            >
+                                <CalendarIcon className="w-5 h-5" />
+                                <span className="font-bold tracking-tight">Schedule</span>
+                            </Button>
+
+                            <Button variant="ghost" size="icon" className="h-14 w-14 rounded-2xl text-muted-foreground hover:bg-secondary/50 transition-colors">
+                                <Smile className="w-5 h-5" />
+                            </Button>
                         </div>
 
-                        {postId && (
-                            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive transition-colors" onClick={handleDelete}>
-                                <Trash2 className="w-5 h-5" />
+                        {showScheduler && (
+                            <AnimatedCard
+                                initial={{ opacity: 0, y: 5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="p-8 bg-secondary/30 rounded-[32px] space-y-4"
+                            >
+                                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Preferred Release</label>
+                                <input
+                                    type="datetime-local"
+                                    className="w-full h-14 bg-background border border-border rounded-xl px-4 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary/20 transition-all"
+                                    value={scheduledFor}
+                                    onChange={(e) => setScheduledFor(e.target.value)}
+                                    min={new Date().toISOString().slice(0, 16)}
+                                />
+                            </AnimatedCard>
+                        )}
+                    </div>
+                </div>
+
+                <div className="pt-12 flex items-center justify-between border-t border-border">
+                    <Button variant="ghost" className="h-12 rounded-xl px-6 text-muted-foreground font-bold text-[13px] uppercase tracking-widest hover:text-site-fg hover:bg-transparent" onClick={() => handleSavePost("DRAFT")}>
+                        Hold as draft
+                    </Button>
+                    <div className="flex items-center gap-4">
+                        {showScheduler ? (
+                            <Button
+                                size="lg"
+                                className="h-16 px-10 rounded-2xl shadow-premium gap-3"
+                                onClick={() => {
+                                    if (scheduledFor) handleSavePost("SCHEDULED")
+                                    else alert("Please pick a date.")
+                                }}
+                            >
+                                <span>Schedule post</span>
+                                <ArrowRight className="w-5 h-5" />
+                            </Button>
+                        ) : (
+                            <Button
+                                size="lg"
+                                className="h-16 px-10 rounded-2xl shadow-premium shadow-blue-600/20 gap-3"
+                                onClick={() => handleSavePost("PUBLISHED")}
+                                disabled={!content.trim()}
+                            >
+                                <span>Publish now</span>
+                                <Send className="w-5 h-5" />
                             </Button>
                         )}
                     </div>
-
-                    <div className="space-y-8">
-                        <div className="space-y-6">
-                            <div className="flex items-center justify-between px-1">
-                                <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Post Content</span>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-8 gap-2 text-blue-600 hover:bg-blue-100 rounded-full px-4"
-                                    onClick={() => setShowAIDialog(true)}
-                                    disabled={isGenerating}
-                                >
-                                    <Sparkles className="w-3.5 h-3.5" />
-                                    <span className="text-[12px] font-bold tracking-tight">AI Assistant</span>
-                                </Button>
-                            </div>
-                            <div className="relative group">
-                                <TextareaAutosize
-                                    minRows={10}
-                                    placeholder="What's worth sharing today?"
-                                    className="w-full resize-none text-2xl font-light leading-relaxed text-site-fg placeholder:text-muted-foreground/30 bg-transparent focus:outline-none transition-all pr-12"
-                                    value={content}
-                                    onChange={(e) => setContent(e.target.value)}
-                                    autoFocus
-                                />
-                                <div className="absolute right-0 bottom-0 text-[11px] font-bold text-muted-foreground/40 tabular-nums uppercase tracking-widest">
-                                    {content.length} / 3000
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="pt-8 space-y-8">
-                            <div className="flex items-center gap-4">
-                                <Button
-                                    variant="outline"
-                                    className={cn("h-14 px-6 rounded-2xl gap-3 transition-all", showScheduler && "border-blue-600 text-blue-600 bg-blue-100 shadow-none")}
-                                    onClick={() => setShowScheduler(!showScheduler)}
-                                >
-                                    <CalendarIcon className="w-5 h-5" />
-                                    <span className="font-bold tracking-tight">Schedule</span>
-                                </Button>
-
-                                <Button variant="ghost" size="icon" className="h-14 w-14 rounded-2xl text-muted-foreground hover:bg-secondary/50 transition-colors">
-                                    <Smile className="w-5 h-5" />
-                                </Button>
-                            </div>
-
-                            {showScheduler && (
-                                <m.div
-                                    initial={{ opacity: 0, y: 5 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="p-8 bg-secondary/30 rounded-[32px] space-y-4"
-                                >
-                                    <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Preferred Release</label>
-                                    <input
-                                        type="datetime-local"
-                                        className="w-full h-14 bg-background border border-border rounded-xl px-4 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary/20 transition-all"
-                                        value={scheduledFor}
-                                        onChange={(e) => setScheduledFor(e.target.value)}
-                                        min={new Date().toISOString().slice(0, 16)}
-                                    />
-                                </m.div>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="pt-12 flex items-center justify-between border-t border-border">
-                        <Button variant="ghost" className="h-12 rounded-xl px-6 text-muted-foreground font-bold text-[13px] uppercase tracking-widest hover:text-site-fg hover:bg-transparent" onClick={() => handleSavePost("DRAFT")}>
-                            Hold as draft
-                        </Button>
-                        <div className="flex items-center gap-4">
-                            {showScheduler ? (
-                                <Button
-                                    size="lg"
-                                    className="h-16 px-10 rounded-2xl shadow-premium gap-3"
-                                    onClick={() => {
-                                        if (scheduledFor) handleSavePost("SCHEDULED")
-                                        else alert("Please pick a date.")
-                                    }}
-                                >
-                                    <span>Schedule post</span>
-                                    <ArrowRight className="w-5 h-5" />
-                                </Button>
-                            ) : (
-                                <Button
-                                    size="lg"
-                                    className="h-16 px-10 rounded-2xl shadow-premium shadow-blue-600/20 gap-3"
-                                    onClick={() => handleSavePost("PUBLISHED")}
-                                    disabled={!content.trim()}
-                                >
-                                    <span>Publish now</span>
-                                    <Send className="w-5 h-5" />
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Preview Column */}
-                <div className="hidden lg:block space-y-12">
-                    <div className="space-y-1">
-                        <h1 className="text-[12px] font-bold tracking-[0.2em] text-blue-600 uppercase">Perspective</h1>
-                        <h2 className="text-4xl font-bold tracking-tight text-site-fg">Preview</h2>
-                    </div>
-
-                    <div className="relative">
-                        <div className="absolute inset-0 bg-primary/5 rounded-[48px] blur-3xl -z-10" />
-                        <m.div
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="bg-card border border-border rounded-[40px] shadow-premium overflow-hidden max-w-lg mx-auto"
-                        >
-                            <div className="p-8">
-                                <div className="flex items-center gap-4 mb-8">
-                                    <div className="w-14 h-14 rounded-2xl bg-secondary flex items-center justify-center text-muted-foreground">
-                                        <ImageIcon className="w-6 h-6" />
-                                    </div>
-                                    <div className="space-y-0.5">
-                                        <div className="text-sm font-semibold text-site-fg">Your Name</div>
-                                        <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                            Posting now <span className="text-[10px]">•</span> 🌐
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="min-h-[200px] mb-12">
-                                    <p className="text-lg font-light leading-relaxed text-site-fg whitespace-pre-wrap">
-                                        {content || <span className="text-muted-foreground italic">The distribution of ideas begins with a single line...</span>}
-                                    </p>
-                                </div>
-
-                                <div className="flex items-center justify-between border-t border-border pt-6 text-muted-foreground/60">
-                                    {['Like', 'Comment', 'Share'].map((action) => (
-                                        <div key={action} className="text-[13px] font-bold uppercase tracking-widest">{action}</div>
-                                    ))}
-                                </div>
-                            </div>
-                        </m.div>
-                    </div>
                 </div>
             </div>
-        </LazyMotion>
+
+            {/* Preview Column */}
+            <div className="hidden lg:block space-y-12">
+                <div className="space-y-1">
+                    <h1 className="text-[12px] font-bold tracking-[0.2em] text-blue-600 uppercase">Perspective</h1>
+                    <h2 className="text-4xl font-bold tracking-tight text-site-fg">Preview</h2>
+                </div>
+
+                <div className="relative">
+                    <div className="absolute inset-0 bg-primary/5 rounded-[48px] blur-3xl -z-10" />
+                    <AnimatedCard
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-card border border-border rounded-[40px] shadow-premium overflow-hidden max-w-lg mx-auto"
+                    >
+                        <div className="p-8">
+                            <div className="flex items-center gap-4 mb-8">
+                                <div className="w-14 h-14 rounded-2xl bg-secondary flex items-center justify-center text-muted-foreground">
+                                    <ImageIcon className="w-6 h-6" />
+                                </div>
+                                <div className="space-y-0.5">
+                                    <div className="text-sm font-semibold text-site-fg">Your Name</div>
+                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                        Posting now <span className="text-[10px]">•</span> 🌐
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="min-h-[200px] mb-12">
+                                <p className="text-lg font-light leading-relaxed text-site-fg whitespace-pre-wrap">
+                                    {content || <span className="text-muted-foreground italic">The distribution of ideas begins with a single line...</span>}
+                                </p>
+                            </div>
+
+                            <div className="flex items-center justify-between border-t border-border pt-6 text-muted-foreground/60">
+                                {['Like', 'Comment', 'Share'].map((action) => (
+                                    <div key={action} className="text-[13px] font-bold uppercase tracking-widest">{action}</div>
+                                ))}
+                            </div>
+                        </div>
+                    </AnimatedCard>
+                </div>
+            </div>
+        </div>
+
     )
 }
 

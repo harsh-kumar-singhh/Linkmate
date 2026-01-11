@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { motion } from "framer-motion"
+import { AnimatedCard } from "@/components/animated/AnimatedCard"
 import { ArrowRight, CheckCircle2, Clock, Sparkles, User2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -28,7 +28,7 @@ export default function Home() {
       {/* Hero Section */}
       <section className="relative pt-32 pb-20 md:pt-48 md:pb-32 px-6">
         <div className="max-w-5xl mx-auto">
-          <motion.div
+          <AnimatedCard
             {...fadeIn}
             className="flex flex-col items-center text-center space-y-8"
           >
@@ -46,7 +46,7 @@ export default function Home() {
               The professional scheduler for people who value focus over noise. Show up on LinkedIn every day, without being on LinkedIn every day.
             </p>
 
-            <motion.div
+            <AnimatedCard
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.4, duration: 0.5 }}
@@ -57,22 +57,22 @@ export default function Home() {
                   Start for free <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
               </Link>
-            </motion.div>
-          </motion.div>
+            </AnimatedCard>
+          </AnimatedCard>
         </div>
       </section>
 
       {/* Value Prop Section */}
       <section className="py-32 px-6 bg-secondary/30">
         <div className="max-w-6xl mx-auto">
-          <motion.div
+          <AnimatedCard
             initial="initial"
             whileInView="animate"
             viewport={{ once: true }}
             variants={stagger}
             className="grid grid-cols-1 md:grid-cols-3 gap-16"
           >
-            <motion.div variants={fadeIn} className="space-y-4">
+            <AnimatedCard variants={fadeIn} className="space-y-4">
               <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-6">
                 <Clock className="w-6 h-6" />
               </div>
@@ -80,9 +80,9 @@ export default function Home() {
               <p className="text-muted-foreground leading-relaxed">
                 LinkedIn shouldn&apos;t be a daily chore. Batch your thoughts once, let us handle the delivery.
               </p>
-            </motion.div>
+            </AnimatedCard>
 
-            <motion.div variants={fadeIn} className="space-y-4">
+            <AnimatedCard variants={fadeIn} className="space-y-4">
               <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-6">
                 <CheckCircle2 className="w-6 h-6" />
               </div>
@@ -90,9 +90,9 @@ export default function Home() {
               <p className="text-muted-foreground leading-relaxed">
                 No complex workflows. Just a clean calendar and a dependable publishing engine that never misses.
               </p>
-            </motion.div>
+            </AnimatedCard>
 
-            <motion.div variants={fadeIn} className="space-y-4">
+            <AnimatedCard variants={fadeIn} className="space-y-4">
               <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-6">
                 <Sparkles className="w-6 h-6" />
               </div>
@@ -100,8 +100,8 @@ export default function Home() {
               <p className="text-muted-foreground leading-relaxed">
                 AI that learns your signature, not one that shouts over it. Refine your thoughts with a partner that understands professional nuance.
               </p>
-            </motion.div>
-          </motion.div>
+            </AnimatedCard>
+          </AnimatedCard>
         </div>
       </section>
 
@@ -119,7 +119,7 @@ export default function Home() {
               { step: "02", title: "Create", desc: "Write your posts or use AI to draft content that sounds like you." },
               { step: "03", title: "Schedule", desc: "Drop posts into your calendar and focus on your actual work." }
             ].map((item, i) => (
-              <motion.div
+              <AnimatedCard
                 key={i}
                 initial="initial"
                 whileInView="animate"
@@ -136,7 +136,7 @@ export default function Home() {
                     {item.desc}
                   </p>
                 </div>
-              </motion.div>
+              </AnimatedCard>
             ))}
           </div>
         </div>
@@ -176,7 +176,7 @@ export default function Home() {
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/5 rounded-full blur-[120px]"></div>
         </div>
 
-        <motion.div
+        <AnimatedCard
           initial={{ opacity: 0, scale: 0.98 }}
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
@@ -196,7 +196,7 @@ export default function Home() {
             </Link>
           </div>
           <p className="text-sm text-muted-foreground">No credit card required. Connect in 2 minutes.</p>
-        </motion.div>
+        </AnimatedCard>
       </section>
 
       <footer className="py-12 px-6 border-t border-border mt-20">
