@@ -1,24 +1,117 @@
 "use client"
 
-import { motion, type HTMLMotionProps } from "framer-motion"
+import { motion, type HTMLMotionProps, type Variants } from "framer-motion"
 import { cn } from "@/lib/utils"
 
-export type AnimatedCardProps = HTMLMotionProps<"div">
+export type AnimationPreset =
+  | "default"
+  | "fade-in-up"
+  | "fade-in-scale"
+  | "stagger-container"
+  | "slide-up"
+  | "slide-up-sm"
+
+interface AnimatedCardProps extends Omit<HTMLMotionProps<"div">, "initial" | "animate" | "transition" | "variants" | "whileInView" | "viewport"> {
+  animation?: AnimationPreset
+  delay?: number
+  index?: number
+  // viewport prop is custom boolean here, masking the original viewport object from Framer
+  viewport?: boolean
+}
+
+const presets: Record<AnimationPreset, {
+  initial?: any
+  animate?: any
+  whileInView?: any
+  viewport?: any
+  variants?: Variants
+  transition?: any
+}> = {
+  "default": {
+    initial: { opacity: 0, scale: 0.98 },
+    animate: { opacity: 1, scale: 1 },
+    transition: { duration: 0.3, ease: [0.23, 1, 0.32, 1] }
+  },
+  "fade-in-up": {
+    initial: { opacity: 0, y: 20 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.6 }
+  },
+  "fade-in-scale": {
+    initial: { opacity: 0, scale: 0.95 },
+    animate: { opacity: 1, scale: 1 },
+    transition: { duration: 0.5 }
+  },
+  "stagger-container": {
+    initial: "initial",
+    animate: "animate",
+    variants: {
+      initial: {},
+      animate: {
+        transition: {
+          staggerChildren: 0.1
+        }
+      }
+    }
+  },
+  "slide-up": {
+    initial: { opacity: 0, y: 10 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.3, ease: "easeOut" }
+  },
+  "slide-up-sm": {
+    initial: { opacity: 0, y: 5 },
+    animate: { opacity: 1, y: 0 }
+  }
+}
 
 export function AnimatedCard({
   children,
   className,
-  initial = { opacity: 0, scale: 0.98 },
-  animate = { opacity: 1, scale: 1 },
-  transition = { duration: 0.3 },
+  animation = "default",
+  delay,
+  index,
+  viewport = false,
+  layoutId,
   ...rest
 }: AnimatedCardProps) {
+  const preset = presets[animation]
+
+  // Calculate final delay: explicit delay prop OR index-based delay, or 0
+  const finalDelay = (delay || 0) + (index ? index * 0.1 : 0)
+
+  // Merge delay into transition if needed
+  const transition = {
+    ...(preset.transition || {}),
+    ...(finalDelay > 0 ? { delay: finalDelay } : {})
+  }
+
+  // Handle viewport vs animate
+  const animationProps = viewport
+    ? {
+      initial: preset.initial,
+      whileInView: preset.animate || preset.whileInView,
+      viewport: preset.viewport || { once: true },
+      variants: preset.variants
+    }
+    : {
+      initial: preset.initial,
+      animate: preset.animate,
+      variants: preset.variants
+    }
+
+  // If staggger-container, we don't want to override the orchestrator transition
+  // usually, but here we just pass the transition if it exists on the preset props.
+  // For stagger container, the transition is inside the 'animate' variant usually.
+
   return (
     <motion.div
-      initial={initial}
-      animate={animate}
-      transition={transition}
+      layoutId={layoutId}
       className={cn(className)}
+      {...animationProps}
+      // Only apply transition override if it's not a stagger container (which has transition in variants)
+      // or if we have a custom delay to inject
+      {...(animation !== "stagger-container" ? { transition } : {})}
       {...rest}
     >
       {children}

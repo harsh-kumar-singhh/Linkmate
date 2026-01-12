@@ -9,19 +9,7 @@ import { Button } from "@/components/ui/button"
 export default function Home() {
   const router = useRouter()
 
-  const fadeIn = {
-    initial: { opacity: 0, y: 20 },
-    animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.6 }
-  }
 
-  const stagger = {
-    animate: {
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
-  }
 
   return (
     <main className="min-h-screen bg-site-bg selection:bg-primary/10 transition-colors duration-500 overflow-x-hidden">
@@ -29,7 +17,7 @@ export default function Home() {
       <section className="relative pt-32 pb-20 md:pt-48 md:pb-32 px-6">
         <div className="max-w-5xl mx-auto">
           <AnimatedCard
-            {...fadeIn}
+            animation="fade-in-up"
             className="flex flex-col items-center text-center space-y-8"
           >
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/5 border border-primary/10 text-primary text-xs font-semibold tracking-wider uppercase mb-4">
@@ -47,9 +35,8 @@ export default function Home() {
             </p>
 
             <AnimatedCard
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.4, duration: 0.5 }}
+              animation="fade-in-scale"
+              delay={0.4}
               className="pt-8"
             >
               <Link href="/signup">
@@ -66,13 +53,11 @@ export default function Home() {
       <section className="py-32 px-6 bg-secondary/30">
         <div className="max-w-6xl mx-auto">
           <AnimatedCard
-            initial="initial"
-            whileInView="animate"
-            viewport={{ once: true }}
-            variants={stagger}
+            animation="stagger-container"
+            viewport
             className="grid grid-cols-1 md:grid-cols-3 gap-16"
           >
-            <AnimatedCard variants={fadeIn} className="space-y-4">
+            <AnimatedCard animation="fade-in-up" className="space-y-4">
               <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-6">
                 <Clock className="w-6 h-6" />
               </div>
@@ -82,7 +67,7 @@ export default function Home() {
               </p>
             </AnimatedCard>
 
-            <AnimatedCard variants={fadeIn} className="space-y-4">
+            <AnimatedCard animation="fade-in-up" className="space-y-4">
               <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-6">
                 <CheckCircle2 className="w-6 h-6" />
               </div>
@@ -92,7 +77,7 @@ export default function Home() {
               </p>
             </AnimatedCard>
 
-            <AnimatedCard variants={fadeIn} className="space-y-4">
+            <AnimatedCard animation="fade-in-up" className="space-y-4">
               <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-6">
                 <Sparkles className="w-6 h-6" />
               </div>
@@ -121,10 +106,8 @@ export default function Home() {
             ].map((item, i) => (
               <AnimatedCard
                 key={i}
-                initial="initial"
-                whileInView="animate"
-                viewport={{ once: true, margin: "-100px" }}
-                variants={fadeIn}
+                animation="fade-in-up"
+                viewport
                 className="flex flex-col md:flex-row gap-8 md:items-center"
               >
                 <div className="text-6xl md:text-8xl font-bold text-primary/10 tabular-nums">
@@ -177,9 +160,8 @@ export default function Home() {
         </div>
 
         <AnimatedCard
-          initial={{ opacity: 0, scale: 0.98 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          viewport={{ once: true }}
+          animation="default"
+          viewport
           className="max-w-xl mx-auto text-center space-y-8 relative z-10"
         >
           <h2 className="text-4xl md:text-5xl font-bold tracking-tight">Ready to build your presence, calmly?</h2>

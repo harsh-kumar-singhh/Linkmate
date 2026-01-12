@@ -210,8 +210,7 @@ function EditorContent() {
 
                         {showScheduler && (
                             <AnimatedCard
-                                initial={{ opacity: 0, y: 5 }}
-                                animate={{ opacity: 1, y: 0 }}
+                                animation="slide-up-sm"
                                 className="p-8 bg-secondary/30 rounded-[32px] space-y-4"
                             >
                                 <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Preferred Release</label>
@@ -269,8 +268,7 @@ function EditorContent() {
                 <div className="relative">
                     <div className="absolute inset-0 bg-primary/5 rounded-[48px] blur-3xl -z-10" />
                     <AnimatedCard
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
+                        animation="fade-in-up"
                         className="bg-card border border-border rounded-[40px] shadow-premium overflow-hidden max-w-lg mx-auto"
                     >
                         <div className="p-8">
