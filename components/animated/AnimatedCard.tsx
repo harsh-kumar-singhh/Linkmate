@@ -15,7 +15,7 @@ export type AnimationPreset =
   | "slide-right"
   | "none"
 
-type AnimatedCardProps = Omit<HTMLMotionProps<"div">, "viewport"> & {
+export type AnimatedCardProps = Omit<HTMLMotionProps<"div">, "viewport"> & {
   animation?: AnimationPreset
   delay?: number
   index?: number
@@ -137,8 +137,9 @@ export function AnimatedCard({
   // For stagger container, the transition is inside the 'animate' variant usually.
 
   return (
+    // Cast motion.div to any to avoid "layoutId does not exist" type error in this version
     <motion.div
-      layoutId={layoutId}
+      {...({ layoutId } as any)}
       className={cn(className)}
       {...animationProps}
       // Only apply transition override if it's not a stagger container (which has transition in variants)
