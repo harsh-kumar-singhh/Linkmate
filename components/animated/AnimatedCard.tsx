@@ -15,12 +15,13 @@ export type AnimationPreset =
   | "slide-right"
   | "none"
 
-interface AnimatedCardProps extends Omit<HTMLMotionProps<"div">, "viewport"> {
+type AnimatedCardProps = Omit<HTMLMotionProps<"div">, "viewport"> & {
   animation?: AnimationPreset
   delay?: number
   index?: number
   // viewport prop is custom boolean here, masking the original viewport object from Framer
   viewport?: boolean
+  layoutId?: string
 }
 
 // Define a local type to avoid "Variants not exported" error and satisfy TS access checks
