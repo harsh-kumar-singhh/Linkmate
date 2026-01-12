@@ -1,6 +1,6 @@
 "use client"
 
-import { motion, type HTMLMotionProps, type Variants } from "framer-motion"
+import { motion, type HTMLMotionProps } from "framer-motion"
 import { cn } from "@/lib/utils"
 
 export type AnimationPreset =
@@ -23,15 +23,18 @@ interface AnimatedCardProps extends Omit<HTMLMotionProps<"div">, "initial" | "an
   viewport?: boolean
 }
 
-const presets: Record<AnimationPreset, {
+// Define a local type to avoid "Variants not exported" error and satisfy TS access checks
+type PresetConfig = {
   initial?: any
   animate?: any
+  exit?: any
   whileInView?: any
   viewport?: any
-  variants?: Variants
+  variants?: any
   transition?: any
-  exit?: any
-}> = {
+}
+
+const presets: Record<AnimationPreset, PresetConfig> = {
   "default": {
     initial: { opacity: 0, scale: 0.98 },
     animate: { opacity: 1, scale: 1 },
