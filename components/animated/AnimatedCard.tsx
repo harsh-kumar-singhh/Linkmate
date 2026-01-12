@@ -15,7 +15,7 @@ export type AnimationPreset =
   | "slide-right"
   | "none"
 
-interface AnimatedCardProps extends Omit<HTMLMotionProps<"div">, "initial" | "animate" | "transition" | "variants" | "whileInView" | "viewport"> {
+interface AnimatedCardProps extends Omit<HTMLMotionProps<"div">, "viewport"> {
   animation?: AnimationPreset
   delay?: number
   index?: number
