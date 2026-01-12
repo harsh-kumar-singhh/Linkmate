@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { motion } from "framer-motion"
+import { AnimatedCard } from "@/components/animated/AnimatedCard"
 import { LayoutDashboard, PenSquare, Calendar, Settings, LogOut } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -17,9 +17,8 @@ export function Sidebar() {
     ]
 
     return (
-        <motion.aside
-            initial={{ x: -10, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
+        <AnimatedCard
+            animation="slide-right"
             className="hidden md:flex flex-col w-64 border-r border-border bg-site-bg h-screen sticky top-0 transition-colors"
         >
             <div className="p-8 flex flex-col h-full">
@@ -44,7 +43,8 @@ export function Sidebar() {
                                 )}
                             >
                                 {isActive && (
-                                    <motion.div
+                                    <AnimatedCard
+                                        animation="none"
                                         layoutId="active-border"
                                         className="absolute left-0 top-0 bottom-0 w-[3px] bg-blue-600"
                                     />
@@ -52,7 +52,8 @@ export function Sidebar() {
                                 <Icon className={cn("w-4.5 h-4.5 transition-colors", isActive ? "text-blue-600" : "text-muted-foreground group-hover:text-site-fg")} />
                                 {link.label}
                                 {isActive && (
-                                    <motion.div
+                                    <AnimatedCard
+                                        animation="none"
                                         layoutId="active-dot"
                                         className="ml-auto w-1 h-1 bg-primary rounded-full"
                                     />
@@ -69,6 +70,6 @@ export function Sidebar() {
                     </button>
                 </div>
             </div>
-        </motion.aside>
+        </AnimatedCard>
     )
 }

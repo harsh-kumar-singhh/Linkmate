@@ -10,6 +10,10 @@ export type AnimationPreset =
   | "stagger-container"
   | "slide-up"
   | "slide-up-sm"
+  | "modal"
+  | "backdrop"
+  | "slide-right"
+  | "none"
 
 interface AnimatedCardProps extends Omit<HTMLMotionProps<"div">, "initial" | "animate" | "transition" | "variants" | "whileInView" | "viewport"> {
   animation?: AnimationPreset
@@ -26,11 +30,34 @@ const presets: Record<AnimationPreset, {
   viewport?: any
   variants?: Variants
   transition?: any
+  exit?: any
 }> = {
   "default": {
     initial: { opacity: 0, scale: 0.98 },
     animate: { opacity: 1, scale: 1 },
     transition: { duration: 0.3, ease: [0.23, 1, 0.32, 1] }
+  },
+  "modal": {
+    initial: { opacity: 0, scale: 0.98, y: 10 },
+    animate: { opacity: 1, scale: 1, y: 0 },
+    exit: { opacity: 0, scale: 0.98, y: 10 },
+    transition: { duration: 0.3, ease: [0.23, 1, 0.32, 1] }
+  },
+  "backdrop": {
+    initial: { opacity: 0 },
+    animate: { opacity: 1 },
+    exit: { opacity: 0 },
+    transition: { duration: 0.2 }
+  },
+  "slide-right": {
+    initial: { x: -10, opacity: 0 },
+    animate: { x: 0, opacity: 1 },
+    transition: { duration: 0.3, ease: [0.23, 1, 0.32, 1] }
+  },
+  "none": {
+    initial: {},
+    animate: {},
+    transition: {}
   },
   "fade-in-up": {
     initial: { opacity: 0, y: 20 },
@@ -97,6 +124,7 @@ export function AnimatedCard({
     : {
       initial: preset.initial,
       animate: preset.animate,
+      exit: preset.exit,
       variants: preset.variants
     }
 

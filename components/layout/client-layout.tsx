@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { Sidebar } from "./sidebar";
 import { useSession } from "next-auth/react";
-import { motion } from "framer-motion";
+import { AnimatedCard } from "@/components/animated/AnimatedCard";
 
 import { DashboardHeader } from "./header";
 
@@ -26,14 +26,12 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
                 <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                     <DashboardHeader />
                     <main className="flex-1 overflow-y-auto p-8">
-                        <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.4, ease: "easeOut" }}
+                        <AnimatedCard
+                            animation="slide-up"
                             key={typeof window !== 'undefined' ? window.location.pathname : 'initial'}
                         >
                             {children}
-                        </motion.div>
+                        </AnimatedCard>
                     </main>
                 </div>
             </div>
