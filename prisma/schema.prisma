@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -34,12 +34,12 @@ model Account {
   type              String
   provider          String  // "linkedin"
   providerAccountId String  // LinkedIn user ID
-  refresh_token     String?
-  access_token      String?
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String?
+  id_token          String? @db.Text
   session_state     String?
   
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -63,7 +63,7 @@ model Session {
 model Post {
   id             String     @id @default(cuid())
   userId         String
-  content        String
+  content        String     @db.Text
   status         String     @default("DRAFT")
   scheduledFor   DateTime?
   publishedAt    DateTime?
@@ -95,4 +95,10 @@ model Schedule {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
 
+  @@unique([identifier, token])
+}

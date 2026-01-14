@@ -3,13 +3,13 @@
 ## Database Configuration
 
 > [!IMPORTANT]
-> `DATABASE_URL` is **MANDATORY** for the application to function in production. Without it, Prisma will fail to initialize, causing login and signup errors.
+> `DATABASE_URL` is **MANDATORY** for the application to function in production. The project has been updated to use **PostgreSQL** (compatible with Neon).
 
 1. Open your Vercel dashboard and navigate to **Project Settings → Environment Variables**.
 2. Add a new variable:
    - **Key**: `DATABASE_URL`
-   - **Value**: `file:./dev.db` (for SQLite) or your hosted database connection string.
-   - **Note**: SQLite files on Vercel are ephemeral and will be reset on every deployment. For persistence, use a hosted database.
+   - **Value**: Your PostgreSQL connection string.
+   - **Neon Note**: If using Neon, ensure the connection string includes `?sslmode=require`. Example: `postgresql://user:pass@host/db?sslmode=require`.
 3. Set the **Environment** to **Production**, **Preview**, and **Development**.
 4. Click **Save** and redeploy.
 
