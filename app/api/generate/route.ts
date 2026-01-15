@@ -3,9 +3,10 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { generatePost } from "@/lib/gemini";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 
 export async function POST(req: Request) {
+    const prisma = getPrisma();
     try {
         const session = await auth();
         if (!session || !session.user?.email) {

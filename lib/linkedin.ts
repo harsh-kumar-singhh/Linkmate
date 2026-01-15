@@ -1,6 +1,7 @@
-import { prisma } from "./prisma";
+import { getPrisma } from "./prisma";
 
 export async function publishToLinkedIn(userId: string, content: string) {
+  const prisma = getPrisma();
   try {
     // 1. Fetch LinkedIn account for the user
     const account = await prisma.account.findFirst({

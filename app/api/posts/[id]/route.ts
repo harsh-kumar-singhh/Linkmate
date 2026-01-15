@@ -2,13 +2,14 @@ export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import { publishToLinkedIn } from "@/lib/linkedin";
 
 export async function GET(
     req: Request,
     { params }: { params: { id: string } }
 ) {
+    const prisma = getPrisma();
     try {
         const session = await auth();
         if (!session || !session.user?.email) {
@@ -34,6 +35,7 @@ export async function PUT(
     req: Request,
     { params }: { params: { id: string } }
 ) {
+    const prisma = getPrisma();
     try {
         const session = await auth();
         if (!session || !session.user?.email) {
@@ -87,6 +89,7 @@ export async function DELETE(
     req: Request,
     { params }: { params: { id: string } }
 ) {
+    const prisma = getPrisma();
     try {
         const session = await auth();
         if (!session || !session.user?.email) {

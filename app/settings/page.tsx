@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import { SettingsForm } from "./settings-form";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ export default async function SettingsPage() {
         );
     }
 
+    const prisma = getPrisma();
     const user = await prisma.user.findUnique({
         where: { email: session.user.email },
         include: {

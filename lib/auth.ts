@@ -1,6 +1,6 @@
 import NextAuth from "next-auth"
 import { PrismaAdapter } from "@auth/prisma-adapter"
-import { prisma } from "./prisma"
+import { getPrisma } from "./prisma"
 import CredentialsProvider from "next-auth/providers/credentials"
 import LinkedInProvider from "next-auth/providers/linkedin"
 import GoogleProvider from "next-auth/providers/google"
@@ -9,7 +9,7 @@ import { authConfig } from "./auth.config"
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
-  adapter: PrismaAdapter(prisma),
+  adapter: PrismaAdapter(getPrisma()),
   session: { strategy: "jwt" },
   providers: [
     CredentialsProvider({
@@ -23,6 +23,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null
         }
 
+        const prisma = getPrisma()
         const user = await prisma.user.findUnique({
           where: { email: credentials.email as string },
           include: {

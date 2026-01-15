@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import { ConnectLinkedInButton } from "./connect-button";
 import { CheckCircle2, XCircle, ArrowRight, LayoutDashboard, Sparkles, Calendar, Zap, ShieldCheck, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ export default async function LinkedInSettingsPage() {
         );
     }
 
+    const prisma = getPrisma();
     const user = await prisma.user.findUnique({
         where: { email: session.user.email },
         include: {

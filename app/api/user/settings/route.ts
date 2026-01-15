@@ -2,9 +2,10 @@ export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 
 export async function PUT(req: Request) {
+    const prisma = getPrisma();
     try {
         const session = await auth();
         if (!session || !session.user?.email) {

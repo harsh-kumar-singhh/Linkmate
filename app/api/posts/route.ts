@@ -3,10 +3,11 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import { publishToLinkedIn } from "@/lib/linkedin";
 
 export async function GET() {
+  const prisma = getPrisma();
   try {
     const session = await auth();
     if (!session || !session.user?.email) {
@@ -34,6 +35,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const prisma = getPrisma();
   try {
     const session = await auth();
     if (!session || !session.user?.email) {
