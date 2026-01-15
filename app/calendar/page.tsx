@@ -1,5 +1,7 @@
 "use client"
 
+export const dynamic = "force-dynamic";
+
 import { useEffect, useState } from "react"
 import { AnimatedCard } from "@/components/animated/AnimatedCard"
 import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon } from "lucide-react"

@@ -1,5 +1,7 @@
 "use client"
 
+export const dynamic = "force-dynamic";
+
 import { useEffect, useState, Suspense } from "react"
 import { AnimatedCard } from "@/components/animated/AnimatedCard"
 import TextareaAutosize from "react-textarea-autosize"

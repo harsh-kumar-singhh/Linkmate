@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { auth } from "@/lib/auth";
 import { getPrisma } from "@/lib/prisma";
 import { ConnectLinkedInButton } from "./connect-button";
