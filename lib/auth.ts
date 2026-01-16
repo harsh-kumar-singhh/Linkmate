@@ -8,8 +8,14 @@ import bcrypt from "bcryptjs"
 import { authConfig } from "./auth.config"
 
 export const { handlers, auth, signIn, signOut } = NextAuth((req) => {
+  // Temporary diagnostic log: Verify secret exists in production
+  if (process.env.NODE_ENV === "production") {
+    console.log("AUTH SECRET EXISTS:", !!process.env.NEXTAUTH_SECRET);
+  }
+
   return {
     ...authConfig,
+    secret: process.env.NEXTAUTH_SECRET,
     adapter: PrismaAdapter(getPrisma()),
     session: { strategy: "jwt" },
     providers: [
