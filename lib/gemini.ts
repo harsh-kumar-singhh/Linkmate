@@ -6,7 +6,7 @@ export function getGeminiModel() {
         throw new Error("Gemini API key not configured. Please add GEMINI_API_KEY to your environment variables.");
     }
     const genAI = new GoogleGenerativeAI(apiKey);
-    return genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    return genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 }
 
 export interface GeneratePostOptions {
@@ -16,18 +16,23 @@ export interface GeneratePostOptions {
 }
 
 export async function generatePost({ topic, style, userWritingSample }: GeneratePostOptions) {
-    let prompt = `Write a LinkedIn post about "${topic}".`;
+    try {
+        let prompt = `Write a LinkedIn post about "${topic}".`;
 
-    if (style === "Write Like Me" && userWritingSample) {
-        prompt += `\n\nMimic the following writing style:\n"${userWritingSample}"\n`;
-    } else if (style) {
-        prompt += `\n\nStyle: ${style}`;
+        if (style === "Write Like Me" && userWritingSample) {
+            prompt += `\n\nMimic the following writing style:\n"${userWritingSample}"\n`;
+        } else if (style) {
+            prompt += `\n\nStyle: ${style}`;
+        }
+
+        prompt += `\n\nEnsure it has a good hook, engaging body, and a clear call to action. Use appropriate emojis but don't overdo it. Keep it under 3000 characters.`;
+
+        const model = getGeminiModel();
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        return response.text();
+    } catch (error) {
+        console.error("Gemini generation error:", error);
+        throw new Error("Failed to generate post. Please check your Gemini API key and model availability.");
     }
-
-    prompt += `\n\nEnsure it has a good hook, engaging body, and a clear call to action. Use appropriate emojis but don't overdo it. Keep it under 3000 characters.`;
-
-    const model = getGeminiModel();
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return response.text();
 }

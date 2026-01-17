@@ -77,6 +77,18 @@
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     /* Prevent horizontal overflow on mobile from animations */
     overflow-x: hidden;
+    width: 100%;
+    position: relative;
+  }
+
+  /* Prevent zoom on focus for mobile inputs */
+  @media screen and (max-width: 767px) {
+    input, 
+    select, 
+    textarea, 
+    button {
+      font-size: 16px !important;
+    }
   }
 
   body::selection {

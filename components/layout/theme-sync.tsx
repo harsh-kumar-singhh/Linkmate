@@ -5,7 +5,7 @@ import { useTheme } from "next-themes";
 import { useSession } from "next-auth/react";
 
 export function ThemeSync() {
-    const { setTheme } = useTheme();
+    const { setTheme, theme } = useTheme();
     const { data: session, status } = useSession();
 
     useEffect(() => {
@@ -15,7 +15,8 @@ export function ThemeSync() {
                     const res = await fetch("/api/user/me");
                     if (res.ok) {
                         const data = await res.json();
-                        if (data.user?.theme) {
+                        // Only update if theme exists and is different to prevent cycles
+                        if (data.user?.theme && data.user.theme !== theme) {
                             setTheme(data.user.theme);
                         }
                     }
@@ -25,7 +26,7 @@ export function ThemeSync() {
             };
             fetchTheme();
         }
-    }, [status, session, setTheme]);
+    }, [status, session, setTheme, theme]);
 
     return null;
 }

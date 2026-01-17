@@ -63,6 +63,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth((req) => {
       LinkedInProvider({
         clientId: process.env.LINKEDIN_CLIENT_ID,
         clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
+        issuer: "https://www.linkedin.com/oauth",
         authorization: {
           params: {
             scope: "openid profile email w_member_social",
@@ -74,6 +75,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth((req) => {
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       }),
     ],
+    debug: process.env.NODE_ENV === "development",
   }
 })
 

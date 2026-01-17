@@ -9,7 +9,7 @@ async function debug() {
     }
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-    const models = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro", "gemini-1.0-pro", "gemini-pro"];
+    const models = ["gemini-2.5-flash-lite"];
 
     for (const modelName of models) {
         console.log(`Testing ${modelName}...`);
@@ -20,7 +20,7 @@ async function debug() {
             return;
         } catch (e) {
             console.log(`FAILED: ${modelName}`);
-            // console.log(e); // Reduce noise
+            console.log(e); // Reduce noise
         }
     }
     console.log("All models failed.");

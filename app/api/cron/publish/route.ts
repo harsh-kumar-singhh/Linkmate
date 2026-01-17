@@ -6,13 +6,16 @@ import { getPrisma } from "@/lib/prisma";
 import { publishToLinkedIn } from "@/lib/linkedin";
 
 export async function GET(req: Request) {
-    // Basic protection (optional but recommended for production)
+    // Strictly enforce CRON_SECRET for security
     const authHeader = req.headers.get('authorization');
-    if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-        // Log it but don't strictly block if user hasn't set it yet, 
-        // OR strictly block if that's the intention. 
-        // For now, let's keep it safe.
-        // return new Response('Unauthorized', { status: 401 });
+    if (!process.env.CRON_SECRET) {
+        console.error("CRON_SECRET is not set in environment variables.");
+        return new Response('Internal Server Error: Security Configuration Missing', { status: 500 });
+    }
+
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+        console.warn("Unauthorized cron attempt blocked.");
+        return new Response('Unauthorized', { status: 401 });
     }
 
     const prisma = getPrisma();
@@ -38,6 +41,19 @@ export async function GET(req: Request) {
 
         for (const post of duePosts) {
             try {
+                // Idempotency check: Re-verify status hasn't changed since query
+                // and update to a transient 'PUBLISHING' state if we had one, 
+                // but since we don't have PUBLISHING in enum, we'll just be careful.
+                const currentPost = await prisma.post.findUnique({
+                    where: { id: post.id },
+                    select: { status: true }
+                });
+
+                if (currentPost?.status !== "SCHEDULED") {
+                    console.info(`Post ${post.id} already processed or cancelled. Skipping.`);
+                    continue;
+                }
+
                 const publishResult = await publishToLinkedIn(post.userId, post.content);
 
                 // Update post status to PUBLISHED
@@ -68,7 +84,7 @@ export async function GET(req: Request) {
         }
 
         return NextResponse.json({
-            processed: duePosts.length,
+            processed: results.length,
             results
         });
     } catch (error) {

@@ -29,17 +29,21 @@ export function MobileNav() {
                 {isOpen && (
                     <>
                         <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
+                            {...({
+                                initial: { opacity: 0 },
+                                animate: { opacity: 1 },
+                                exit: { opacity: 0 }
+                            } as any)}
                             onClick={() => setIsOpen(false)}
                             className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50"
                         />
                         <motion.div
-                            initial={{ x: "100%" }}
-                            animate={{ x: 0 }}
-                            exit={{ x: "100%" }}
-                            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                            {...({
+                                initial: { x: "100%" },
+                                animate: { x: 0 },
+                                exit: { x: "100%" },
+                                transition: { type: "spring", damping: 25, stiffness: 200 }
+                            } as any)}
                             className="fixed right-0 top-0 bottom-0 w-[280px] bg-card border-l border-border z-50 p-6 flex flex-col shadow-2xl"
                         >
                             <div className="flex items-center justify-between mb-8">
