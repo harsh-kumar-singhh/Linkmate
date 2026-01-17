@@ -9,7 +9,7 @@ async function debug() {
     }
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-    const models = ["gemini-2.5-flash-lite"];
+    const models = ["gemini-1.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-1.5-flash-latest"];
 
     for (const modelName of models) {
         console.log(`Testing ${modelName}...`);

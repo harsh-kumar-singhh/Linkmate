@@ -31,6 +31,10 @@ export async function GET() {
             return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
+        if (process.env.NODE_ENV === "development") {
+            console.log(`[USER_ME] Fetching state for ${session.user.email}. Connected accounts: ${user.accounts.length}`);
+        }
+
         return NextResponse.json({
             user: {
                 id: user.id,
@@ -38,7 +42,12 @@ export async function GET() {
                 name: user.name,
                 writingStyle: user.writingStyle,
                 theme: user.theme,
+                // Strictly database-backed connection status
                 isConnected: user.accounts.length > 0,
+            }
+        }, {
+            headers: {
+                'Cache-Control': 'no-store, max-age=0',
             }
         });
     } catch (error) {

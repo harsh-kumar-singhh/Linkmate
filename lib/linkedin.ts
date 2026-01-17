@@ -26,7 +26,7 @@ export async function publishToLinkedIn(userId: string, content: string) {
         "Authorization": `Bearer ${account.access_token}`,
         "Content-Type": "application/json",
         "X-Restli-Protocol-Version": "2.0.0",
-        "LinkedIn-Version": "202501", // Use a stable 2025 version
+        "LinkedIn-Version": "202401", // Use a confirmed stable 2024 version to avoid "not active" errors
       },
       body: JSON.stringify({
         author: `urn:li:person:${account.providerAccountId}`,

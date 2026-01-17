@@ -8,16 +8,30 @@ import bcrypt from "bcryptjs"
 import { authConfig } from "./auth.config"
 
 export const { handlers, auth, signIn, signOut } = NextAuth((req) => {
-  // Temporary diagnostic log: Verify secret exists in production
+  const secret = process.env.NEXTAUTH_SECRET;
+  const nextAuthUrl = process.env.NEXTAUTH_URL;
+
+  // Stability Check: Log configuration presence in production
   if (process.env.NODE_ENV === "production") {
-    console.log("AUTH SECRET EXISTS:", !!process.env.NEXTAUTH_SECRET);
+    console.log("[AUTH_INIT] Checks:", {
+      hasSecret: !!secret,
+      hasUrl: !!nextAuthUrl,
+      url: nextAuthUrl ? (nextAuthUrl.startsWith('http') ? 'valid' : 'invalid_format') : 'missing'
+    });
+  }
+
+  if (!secret) {
+    console.warn("WARNING: NEXTAUTH_SECRET is missing. This will cause persistent authentication failures.");
   }
 
   return {
     ...authConfig,
-    secret: process.env.NEXTAUTH_SECRET,
+    secret: secret,
     adapter: PrismaAdapter(getPrisma()),
-    session: { strategy: "jwt" },
+    session: {
+      strategy: "jwt",
+      maxAge: 30 * 24 * 60 * 60, // 30 days
+    },
     providers: [
       CredentialsProvider({
         name: "Email",
