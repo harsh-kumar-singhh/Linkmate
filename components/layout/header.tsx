@@ -4,17 +4,23 @@ import { useSession } from "next-auth/react"
 import { Bell, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ModeToggle } from "@/components/mode-toggle"
+import { MobileNav } from "./mobile-nav"
 
 export function DashboardHeader() {
     const { data: session } = useSession()
 
     return (
-        <header className="h-20 border-b border-border bg-site-bg px-8 flex items-center justify-between sticky top-0 z-10 transition-colors">
+        <header className="h-20 border-b border-border bg-site-bg px-4 md:px-8 flex items-center justify-between sticky top-0 z-40 transition-colors">
             <div className="flex-1 flex items-center">
+                <div className="md:hidden mr-4">
+                    <MobileNav />
+                </div>
                 <div className="flex items-center gap-3 text-muted-foreground mr-8">
-                    <span className="text-[12px] font-medium tracking-tight uppercase opacity-50">Workspace</span>
+                    <span className="text-[10px] md:text-[12px] font-medium tracking-tight uppercase opacity-50">Workspace</span>
                     <span className="w-1 h-1 rounded-full bg-border" />
-                    <span className="text-[12px] font-medium tracking-tight text-site-fg">{session?.user?.name || "Member"}</span>
+                    <span className="text-[10px] md:text-[12px] font-medium tracking-tight text-site-fg truncate max-w-[100px] md:max-w-none">
+                        {session?.user?.name || "Member"}
+                    </span>
                 </div>
             </div>
 

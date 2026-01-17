@@ -18,6 +18,7 @@ model User {
   emailVerified DateTime?
   image         String?
   writingStyle  String?
+  theme         String?   @default("system")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   
@@ -59,12 +60,19 @@ model Session {
   @@index([userId])
 }
 
+enum PostStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  FAILED
+}
+
 // Post content and metadata
 model Post {
   id             String     @id @default(cuid())
   userId         String
   content        String     @db.Text
-  status         String     @default("DRAFT")
+  status         PostStatus @default(DRAFT)
   scheduledFor   DateTime?
   publishedAt    DateTime?
   linkedinPostId String?    // LinkedIn's post ID after publishing

@@ -16,10 +16,6 @@ export async function POST(req: Request) {
 
         const { topic, style } = await req.json();
 
-        if (!process.env.GEMINI_API_KEY) {
-            return NextResponse.json({ error: "Gemini API Key not configured" }, { status: 500 });
-        }
-
         let userWritingSample = undefined;
 
         // If style is "Write Like Me", fetch user's stored style
@@ -37,6 +33,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ content });
     } catch (error) {
         console.error("AI Generation Error:", error);
-        return NextResponse.json({ error: "Failed to generate post" }, { status: 500 });
+        const errorMessage = error instanceof Error ? error.message : "Failed to generate post";
+        return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
 }

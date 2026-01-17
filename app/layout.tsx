@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+import { ThemeSync } from "@/components/layout/theme-sync";
 import { ClientLayout } from "@/components/layout/client-layout";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +22,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={cn(inter.className, "bg-site-bg text-site-fg")}>
         <Providers>
+          <ThemeSync />
           <ClientLayout>{children}</ClientLayout>
         </Providers>
       </body>

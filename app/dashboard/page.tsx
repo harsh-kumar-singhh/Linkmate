@@ -9,7 +9,8 @@ import { useEffect, useState } from "react"
 import { AnimatedCard } from "@/components/animated/AnimatedCard"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Plus, Calendar as CalendarIcon, FileText, Send, Clock, CheckCircle, PenSquare, ArrowRight, Sparkles } from "lucide-react"
+import { Plus, Calendar as CalendarIcon, FileText, Send, Clock, CheckCircle, PenSquare, ArrowRight, Sparkles, X } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 export default function DashboardPage() {
   const { data: session, status } = useSession()
@@ -93,17 +94,17 @@ export default function DashboardPage() {
       {!isConnected && (
         <AnimatedCard
           animation="default"
-          className="bg-secondary/50 p-10 rounded-[40px] border border-primary/10 flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden group"
+          className="bg-secondary/50 dark:bg-secondary/20 p-6 md:p-10 rounded-[32px] md:rounded-[40px] border border-primary/10 flex flex-col md:flex-row items-center justify-between gap-6 md:gap-8 relative overflow-hidden group"
         >
           <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -mr-32 -mt-32 blur-3xl transition-transform group-hover:scale-110" />
           <div className="space-y-4 text-center md:text-left relative z-10">
-            <h3 className="text-3xl font-bold tracking-tight text-site-fg">Link your Identity</h3>
-            <p className="text-muted-foreground text-lg font-light leading-relaxed max-w-lg">
+            <h3 className="text-2xl md:text-3xl font-bold tracking-tight text-site-fg">Link your Identity</h3>
+            <p className="text-muted-foreground text-base md:text-lg font-light leading-relaxed max-w-lg">
               Authorized access is required to broadcast your thoughts to the professional world.
             </p>
           </div>
-          <Link href="/settings" className="relative z-10 shrink-0">
-            <Button size="lg" className="h-16 px-10 rounded-2xl shadow-premium hover:shadow-xl transition-all">
+          <Link href="/settings" className="relative z-10 shrink-0 w-full md:w-auto">
+            <Button size="lg" className="h-14 md:h-16 px-10 rounded-2xl shadow-premium hover:shadow-xl transition-all w-full md:w-auto">
               Connect Profile
             </Button>
           </Link>
@@ -111,7 +112,7 @@ export default function DashboardPage() {
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
         {stats.map((stat, i) => {
           const Icon = stat.icon
           return (
@@ -120,14 +121,14 @@ export default function DashboardPage() {
               animation="slide-up"
               index={i}
             >
-              <Card className="border-none bg-secondary/30 shadow-none rounded-[24px] hover:bg-secondary/40 transition-colors">
-                <CardContent className="p-8">
+              <Card className="border-none bg-secondary/30 dark:bg-secondary/10 shadow-none rounded-[24px] hover:bg-secondary/40 transition-colors">
+                <CardContent className="p-6 md:p-8">
                   <div className="flex items-center justify-between">
                     <div className="space-y-1">
                       <p className="text-[10px] font-bold tracking-[0.2em] text-muted-foreground uppercase">{stat.title}</p>
-                      <h3 className="text-3xl font-bold text-blue-600">{stat.value}</h3>
+                      <h3 className="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400">{stat.value}</h3>
                     </div>
-                    <div className="w-12 h-12 rounded-xl bg-site-bg flex items-center justify-center text-blue-300 shadow-sm group-hover:text-blue-600 transition-colors">
+                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-site-bg flex items-center justify-center text-blue-300 dark:text-blue-700 shadow-sm group-hover:text-blue-600 transition-colors">
                       <Icon className="w-5 h-5" />
                     </div>
                   </div>
@@ -142,16 +143,16 @@ export default function DashboardPage() {
           animation="slide-up"
           delay={0.3}
         >
-          <Card className="border-none bg-blue-100 shadow-blue-glow rounded-[24px] relative overflow-hidden group border-t-2 border-blue-600">
-            <CardContent className="p-8">
+          <Card className="border-none bg-blue-100 dark:bg-blue-900/20 shadow-blue-glow rounded-[24px] relative overflow-hidden group border-t-2 border-blue-600 dark:border-blue-500">
+            <CardContent className="p-6 md:p-8">
               <div className="space-y-1 relative z-10">
-                <p className="text-[10px] font-bold tracking-[0.2em] text-blue-600 uppercase">Network Resonance</p>
-                <h3 className="text-3xl font-bold text-site-fg">Steady</h3>
+                <p className="text-[10px] font-bold tracking-[0.2em] text-blue-600 dark:text-blue-400 uppercase">Network Resonance</p>
+                <h3 className="text-2xl md:text-3xl font-bold text-site-fg">Steady</h3>
                 <p className="text-[11px] text-muted-foreground leading-relaxed mt-2 max-w-[120px]">
                   Your consistency is building a compound effect.
                 </p>
               </div>
-              <Sparkles className="absolute -bottom-2 -right-2 w-16 h-16 text-blue-600/10 group-hover:scale-110 transition-transform" />
+              <Sparkles className="absolute -bottom-2 -right-2 w-12 h-12 md:w-16 md:h-16 text-blue-600/10 group-hover:scale-110 transition-transform" />
             </CardContent>
           </Card>
         </AnimatedCard>
@@ -180,22 +181,40 @@ export default function DashboardPage() {
               </div>
             ) : (
               posts.slice(0, 5).map((post: any, i) => (
-                <div key={post.id} className="group flex items-center justify-between p-6 bg-card border border-border rounded-[24px] hover:shadow-premium transition-all duration-300">
-                  <div className="flex items-center gap-6 min-w-0">
-                    <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center flex-shrink-0 text-primary transition-colors">
+                <div key={post.id} className="group flex items-center justify-between p-4 md:p-6 bg-card border border-border rounded-[24px] hover:shadow-premium transition-all duration-300">
+                  <div className="flex items-center gap-4 md:gap-6 min-w-0 flex-1">
+                    <div className={cn(
+                      "w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center flex-shrink-0 transition-colors",
+                      post.status === 'PUBLISHED' ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400" :
+                        post.status === 'SCHEDULED' ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" :
+                          post.status === 'FAILED' ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400" :
+                            "bg-secondary text-primary"
+                    )}>
                       {post.status === 'PUBLISHED' ? <CheckCircle className="w-5 h-5" /> :
-                        post.status === 'SCHEDULED' ? <Clock className="w-5 h-5" /> :
-                          <PenSquare className="w-5 h-5" />}
+                        post.status === 'SCHEDULED' ? <CalendarIcon className="w-5 h-5" /> :
+                          post.status === 'FAILED' ? <X className="w-5 h-5" /> :
+                            <PenSquare className="w-5 h-5" />}
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-lg font-medium text-foreground truncate">{post.content}</p>
-                      <p className="text-[13px] font-bold text-muted-foreground uppercase tracking-widest mt-1">
-                        {post.status} — {post.scheduledFor ? new Date(post.scheduledFor).toLocaleDateString() : new Date(post.createdAt).toLocaleDateString()}
-                      </p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-base md:text-lg font-medium text-foreground truncate">{post.content}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={cn(
+                          "text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full",
+                          post.status === 'PUBLISHED' ? "text-green-600 bg-green-100 dark:bg-green-900/30" :
+                            post.status === 'SCHEDULED' ? "text-blue-600 bg-blue-100 dark:bg-blue-900/30" :
+                              post.status === 'FAILED' ? "text-red-600 bg-red-100 dark:bg-red-900/30" :
+                                "text-muted-foreground bg-secondary"
+                        )}>
+                          {post.status}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground truncate">
+                          {post.scheduledFor ? new Date(post.scheduledFor).toLocaleDateString() : new Date(post.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  <Link href={`/posts/new?id=${post.id}`}>
-                    <Button variant="ghost" size="icon" className="rounded-full w-12 h-12 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Link href={`/posts/new?id=${post.id}`} className="ml-2">
+                    <Button variant="ghost" size="icon" className="rounded-full w-10 h-10 md:w-12 md:h-12 md:opacity-0 group-hover:opacity-100 transition-opacity">
                       <PenSquare className="w-4 h-4" />
                     </Button>
                   </Link>

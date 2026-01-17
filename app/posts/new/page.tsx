@@ -88,16 +88,23 @@ function EditorContent() {
         if (!content.trim()) return
 
         try {
-            const url = postId ? `/api/posts/${postId}` : "/api/posts"
-            const method = postId ? "PUT" : "POST"
+            let url = postId ? `/api/posts/${postId}` : "/api/posts"
+            let method = postId ? "PUT" : "POST"
+
+            // Special handling for scheduled posts to use the dedicated schedule API
+            if (status === "SCHEDULED") {
+                url = "/api/posts/schedule"
+                method = "POST"
+            }
 
             const response = await fetch(url, {
                 method,
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     content,
-                    status,
+                    status, // Still send status for the general API
                     scheduledFor: status === "SCHEDULED" ? scheduledFor : undefined,
+                    postId: status === "SCHEDULED" ? postId : undefined // Pass existing postId if updating
                 }),
             })
 
@@ -109,6 +116,8 @@ function EditorContent() {
             if (status !== "DRAFT") {
                 setContent("")
                 router.push("/calendar")
+            } else {
+                router.push("/dashboard")
             }
         } catch (error) {
             console.error("Error saving post:", error);
@@ -171,7 +180,7 @@ function EditorContent() {
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-8 gap-2 text-blue-600 hover:bg-blue-100 rounded-full px-4"
+                                className="h-8 gap-2 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-full px-4"
                                 onClick={() => setShowAIDialog(true)}
                                 disabled={isGenerating}
                             >
@@ -181,9 +190,9 @@ function EditorContent() {
                         </div>
                         <div className="relative group">
                             <TextareaAutosize
-                                minRows={10}
+                                minRows={8}
                                 placeholder="What's worth sharing today?"
-                                className="w-full resize-none text-2xl font-light leading-relaxed text-site-fg placeholder:text-muted-foreground/30 bg-transparent focus:outline-none transition-all pr-12"
+                                className="w-full resize-none text-xl md:text-2xl font-light leading-relaxed text-site-fg placeholder:text-muted-foreground/30 bg-transparent focus:outline-none transition-all pr-12"
                                 value={content}
                                 onChange={(e) => setContent(e.target.value)}
                                 autoFocus
@@ -194,18 +203,18 @@ function EditorContent() {
                         </div>
                     </div>
 
-                    <div className="pt-8 space-y-8">
+                    <div className="pt-8 space-y-6 md:space-y-8">
                         <div className="flex items-center gap-4">
                             <Button
                                 variant="outline"
-                                className={cn("h-14 px-6 rounded-2xl gap-3 transition-all", showScheduler && "border-blue-600 text-blue-600 bg-blue-100 shadow-none")}
+                                className={cn("h-12 md:h-14 px-4 md:px-6 rounded-2xl gap-3 transition-all", showScheduler && "border-blue-600 text-blue-600 bg-blue-100 dark:bg-blue-900/30 shadow-none")}
                                 onClick={() => setShowScheduler(!showScheduler)}
                             >
                                 <CalendarIcon className="w-5 h-5" />
                                 <span className="font-bold tracking-tight">Schedule</span>
                             </Button>
 
-                            <Button variant="ghost" size="icon" className="h-14 w-14 rounded-2xl text-muted-foreground hover:bg-secondary/50 transition-colors">
+                            <Button variant="ghost" size="icon" className="h-12 md:h-14 w-12 md:w-14 rounded-2xl text-muted-foreground hover:bg-secondary/50 transition-colors">
                                 <Smile className="w-5 h-5" />
                             </Button>
                         </div>
@@ -213,12 +222,12 @@ function EditorContent() {
                         {showScheduler && (
                             <AnimatedCard
                                 animation="slide-up-sm"
-                                className="p-8 bg-secondary/30 rounded-[32px] space-y-4"
+                                className="p-6 md:p-8 bg-secondary/30 dark:bg-secondary/10 rounded-[28px] md:rounded-[32px] space-y-4"
                             >
                                 <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Preferred Release</label>
                                 <input
                                     type="datetime-local"
-                                    className="w-full h-14 bg-background border border-border rounded-xl px-4 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary/20 transition-all"
+                                    className="w-full h-12 md:h-14 bg-background border border-border rounded-xl px-4 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary/20 transition-all dark:color-scheme-dark"
                                     value={scheduledFor}
                                     onChange={(e) => setScheduledFor(e.target.value)}
                                     min={new Date().toISOString().slice(0, 16)}
@@ -228,15 +237,15 @@ function EditorContent() {
                     </div>
                 </div>
 
-                <div className="pt-12 flex items-center justify-between border-t border-border">
-                    <Button variant="ghost" className="h-12 rounded-xl px-6 text-muted-foreground font-bold text-[13px] uppercase tracking-widest hover:text-site-fg hover:bg-transparent" onClick={() => handleSavePost("DRAFT")}>
+                <div className="pt-8 md:pt-12 flex flex-col md:flex-row items-center justify-between border-t border-border gap-6">
+                    <Button variant="ghost" className="h-12 rounded-xl px-6 text-muted-foreground font-bold text-[13px] uppercase tracking-widest hover:text-site-fg hover:bg-transparent w-full md:w-auto" onClick={() => handleSavePost("DRAFT")}>
                         Hold as draft
                     </Button>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 w-full md:w-auto">
                         {showScheduler ? (
                             <Button
                                 size="lg"
-                                className="h-16 px-10 rounded-2xl shadow-premium gap-3"
+                                className="h-14 md:h-16 px-10 rounded-2xl shadow-premium gap-3 w-full"
                                 onClick={() => {
                                     if (scheduledFor) handleSavePost("SCHEDULED")
                                     else alert("Please pick a date.")
@@ -248,7 +257,7 @@ function EditorContent() {
                         ) : (
                             <Button
                                 size="lg"
-                                className="h-16 px-10 rounded-2xl shadow-premium shadow-blue-600/20 gap-3"
+                                className="h-14 md:h-16 px-10 rounded-2xl shadow-premium shadow-blue-600/20 gap-3 w-full"
                                 onClick={() => handleSavePost("PUBLISHED")}
                                 disabled={!content.trim()}
                             >

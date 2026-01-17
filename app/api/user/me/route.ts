@@ -37,6 +37,7 @@ export async function GET() {
                 email: user.email,
                 name: user.name,
                 writingStyle: user.writingStyle,
+                theme: user.theme,
                 isConnected: user.accounts.length > 0,
             }
         });

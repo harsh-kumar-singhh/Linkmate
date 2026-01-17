@@ -56,9 +56,17 @@
     --ring: 210 90% 45%;
 
     /* LinkedIn Blue Ramp Dark */
-    --blue-100: 210 30% 15%;
+    --blue-100: 210 50% 12%;
     --blue-300: 210 50% 35%;
     --blue-600: 210 90% 45%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
   }
 
   body {
@@ -67,6 +75,8 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    /* Prevent horizontal overflow on mobile from animations */
+    overflow-x: hidden;
   }
 
   body::selection {
