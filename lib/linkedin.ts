@@ -1,20 +1,17 @@
 import { getPrisma } from "./prisma";
 
-const LINKEDIN_VERSIONS = [
-  // Preferred: YYYY-MM (most stable)
-  "2024-01",
-  "2023-12",
-  "2023-11",
-  "2023-10",
+const LINKEDIN_API_URL = "https://api.linkedin.com/rest/posts";
 
-  // Fallback: YYYY-MM-DD (only recent, known-safe)
-  "2024-01-01",
-  "2023-12-01",
-];
+/**
+ * LinkedIn officially supported stable version for posting.
+ * Do NOT change unless LinkedIn announces a new one.
+ */
+const LINKEDIN_VERSION = "2023-08";
 
 export async function publishToLinkedIn(userId: string, content: string) {
   const prisma = getPrisma();
 
+  // 1. Fetch LinkedIn account
   const account = await prisma.account.findFirst({
     where: {
       userId,
@@ -23,63 +20,78 @@ export async function publishToLinkedIn(userId: string, content: string) {
   });
 
   if (!account?.access_token || !account.providerAccountId) {
-    throw new Error("LinkedIn account not connected or missing permissions.");
+    throw new Error("LinkedIn account not connected.");
   }
 
   const authorUrn = `urn:li:person:${account.providerAccountId}`;
-  let lastError: any = null;
 
-  for (const version of LINKEDIN_VERSIONS) {
-    try {
-      console.log(`🔁 Trying LinkedIn publish with version ${version}`);
+  console.log("[LinkedIn] Publishing post", {
+    userId,
+    authorUrn,
+    version: LINKEDIN_VERSION,
+  });
 
-      const response = await fetch("https://api.linkedin.com/rest/posts", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${account.access_token}`,
-          "Content-Type": "application/json",
-          "X-Restli-Protocol-Version": "2.0.0",
-          "LinkedIn-Version": version,
-        },
-        body: JSON.stringify({
-          author: authorUrn,
-          commentary: content,
-          visibility: "PUBLIC",
-          distribution: {
-            feedDistribution: "MAIN_FEED",
-            targetEntities: [],
-            thirdPartyDistributionChannels: [],
-          },
-          lifecycleState: "PUBLISHED",
-          isReshareDisabledByAuthor: false,
-        }),
-      });
+  // 2. Call LinkedIn API
+  const response = await fetch(LINKEDIN_API_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${account.access_token}`,
+      "Content-Type": "application/json",
 
-      const text = await response.text();
-      const data = text ? JSON.parse(text) : {};
+      // REQUIRED HEADERS
+      "X-Restli-Protocol-Version": "2.0.0",
+      "LinkedIn-Version": LINKEDIN_VERSION,
+    },
+    body: JSON.stringify({
+      author: authorUrn,
+      commentary: content,
+      visibility: "PUBLIC",
+      distribution: {
+        feedDistribution: "MAIN_FEED",
+        targetEntities: [],
+        thirdPartyDistributionChannels: [],
+      },
+      lifecycleState: "PUBLISHED",
+      isReshareDisabledByAuthor: false,
+    }),
+  });
 
-      if (!response.ok) {
-        throw new Error(
-          `Version ${version} failed: ${response.status} ${JSON.stringify(data)}`
-        );
-      }
+  const rawText = await response.text();
+  let data: any;
 
-      const linkedinPostId =
-        response.headers.get("x-restli-id") || data.id || "published";
-
-      console.log(`✅ LinkedIn publish succeeded with version ${version}`);
-
-      return {
-        success: true,
-        linkedinPostId,
-        usedVersion: version,
-      };
-    } catch (err) {
-      console.warn(`❌ LinkedIn version ${version} failed`);
-      lastError = err;
-    }
+  try {
+    data = rawText ? JSON.parse(rawText) : {};
+  } catch {
+    data = { raw: rawText };
   }
 
-  console.error("🚨 All LinkedIn API versions failed");
-  throw lastError || new Error("LinkedIn publish failed on all known versions.");
+  if (!response.ok) {
+    console.error("[LinkedIn] Publish failed", {
+      status: response.status,
+      data,
+      headers: Object.fromEntries(response.headers.entries()),
+    });
+
+    // Explicit error mapping
+    if (data?.message?.includes("VERSION")) {
+      throw new Error(
+        "LinkedIn API version rejected. App does not have access to this version."
+      );
+    }
+
+    throw new Error(
+      data?.message ||
+        `LinkedIn API error ${response.status}: ${response.statusText}`
+    );
+  }
+
+  const postUrn =
+    response.headers.get("x-restli-id") || data?.id || "unknown";
+
+  console.log("[LinkedIn] Post published successfully", postUrn);
+
+  return {
+    success: true,
+    linkedinPostId: postUrn,
+  };
 }
