@@ -1,7 +1,5 @@
 import { getPrisma } from "./prisma";
 
-const LINKEDIN_VERSION = "2023-08.01";
-
 export async function publishToLinkedIn(userId: string, content: string) {
   const prisma = getPrisma();
 
@@ -16,44 +14,47 @@ export async function publishToLinkedIn(userId: string, content: string) {
     throw new Error("LinkedIn account not connected");
   }
 
-  const response = await fetch("https://api.linkedin.com/rest/posts", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${account.access_token}`,
-      "Content-Type": "application/json",
-      "X-Restli-Protocol-Version": "2.0.0",
-      "LinkedIn-Version": LINKEDIN_VERSION,
-    },
-    body: JSON.stringify({
-      author: `urn:li:person:${account.providerAccountId}`,
-      commentary: content,
-      visibility: "PUBLIC",
-      distribution: {
-        feedDistribution: "MAIN_FEED",
-        targetEntities: [],
-        thirdPartyDistributionChannels: [],
+  const response = await fetch(
+    "https://api.linkedin.com/v2/ugcPosts",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${account.access_token}`,
+        "Content-Type": "application/json",
+        "X-Restli-Protocol-Version": "2.0.0",
       },
-      lifecycleState: "PUBLISHED",
-      isReshareDisabledByAuthor: false,
-    }),
-  });
+      body: JSON.stringify({
+        author: `urn:li:person:${account.providerAccountId}`,
+        lifecycleState: "PUBLISHED",
+        specificContent: {
+          "com.linkedin.ugc.ShareContent": {
+            shareCommentary: {
+              text: content,
+            },
+            shareMediaCategory: "NONE",
+          },
+        },
+        visibility: {
+          "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC",
+        },
+      }),
+    }
+  );
 
   const text = await response.text();
   let data: any = {};
 
   try {
     data = text ? JSON.parse(text) : {};
-  } catch {
-    data = { raw: text };
-  }
+  } catch {}
 
   if (!response.ok) {
-    console.error("LinkedIn API error:", data);
+    console.error("LinkedIn UGC error:", data);
     throw new Error(data.message || "LinkedIn publish failed");
   }
 
   return {
     success: true,
-    linkedinPostId: response.headers.get("x-restli-id"),
+    linkedinPostId: data.id,
   };
 }
