@@ -1,6 +1,6 @@
 import { getPrisma } from "./prisma";
 
-const LINKEDIN_VERSION = "2023-08"; // ✅ last known active REST version
+const LINKEDIN_VERSION = "2023-08.01";
 
 export async function publishToLinkedIn(userId: string, content: string) {
   const prisma = getPrisma();
@@ -48,7 +48,7 @@ export async function publishToLinkedIn(userId: string, content: string) {
   }
 
   if (!response.ok) {
-    console.error("LinkedIn error:", data);
+    console.error("LinkedIn API error:", data);
     throw new Error(data.message || "LinkedIn publish failed");
   }
 
