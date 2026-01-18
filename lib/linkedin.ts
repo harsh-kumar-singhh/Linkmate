@@ -1,16 +1,20 @@
 import { getPrisma } from "./prisma";
 
 const LINKEDIN_VERSIONS = [
-  "2023-08-01",
-  "2023-06-01",
-  "2023-05-01",
-  "2023-03-01",
+  // Preferred: YYYY-MM (most stable)
+  "2024-01",
+  "2023-12",
+  "2023-11",
+  "2023-10",
+
+  // Fallback: YYYY-MM-DD (only recent, known-safe)
+  "2024-01-01",
+  "2023-12-01",
 ];
 
 export async function publishToLinkedIn(userId: string, content: string) {
   const prisma = getPrisma();
 
-  // 1. Fetch LinkedIn account
   const account = await prisma.account.findFirst({
     where: {
       userId,
@@ -25,7 +29,6 @@ export async function publishToLinkedIn(userId: string, content: string) {
   const authorUrn = `urn:li:person:${account.providerAccountId}`;
   let lastError: any = null;
 
-  // 2. Try versions one by one
   for (const version of LINKEDIN_VERSIONS) {
     try {
       console.log(`🔁 Trying LinkedIn publish with version ${version}`);
@@ -77,7 +80,6 @@ export async function publishToLinkedIn(userId: string, content: string) {
     }
   }
 
-  // 3. If all versions failed
-  console.error("🚨 All LinkedIn versions failed");
+  console.error("🚨 All LinkedIn API versions failed");
   throw lastError || new Error("LinkedIn publish failed on all known versions.");
 }
