@@ -2,16 +2,12 @@ import { getPrisma } from "./prisma";
 
 const LINKEDIN_API_URL = "https://api.linkedin.com/rest/posts";
 
-/**
- * LinkedIn officially supported stable version for posting.
- * Do NOT change unless LinkedIn announces a new one.
- */
-const LINKEDIN_VERSION = "2023-08";
+// REQUIRED for /rest/posts as of current LinkedIn enforcement
+const LINKEDIN_VERSION = "2023-08.01";
 
 export async function publishToLinkedIn(userId: string, content: string) {
   const prisma = getPrisma();
 
-  // 1. Fetch LinkedIn account
   const account = await prisma.account.findFirst({
     where: {
       userId,
@@ -25,13 +21,12 @@ export async function publishToLinkedIn(userId: string, content: string) {
 
   const authorUrn = `urn:li:person:${account.providerAccountId}`;
 
-  console.log("[LinkedIn] Publishing post", {
+  console.log("[LinkedIn] Publishing", {
     userId,
     authorUrn,
     version: LINKEDIN_VERSION,
   });
 
-  // 2. Call LinkedIn API
   const response = await fetch(LINKEDIN_API_URL, {
     method: "POST",
     headers: {
@@ -56,39 +51,32 @@ export async function publishToLinkedIn(userId: string, content: string) {
     }),
   });
 
-  const rawText = await response.text();
+  const raw = await response.text();
   let data: any;
 
   try {
-    data = rawText ? JSON.parse(rawText) : {};
+    data = raw ? JSON.parse(raw) : {};
   } catch {
-    data = { raw: rawText };
+    data = { raw };
   }
 
   if (!response.ok) {
-    console.error("[LinkedIn] Publish failed", {
+    console.error("[LinkedIn ERROR]", {
       status: response.status,
       data,
       headers: Object.fromEntries(response.headers.entries()),
     });
 
-    // Explicit error mapping
-    if (data?.message?.includes("VERSION")) {
-      throw new Error(
-        "LinkedIn API version rejected. App does not have access to this version."
-      );
-    }
-
     throw new Error(
       data?.message ||
-        `LinkedIn API error ${response.status}: ${response.statusText}`
+        `LinkedIn publish failed (${response.status})`
     );
   }
 
   const postUrn =
-    response.headers.get("x-restli-id") || data?.id || "unknown";
+    response.headers.get("x-restli-id") || data?.id;
 
-  console.log("[LinkedIn] Post published successfully", postUrn);
+  console.log("[LinkedIn] Published successfully:", postUrn);
 
   return {
     success: true,
