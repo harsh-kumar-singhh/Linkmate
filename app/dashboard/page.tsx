@@ -15,9 +15,10 @@ import { cn } from "@/lib/utils"
 export default function DashboardPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const [posts, setPosts] = useState([])
+  const [posts, setPosts] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isConnected, setIsConnected] = useState(true)
+  const [notifications, setNotifications] = useState<any[]>([])
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -28,12 +29,31 @@ export default function DashboardPage() {
   useEffect(() => {
     if (session) {
       fetchData()
+
+      // Heartbeat: Trigger scheduler every 60 seconds
+      const heartbeat = setInterval(async () => {
+        try {
+          // Trigger the background scheduler
+          const res = await fetch("/api/scheduler/run", { method: "POST" });
+          const data = await res.json();
+
+          if (data.processed > 0) {
+            console.log(`[HEARTBEAT] Processed ${data.processed} posts.`);
+            // Refetch posts to see the new status and trigger notifications
+            await fetchData();
+          }
+        } catch (e) {
+          console.error("Heartbeat error:", e);
+        }
+      }, 60000);
+
+      return () => clearInterval(heartbeat);
     }
   }, [session])
 
   const fetchData = async () => {
     try {
-      setIsLoading(true)
+      setIsLoading(true || !posts.length) // Only show loader on first fetch
       const [postsRes, userRes] = await Promise.all([
         fetch("/api/posts"),
         fetch("/api/user/me")
@@ -41,7 +61,14 @@ export default function DashboardPage() {
 
       if (postsRes.ok) {
         const data = await postsRes.json()
-        setPosts(data.posts || [])
+        const fetchedPosts = data.posts || []
+        setPosts(fetchedPosts)
+
+        // Process Notifications: Find published posts that haven't been notified
+        const unnotified = fetchedPosts.filter((p: any) => p.status === "PUBLISHED" && p.notified === false)
+        if (unnotified.length > 0) {
+          setNotifications(prev => [...prev, ...unnotified])
+        }
       }
 
       if (userRes.ok) {
@@ -52,6 +79,15 @@ export default function DashboardPage() {
       console.error("Error fetching dashboard data:", error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const dismissNotification = async (postId: string) => {
+    try {
+      await fetch(`/api/posts/${postId}/notified`, { method: "PATCH" })
+      setNotifications(prev => prev.filter(n => n.id !== postId))
+    } catch (e) {
+      console.error("Failed to dismiss notification", e)
     }
   }
 
@@ -76,6 +112,33 @@ export default function DashboardPage() {
   return (
 
     <div className="space-y-12 max-w-6xl mx-auto py-8">
+      {/* Notifications Area */}
+      {notifications.length > 0 && (
+        <div className="fixed top-24 right-8 z-50 w-80 space-y-4">
+          {notifications.map((n) => (
+            <AnimatedCard key={n.id} animation="slide-up">
+              <div className="bg-blue-600 text-white p-4 rounded-2xl shadow-premium relative group">
+                <button
+                  onClick={() => dismissNotification(n.id)}
+                  className="absolute top-2 right-2 p-1 hover:bg-white/20 rounded-lg transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+                <div className="flex items-start gap-3 pr-6">
+                  <div className="bg-white/20 p-2 rounded-xl">
+                    <CheckCircle className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">Published Now</p>
+                    <p className="text-sm font-medium line-clamp-2">{n.content}</p>
+                  </div>
+                </div>
+              </div>
+            </AnimatedCard>
+          ))}
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-2">
           <h1 className="text-4xl font-bold tracking-tight text-foreground">Overview</h1>
