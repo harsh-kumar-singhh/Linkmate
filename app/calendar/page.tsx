@@ -96,10 +96,10 @@ export default function CalendarPage() {
                         const cellDate = date ? new Date(currentYear, currentMonth, date) : null
                         const datePosts = cellDate ? posts.filter(p => {
                             if (!p.scheduledFor && !p.createdAt) return false
+                            // p.scheduledFor and p.createdAt are UTC ISO strings from the DB
+                            // new Date(utcString) correctly converts to local time
                             const d = new Date(p.scheduledFor || p.createdAt)
-                            return d.getDate() === cellDate.getDate() &&
-                                d.getMonth() === cellDate.getMonth() &&
-                                d.getFullYear() === cellDate.getFullYear()
+                            return d.toDateString() === cellDate.toDateString()
                         }) : []
 
                         const isToday = cellDate && new Date().toDateString() === cellDate.toDateString()

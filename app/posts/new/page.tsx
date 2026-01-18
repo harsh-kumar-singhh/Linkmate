@@ -33,8 +33,11 @@ function EditorContent() {
                     const data = await response.json()
                     setContent(data.content)
                     if (data.scheduledFor) {
-                        setScheduledFor(new Date(data.scheduledFor).toISOString().slice(0, 16))
-                        setShowScheduler(true)
+                        // Correctly convert UTC string from DB to local datetime-local format
+                        const date = new Date(data.scheduledFor);
+                        const localYMDHM = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                        setScheduledFor(localYMDHM);
+                        setShowScheduler(true);
                     }
                 }
             } catch (error) {
@@ -52,7 +55,9 @@ function EditorContent() {
             if (date < new Date()) {
                 date.setDate(date.getDate() + 1)
             }
-            setScheduledFor(date.toISOString().slice(0, 16))
+            // Correctly convert to local datetime-local format
+            const localYMDHM = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+            setScheduledFor(localYMDHM);
             setShowScheduler(true)
         }
     }, [searchParams, postId])
@@ -102,9 +107,10 @@ function EditorContent() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     content,
-                    status, // Still send status for the general API
-                    scheduledFor: status === "SCHEDULED" ? scheduledFor : undefined,
-                    postId: status === "SCHEDULED" ? postId : undefined // Pass existing postId if updating
+                    status,
+                    // Send as a full UTC ISO string by creating a Date object from the local string
+                    scheduledFor: status === "SCHEDULED" ? new Date(scheduledFor).toISOString() : undefined,
+                    postId: status === "SCHEDULED" ? postId : undefined
                 }),
             })
 
@@ -230,7 +236,8 @@ function EditorContent() {
                                     className="w-full h-12 md:h-14 bg-background border border-border rounded-xl px-4 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary/20 transition-all dark:color-scheme-dark"
                                     value={scheduledFor}
                                     onChange={(e) => setScheduledFor(e.target.value)}
-                                    min={new Date().toISOString().slice(0, 16)}
+                                    // Ensure min is also local YMDHM
+                                    min={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
                                 />
                             </AnimatedCard>
                         )}

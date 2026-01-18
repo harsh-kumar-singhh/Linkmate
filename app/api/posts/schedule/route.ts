@@ -20,6 +20,8 @@ export async function POST(req: Request) {
         }
 
         const scheduleDate = new Date(scheduledFor);
+        console.log(`[SCHEDULE_POST] Incoming: ${scheduledFor}, Parsed UTC: ${scheduleDate.toISOString()}`);
+
         if (scheduleDate <= new Date()) {
             return NextResponse.json({ error: "Scheduled time must be in the future" }, { status: 400 });
         }
