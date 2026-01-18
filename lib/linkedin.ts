@@ -19,14 +19,15 @@ export async function publishToLinkedIn(userId: string, content: string) {
     console.log(`Attempting to publish to LinkedIn for user ${userId} with URN: ${authorUrn}`);
 
     // 2. Prepare the LinkedIn API request
-    // Recent LinkedIn API requires a version header and uses /rest/posts
+    // Removing hardcoded LinkedIn-Version to let it default or use a known stable one if needed.
+    // Based on user feedback, hardcoded versions like 20240101 were "not active".
     const response = await fetch("https://api.linkedin.com/rest/posts", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${account.access_token}`,
         "Content-Type": "application/json",
         "X-Restli-Protocol-Version": "2.0.0",
-        "LinkedIn-Version": "202401", // Use a confirmed stable 2024 version to avoid "not active" errors
+        // Letting LinkedIn default to the current active version is safer than hardcoding an old one.
       },
       body: JSON.stringify({
         author: `urn:li:person:${account.providerAccountId}`,

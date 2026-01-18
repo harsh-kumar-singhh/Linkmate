@@ -13,11 +13,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth((req) => {
 
   // Stability Check: Log configuration presence in production
   if (process.env.NODE_ENV === "production") {
+    const host = req?.headers?.get("host");
     console.log("[AUTH_INIT] Checks:", {
       hasSecret: !!secret,
       hasUrl: !!nextAuthUrl,
-      url: nextAuthUrl ? (nextAuthUrl.startsWith('http') ? 'valid' : 'invalid_format') : 'missing'
+      url: nextAuthUrl ? (nextAuthUrl.startsWith('http') ? 'valid' : 'invalid_format') : 'missing',
+      incomingHost: host,
+      mismatch: nextAuthUrl && host && !nextAuthUrl.includes(host)
     });
+
+    if (nextAuthUrl && host && !nextAuthUrl.includes(host)) {
+      console.warn(`[AUTH_WARNING] Host mismatch detected! NEXTAUTH_URL is ${nextAuthUrl} but request host is ${host}. This may cause session issues.`);
+    }
   }
 
   if (!secret) {
