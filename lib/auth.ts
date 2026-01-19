@@ -31,6 +31,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth((req) => {
     console.warn("WARNING: NEXTAUTH_SECRET is missing. This will cause persistent authentication failures.");
   }
 
+  const useSecureCookies = process.env.NODE_ENV === "production"
+  const cookiePrefix = useSecureCookies ? "__Secure-" : ""
+
   return {
     ...authConfig,
     secret: secret,
@@ -38,6 +41,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth((req) => {
     session: {
       strategy: "jwt",
       maxAge: 30 * 24 * 60 * 60, // 30 days
+    },
+    cookies: {
+      sessionToken: {
+        name: `${cookiePrefix}next-auth.session-token`,
+        options: {
+          httpOnly: true,
+          sameSite: 'lax',
+          path: '/',
+          secure: useSecureCookies
+        }
+      }
     },
     providers: [
       CredentialsProvider({
