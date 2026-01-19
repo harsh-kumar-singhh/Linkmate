@@ -2,6 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
+import { useSession } from "next-auth/react"
 import { useEffect, useState, Suspense } from "react"
 import { AnimatedCard } from "@/components/animated/AnimatedCard"
 import TextareaAutosize from "react-textarea-autosize"
@@ -13,6 +14,7 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 
 function EditorContent() {
+    const { status } = useSession()
     const searchParams = useSearchParams()
     const router = useRouter()
     const [content, setContent] = useState("")
@@ -24,8 +26,14 @@ function EditorContent() {
     const postId = searchParams.get("id")
 
     useEffect(() => {
+        if (status === "unauthenticated") {
+            router.push("/login")
+        }
+    }, [status, router])
+
+    useEffect(() => {
         const fetchPost = async () => {
-            if (!postId) return
+            if (!postId || status !== "authenticated") return
             setIsInitialLoading(true)
             try {
                 const response = await fetch(`/api/posts/${postId}`)
@@ -60,9 +68,11 @@ function EditorContent() {
             setScheduledFor(localYMDHM);
             setShowScheduler(true)
         }
-    }, [searchParams, postId])
+    }, [searchParams, postId, status])
 
     const handleGenerate = async ({ topic, style }: { topic: string; style: string }) => {
+        if (status !== "authenticated") return
+
         setIsGenerating(true)
         try {
             const response = await fetch("/api/generate", {
@@ -89,15 +99,15 @@ function EditorContent() {
         }
     }
 
-    const handleSavePost = async (status: "DRAFT" | "SCHEDULED" | "PUBLISHED") => {
-        if (!content.trim()) return
+    const handleSavePost = async (statusArg: "DRAFT" | "SCHEDULED" | "PUBLISHED") => {
+        if (!content.trim() || status !== "authenticated") return
 
         try {
             let url = postId ? `/api/posts/${postId}` : "/api/posts"
             let method = postId ? "PUT" : "POST"
 
             // Special handling for scheduled posts to use the dedicated schedule API
-            if (status === "SCHEDULED") {
+            if (statusArg === "SCHEDULED") {
                 url = "/api/posts/schedule"
                 method = "POST"
             }
@@ -107,10 +117,10 @@ function EditorContent() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     content,
-                    status,
+                    status: statusArg,
                     // Send as a full UTC ISO string by creating a Date object from the local string
-                    scheduledFor: status === "SCHEDULED" ? new Date(scheduledFor).toISOString() : undefined,
-                    postId: status === "SCHEDULED" ? postId : undefined
+                    scheduledFor: statusArg === "SCHEDULED" ? new Date(scheduledFor).toISOString() : undefined,
+                    postId: statusArg === "SCHEDULED" ? postId : undefined
                 }),
             })
 
@@ -119,7 +129,7 @@ function EditorContent() {
                 throw new Error(errorData.error || "Failed to save post");
             }
 
-            if (status !== "DRAFT") {
+            if (statusArg !== "DRAFT") {
                 setContent("")
                 router.push("/calendar")
             } else {
@@ -145,7 +155,7 @@ function EditorContent() {
         }
     }
 
-    if (isInitialLoading) {
+    if (status === "loading" || isInitialLoading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
                 <div className="w-12 h-12 border-2 border-primary border-t-transparent rounded-full animate-spin" />

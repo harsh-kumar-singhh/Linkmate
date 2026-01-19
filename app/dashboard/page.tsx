@@ -27,7 +27,7 @@ export default function DashboardPage() {
   }, [status, router])
 
   useEffect(() => {
-    if (session) {
+    if (status === "authenticated") {
       fetchData()
 
       // Heartbeat: Trigger scheduler every 60 seconds
@@ -49,7 +49,7 @@ export default function DashboardPage() {
 
       return () => clearInterval(heartbeat);
     }
-  }, [session])
+  }, [status])
 
   const fetchData = async () => {
     try {
