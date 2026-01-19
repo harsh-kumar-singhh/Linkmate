@@ -137,14 +137,14 @@ export const authOptions: NextAuthConfig = {
     LinkedInProvider({
       clientId: process.env.LINKEDIN_CLIENT_ID,
       clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
+      issuer: "https://www.linkedin.com/oauth",
+      wellKnown: "https://www.linkedin.com/oauth/openid/.well-known/openid-configuration",
       authorization: {
-        url: "https://www.linkedin.com/oauth/v2/authorization",
         params: {
           scope: "openid profile email w_member_social",
         },
       },
-      token: "https://www.linkedin.com/oauth/v2/accessToken",
-      userinfo: "https://api.linkedin.com/v2/userinfo",
+      checks: ["pkce", "state"],
       async profile(profile) {
         console.log("[LINKEDIN_AUTH] Profile Callback:", profile);
         return {
