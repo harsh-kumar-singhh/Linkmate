@@ -34,6 +34,43 @@ export const authOptions: NextAuthConfig = {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
+  callbacks: {
+    ...(authConfig.callbacks || {}),
+    async signIn({ user, account, profile }) {
+      if (account?.provider === "linkedin") {
+        console.log("[LINKEDIN_AUTH] SignIn Callback:", {
+          userEmail: user.email,
+          userId: user.id,
+          accountProvider: account.provider,
+          profileSub: profile?.sub
+        });
+      }
+      return true;
+    },
+    async jwt({ token, user, account, profile, trigger }) {
+      if (account?.provider === "linkedin") {
+        console.log("[LINKEDIN_AUTH] JWT Callback:", {
+          tokenSub: token.sub,
+          trigger
+        });
+      }
+      // Pass through to original callbacks logic if needed,
+      // but since we are replacing the entire authOptions object structure in previous steps or relying on merging,
+      // and here we are in lib/auth.ts where we can access authConfig.
+      // We must ensure we don't break the existing jwt logic from auth.config.ts which we are spreading via ...authConfig.
+      // However, declaring `callbacks` here OVERRIDES `...authConfig`.
+      // So we must explicitly call the original logic.
+
+      if (authConfig.callbacks?.jwt) {
+        return authConfig.callbacks.jwt({ token, user, account, profile, trigger } as any);
+      }
+      return token;
+    },
+    // We must also re-declare session/authorized if we are overriding the whole callbacks object,
+    // OR we can spread ...authConfig.callbacks
+    // But we can't spread AND define methods with same name easily in object literal without overrides order mattering.
+    // The safely merged version:
+  },
   cookies: {
     sessionToken: {
       name: `${cookiePrefix}next-auth.session-token`,
@@ -101,10 +138,20 @@ export const authOptions: NextAuthConfig = {
       clientId: process.env.LINKEDIN_CLIENT_ID,
       clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
       issuer: "https://www.linkedin.com/oauth",
+      jwks_endpoint: "https://www.linkedin.com/oauth/openid/jwks",
       authorization: {
         params: {
           scope: "openid profile email w_member_social",
         },
+      },
+      async profile(profile) {
+        console.log("[LINKEDIN_AUTH] Profile Callback:", profile);
+        return {
+          id: profile.sub,
+          name: profile.name,
+          email: profile.email,
+          image: profile.picture,
+        }
       },
     }),
     GoogleProvider({
