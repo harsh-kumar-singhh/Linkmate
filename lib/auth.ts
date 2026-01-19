@@ -1,4 +1,4 @@
-import NextAuth from "next-auth"
+import NextAuth, { NextAuthConfig } from "next-auth"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { getPrisma } from "./prisma"
 import CredentialsProvider from "next-auth/providers/credentials"
@@ -7,110 +7,112 @@ import GoogleProvider from "next-auth/providers/google"
 import bcrypt from "bcryptjs"
 import { authConfig } from "./auth.config"
 
-export const { handlers, auth, signIn, signOut } = NextAuth((req) => {
-  const secret = process.env.NEXTAUTH_SECRET;
-  const nextAuthUrl = process.env.NEXTAUTH_URL;
+const secret = process.env.NEXTAUTH_SECRET;
+const nextAuthUrl = process.env.NEXTAUTH_URL;
+const useSecureCookies = process.env.NODE_ENV === "production"
+const cookiePrefix = useSecureCookies ? "__Secure-" : ""
 
-  // Stability Check: Log configuration presence in production
-  if (process.env.NODE_ENV === "production") {
-    const host = req?.headers?.get("host");
-    console.log("[AUTH_INIT] Checks:", {
-      hasSecret: !!secret,
-      hasUrl: !!nextAuthUrl,
-      url: nextAuthUrl ? (nextAuthUrl.startsWith('http') ? 'valid' : 'invalid_format') : 'missing',
-      incomingHost: host,
-      mismatch: nextAuthUrl && host && !nextAuthUrl.includes(host)
-    });
+// Warning log for missing secret
+if (!secret) {
+  console.warn("WARNING: NEXTAUTH_SECRET is missing. This will cause persistent authentication failures.");
+}
 
-    if (nextAuthUrl && host && !nextAuthUrl.includes(host)) {
-      console.warn(`[AUTH_WARNING] Host mismatch detected! NEXTAUTH_URL is ${nextAuthUrl} but request host is ${host}. This may cause session issues.`);
+// Log configuration for debugging (simplified for static context)
+if (process.env.NODE_ENV === "production") {
+  console.log("[AUTH_INIT] Configuration:", {
+    hasSecret: !!secret,
+    hasUrl: !!nextAuthUrl,
+    cookieSecure: useSecureCookies
+  });
+}
+
+export const authOptions: NextAuthConfig = {
+  ...authConfig,
+  secret: secret,
+  adapter: PrismaAdapter(getPrisma()),
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
+  cookies: {
+    sessionToken: {
+      name: `${cookiePrefix}next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: useSecureCookies
+      }
     }
-  }
+  },
+  providers: [
+    CredentialsProvider({
+      name: "Email",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" }
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          console.log("Missing credentials");
+          return null
+        }
 
-  if (!secret) {
-    console.warn("WARNING: NEXTAUTH_SECRET is missing. This will cause persistent authentication failures.");
-  }
+        const prisma = getPrisma()
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email as string },
+          include: {
+            accounts: {
+              where: { provider: "credentials" }
+            }
+          }
+        })
 
-  const useSecureCookies = process.env.NODE_ENV === "production"
-  const cookiePrefix = useSecureCookies ? "__Secure-" : ""
+        if (!user) {
+          console.log("User not found");
+          return null
+        }
 
-  return {
-    ...authConfig,
-    secret: secret,
-    adapter: PrismaAdapter(getPrisma()),
-    session: {
-      strategy: "jwt",
-      maxAge: 30 * 24 * 60 * 60, // 30 days
-    },
-    cookies: {
-      sessionToken: {
-        name: `${cookiePrefix}next-auth.session-token`,
-        options: {
-          httpOnly: true,
-          sameSite: 'lax',
-          path: '/',
-          secure: useSecureCookies
+        const credentialsAccount = user.accounts[0]
+
+        if (!credentialsAccount?.access_token) {
+          console.log("No credentials account found or password missing");
+          return null
+        }
+
+        const isValid = await bcrypt.compare(
+          credentials.password as string,
+          credentialsAccount.access_token
+        )
+
+        if (!isValid) {
+          console.log("Invalid password");
+          return null
+        }
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
         }
       }
-    },
-    providers: [
-      CredentialsProvider({
-        name: "Email",
-        credentials: {
-          email: { label: "Email", type: "email" },
-          password: { label: "Password", type: "password" }
+    }),
+    LinkedInProvider({
+      clientId: process.env.LINKEDIN_CLIENT_ID,
+      clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
+      issuer: "https://www.linkedin.com/oauth",
+      authorization: {
+        params: {
+          scope: "openid profile email w_member_social",
         },
-        async authorize(credentials) {
-          if (!credentials?.email || !credentials?.password) {
-            return null
-          }
+      },
+    }),
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    }),
+  ],
+  debug: process.env.NODE_ENV === "development",
+}
 
-          const prisma = getPrisma()
-          const user = await prisma.user.findUnique({
-            where: { email: credentials.email as string },
-            include: {
-              accounts: {
-                where: { provider: "credentials" }
-              }
-            }
-          })
-
-          if (!user) return null
-
-          const credentialsAccount = user.accounts[0]
-
-          if (!credentialsAccount?.access_token) return null
-
-          const isValid = await bcrypt.compare(
-            credentials.password as string,
-            credentialsAccount.access_token
-          )
-
-          if (!isValid) return null
-
-          return {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-          }
-        }
-      }),
-      LinkedInProvider({
-        clientId: process.env.LINKEDIN_CLIENT_ID,
-        clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
-        issuer: "https://www.linkedin.com/oauth",
-        authorization: {
-          params: {
-            scope: "openid profile email w_member_social",
-          },
-        },
-      }),
-      GoogleProvider({
-        clientId: process.env.GOOGLE_CLIENT_ID,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      }),
-    ],
-    debug: process.env.NODE_ENV === "development",
-  }
-})
-
+export const { handlers, auth, signIn, signOut } = NextAuth(authOptions)
