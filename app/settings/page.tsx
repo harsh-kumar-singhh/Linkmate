@@ -32,7 +32,7 @@ export default async function SettingsPage() {
         }
     });
 
-    const isConnected = !!(user?.accounts && user.accounts.length > 0);
+    const isConnected = !!(user?.accounts && user.accounts.some(a => a.access_token));
 
     return (
         <div className="max-w-4xl mx-auto py-12 px-6 space-y-16 mt-8">

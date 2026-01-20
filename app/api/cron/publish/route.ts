@@ -31,7 +31,13 @@ export async function GET(req: Request) {
                 }
             },
             include: {
-                user: true
+                user: {
+                    include: {
+                        accounts: {
+                            where: { provider: "linkedin" }
+                        }
+                    }
+                }
             }
         });
 
@@ -42,8 +48,6 @@ export async function GET(req: Request) {
         for (const post of duePosts) {
             try {
                 // Idempotency check: Re-verify status hasn't changed since query
-                // and update to a transient 'PUBLISHING' state if we had one, 
-                // but since we don't have PUBLISHING in enum, we'll just be careful.
                 const currentPost = await prisma.post.findUnique({
                     where: { id: post.id },
                     select: { status: true }
@@ -51,6 +55,21 @@ export async function GET(req: Request) {
 
                 if (currentPost?.status !== "SCHEDULED") {
                     console.info(`Post ${post.id} already processed or cancelled. Skipping.`);
+                    continue;
+                }
+
+                // Check connection logic
+                const account = post.user.accounts[0];
+                if (!account?.access_token) {
+                    console.warn(`User ${post.userId} is not connected to LinkedIn. Marking post ${post.id} as FAILED.`);
+                    await prisma.post.update({
+                        where: { id: post.id },
+                        data: {
+                            status: "FAILED",
+                            failureReason: "User disconnected from LinkedIn (missing access_token)"
+                        }
+                    });
+                    results.push({ id: post.id, status: "FAILED", error: "User disconnected" });
                     continue;
                 }
 

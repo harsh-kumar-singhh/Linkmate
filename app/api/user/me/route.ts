@@ -22,6 +22,7 @@ export async function GET() {
                         id: true,
                         provider: true,
                         providerAccountId: true,
+                        access_token: true, // Check for actual token existence
                     }
                 }
             }
@@ -35,6 +36,11 @@ export async function GET() {
             console.log(`[USER_ME] Fetching state for ${session.user.id}. Connected accounts: ${user.accounts.length}`);
         }
 
+        // Strict check: Must have an account AND a non-null access token
+        const hasValidConnection = user.accounts.some(
+            (account) => account.provider === "linkedin" && account.access_token
+        );
+
         return NextResponse.json({
             user: {
                 id: user.id,
@@ -43,7 +49,7 @@ export async function GET() {
                 writingStyle: user.writingStyle,
                 theme: user.theme,
                 // Strictly database-backed connection status
-                isConnected: user.accounts.length > 0,
+                isConnected: hasValidConnection,
             }
         }, {
             headers: {

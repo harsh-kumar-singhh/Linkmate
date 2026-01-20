@@ -17,6 +17,19 @@ export async function POST(req: Request) {
         const prisma = getPrisma();
         const now = new Date();
 
+        // Check for valid LinkedIn connection first to avoid unnecessary processing
+        const linkedInAccount = await prisma.account.findFirst({
+            where: {
+                userId: session.user.id,
+                provider: "linkedin",
+                access_token: { not: null }
+            }
+        });
+
+        if (!linkedInAccount) {
+            return NextResponse.json({ processed: 0, status: "No valid LinkedIn connection" });
+        }
+
         // 1. Find all due posts for the current user
         // We only process posts for the user triggering the heartbeat for simplicity and security
         const duePosts = await prisma.post.findMany({
