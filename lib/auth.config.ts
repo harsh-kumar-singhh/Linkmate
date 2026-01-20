@@ -1,33 +1,28 @@
-// lib/auth.config.ts
 import type { NextAuthConfig } from "next-auth"
 
 export const authConfig: NextAuthConfig = {
   pages: {
     signIn: "/login",
   },
-  providers: [], // REQUIRED for NextAuthConfig typing
+
+  providers: [],
+
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user
-      const protectedPaths = [
-        "/dashboard",
-        "/posts",
-        "/calendar",
-        "/settings",
-      ]
 
-      const isProtected = protectedPaths.some((path) =>
-        nextUrl.pathname.startsWith(path)
-      )
+      const isProtected =
+        nextUrl.pathname.startsWith("/dashboard") ||
+        nextUrl.pathname.startsWith("/posts") ||
+        nextUrl.pathname.startsWith("/calendar") ||
+        nextUrl.pathname.startsWith("/settings")
 
-      if (isProtected && !isLoggedIn) {
-        return false
-      }
+      const isAuthPage =
+        nextUrl.pathname === "/login" ||
+        nextUrl.pathname === "/signup"
 
-      if (
-        isLoggedIn &&
-        (nextUrl.pathname === "/login" || nextUrl.pathname === "/signup")
-      ) {
+      if (isProtected && !isLoggedIn) return false
+      if (isLoggedIn && isAuthPage) {
         return Response.redirect(new URL("/dashboard", nextUrl))
       }
 

@@ -1,94 +1,28 @@
-import NextAuth, { type NextAuthConfig } from "next-auth"
-import CredentialsProvider from "next-auth/providers/credentials"
-import GoogleProvider from "next-auth/providers/google"
-import LinkedInProvider from "next-auth/providers/linkedin"
+import NextAuth from "next-auth"
+import Google from "next-auth/providers/google"
+import LinkedIn from "next-auth/providers/linkedin"
 import { PrismaAdapter } from "@auth/prisma-adapter"
-import bcrypt from "bcryptjs"
-
-import { getPrisma } from "./prisma"
-import { authConfig } from "./auth.config"
+import type { Session, User, Account } from "next-auth"
+import type { JWT } from "next-auth/jwt"
+import { getPrisma } from "@/lib/prisma"
 
 const prisma = getPrisma()
 
-export const authOptions: NextAuthConfig = {
-  ...authConfig,
+export const authOptions = {
   adapter: PrismaAdapter(prisma),
-  secret: process.env.NEXTAUTH_SECRET,
-  session: { strategy: "jwt" },
 
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user?.id) token.id = user.id
-      return token
-    },
-
-    async session({ session, token }) {
-      if (session.user && token.id) {
-        session.user.id = token.id as string
-      }
-      return session
-    },
+  session: {
+    strategy: "jwt" as const, // 👈 THIS FIXES YOUR ERROR
   },
 
   providers: [
-    // ------------------------
-    // EMAIL / PASSWORD
-    // ------------------------
-    CredentialsProvider({
-      name: "Email",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        if (
-          !credentials ||
-          typeof credentials.email !== "string" ||
-          typeof credentials.password !== "string"
-        ) {
-          return null
-        }
-
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-          include: { accounts: true },
-        })
-
-        if (!user) return null
-
-        const credentialsAccount = user.accounts.find(
-          (acc: { provider: string }) => acc.provider === "credentials"
-        )
-
-        if (!credentialsAccount?.access_token) return null
-
-        const valid = await bcrypt.compare(
-          credentials.password,
-          credentialsAccount.access_token
-        )
-
-        if (!valid) return null
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-        }
-      },
-    }),
-
-    // ------------------------
-    // GOOGLE (OIDC – STABLE)
-    // ------------------------
-    GoogleProvider({
+    Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
 
-    // ------------------------
-    // LINKEDIN (LEGACY OAUTH)
-    // ------------------------
-    LinkedInProvider({
+    // ✅ Legacy OAuth (NOT OIDC)
+    LinkedIn({
       clientId: process.env.LINKEDIN_CLIENT_ID!,
       clientSecret: process.env.LINKEDIN_CLIENT_SECRET!,
       authorization: {
@@ -96,22 +30,54 @@ export const authOptions: NextAuthConfig = {
           scope: "r_liteprofile r_emailaddress w_member_social",
         },
       },
-      token: "https://www.linkedin.com/oauth/v2/accessToken",
-      userinfo: "https://api.linkedin.com/v2/me",
-      profile(profile) {
-        return {
-          id: profile.id,
-          name:
-            `${profile.localizedFirstName ?? ""} ${profile.localizedLastName ?? ""}`.trim() ||
-            "LinkedIn User",
-          email: null, // ✔ allowed by module augmentation
-          image: null,
-        }
-      },
     }),
   ],
+
+  callbacks: {
+    async jwt({
+      token,
+      user,
+      account,
+    }: {
+      token: JWT
+      user?: User
+      account?: Account | null
+    }) {
+      if (user?.id) {
+        token.id = user.id
+      }
+
+      if (account?.access_token) {
+        token.accessToken = account.access_token
+      }
+
+      return token
+    },
+
+    async session({
+      session,
+      token,
+    }: {
+      session: Session
+      token: JWT
+    }) {
+      if (session.user && token.id) {
+        session.user.id = token.id
+      }
+
+      return session
+    },
+  },
+
+  pages: {
+    signIn: "/login",
+    error: "/login",
+  },
 
   debug: process.env.NODE_ENV === "development",
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth(authOptions)
+export const {
+  handlers: { GET, POST },
+  auth,
+} = NextAuth(authOptions)
