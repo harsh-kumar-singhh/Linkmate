@@ -21,7 +21,7 @@ export async function GET(req: Request) {
     response_type: "code",
     client_id: process.env.LINKEDIN_CLIENT_ID!,
     redirect_uri: `${process.env.NEXTAUTH_URL}/api/linkedin/callback`,
-    scope: "r_liteprofile r_emailaddress",
+    scope: "r_liteprofile",
     state,
   });
 
