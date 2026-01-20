@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,13 +10,23 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
 
   const code = searchParams.get("code");
-  const userId = searchParams.get("state");
 
-  if (!code || !userId) {
+  if (!code) {
     return NextResponse.redirect(
       new URL("/settings?linkedin=failed", req.url)
     );
   }
+
+  // Get logged-in user from session
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return NextResponse.redirect(
+      new URL("/login?callbackUrl=/settings", req.url)
+    );
+  }
+
+  const userId = session.user.id;
 
   // Exchange code for access token
   const tokenRes = await fetch(
@@ -54,12 +65,13 @@ export async function GET(req: NextRequest) {
   const profile = await profileRes.json();
 
   if (!profile?.id) {
+    console.error("LinkedIn profile error:", profile);
     return NextResponse.redirect(
       new URL("/settings?linkedin=failed", req.url)
     );
   }
 
-  // Save / update account
+  // Save / update LinkedIn account for THIS USER
   await prisma.account.upsert({
     where: {
       provider_providerAccountId: {
