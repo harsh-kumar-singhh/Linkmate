@@ -11,7 +11,7 @@ export async function PATCH(
 ) {
     try {
         const session = await auth();
-        if (!session || !session.user?.email) {
+        if (!session || !session.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 

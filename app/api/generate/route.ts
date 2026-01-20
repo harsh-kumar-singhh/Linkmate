@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     const prisma = getPrisma();
     try {
         const session = await auth();
-        if (!session || !session.user?.email) {
+        if (!session || !session.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
@@ -21,7 +21,7 @@ export async function POST(req: Request) {
         // If style is "Write Like Me", fetch user's stored style
         if (style === "Write Like Me") {
             const user = await prisma.user.findUnique({
-                where: { email: session.user.email },
+                where: { id: session.user.id },
                 select: { writingStyle: true }
             });
             if (user?.writingStyle) {

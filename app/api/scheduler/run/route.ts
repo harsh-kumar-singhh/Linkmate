@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     try {
         // Authenticate the request (Heartbeat comes from an active session)
         const session = await auth();
-        if (!session || !session.user?.email) {
+        if (!session || !session.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 

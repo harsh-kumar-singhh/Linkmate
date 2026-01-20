@@ -9,12 +9,12 @@ export async function GET() {
     const prisma = getPrisma();
     try {
         const session = await auth();
-        if (!session || !session.user?.email) {
+        if (!session || !session.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
+            where: { id: session.user.id },
             include: {
                 accounts: {
                     where: { provider: "linkedin" },
@@ -32,7 +32,7 @@ export async function GET() {
         }
 
         if (process.env.NODE_ENV === "development") {
-            console.log(`[USER_ME] Fetching state for ${session.user.email}. Connected accounts: ${user.accounts.length}`);
+            console.log(`[USER_ME] Fetching state for ${session.user.id}. Connected accounts: ${user.accounts.length}`);
         }
 
         return NextResponse.json({

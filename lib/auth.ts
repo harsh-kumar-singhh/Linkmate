@@ -26,13 +26,14 @@ export const authConfig: NextAuthConfig = {
       clientId: process.env.LINKEDIN_CLIENT_ID!,
       clientSecret: process.env.LINKEDIN_CLIENT_SECRET!,
 
+      // Explicitly request scopes for legacy flow
       authorization: {
         params: {
           scope: "r_liteprofile r_emailaddress w_member_social",
         },
       },
 
-      // 🔑 CRITICAL: normalize profile + fallback email
+      // 🔑 CRITICAL: Handle missing email safely. Do NOT fallback to fake email.
       profile(profile) {
         const id = profile.id as string
 
@@ -41,14 +42,13 @@ export const authConfig: NextAuthConfig = {
         const lastName =
           (profile as any).localizedLastName ?? "User"
 
-        const email =
-          (profile as any).emailAddress ??
-          `linkedin_${id}@linkmate.local`
+        // LinkedIn API might not return email if not granted or accounted for
+        const email = (profile as any).emailAddress || null
 
         return {
           id,
           name: `${firstName} ${lastName}`,
-          email,
+          email, // Can be null now
           image: null,
         }
       },

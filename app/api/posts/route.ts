@@ -8,12 +8,12 @@ export async function GET() {
   const prisma = getPrisma();
   try {
     const session = await auth();
-    if (!session || !session.user?.email) {
+    if (!session || !session.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+      where: { id: session.user.id },
     });
 
     if (!user) {
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
   const prisma = getPrisma();
   try {
     const session = await auth();
-    if (!session || !session.user?.email) {
+    if (!session || !session.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -46,9 +46,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 });
     }
 
-    // Find user by email
+    // Find user by id
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+      where: { id: session.user.id },
     });
 
     if (!user) {

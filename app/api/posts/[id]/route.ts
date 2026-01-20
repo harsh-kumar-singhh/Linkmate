@@ -13,7 +13,7 @@ export async function GET(
     const prisma = getPrisma();
     try {
         const session = await auth();
-        if (!session || !session.user?.email) {
+        if (!session || !session.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
@@ -39,7 +39,7 @@ export async function PUT(
     const prisma = getPrisma();
     try {
         const session = await auth();
-        if (!session || !session.user?.email) {
+        if (!session || !session.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
@@ -49,7 +49,7 @@ export async function PUT(
         let finalLinkedinPostId = undefined;
         if (status === "PUBLISHED") {
             const user = await prisma.user.findUnique({
-                where: { email: session.user.email },
+                where: { id: session.user.id },
             });
 
             if (!user) {
@@ -93,7 +93,7 @@ export async function DELETE(
     const prisma = getPrisma();
     try {
         const session = await auth();
-        if (!session || !session.user?.email) {
+        if (!session || !session.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
