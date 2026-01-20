@@ -1,15 +1,16 @@
-import NextAuth, { type NextAuthConfig } from "next-auth"
-import { PrismaAdapter } from "@auth/prisma-adapter"
-import { getPrisma } from "./prisma"
+import NextAuth from "next-auth";
+import type { NextAuthConfig } from "next-auth";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import { getPrisma } from "./prisma";
 
-import CredentialsProvider from "next-auth/providers/credentials"
-import GoogleProvider from "next-auth/providers/google"
-import LinkedInProvider from "next-auth/providers/linkedin"
+import CredentialsProvider from "next-auth/providers/credentials";
+import GoogleProvider from "next-auth/providers/google";
+import LinkedInProvider from "next-auth/providers/linkedin";
 
-import bcrypt from "bcryptjs"
-import { authConfig } from "./auth.config"
+import bcrypt from "bcryptjs";
+import { authConfig } from "./auth.config";
 
-const prisma = getPrisma()
+const prisma = getPrisma();
 
 export const authOptions: NextAuthConfig = {
   ...authConfig,
@@ -18,58 +19,63 @@ export const authOptions: NextAuthConfig = {
 
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60,
   },
 
   providers: [
     // =========================
-    // Credentials Provider
+    // CREDENTIALS (EMAIL/PASSWORD)
     // =========================
     CredentialsProvider({
-      name: "Email",
+      name: "Credentials",
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
+
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          return null
+        // ✅ HARD GUARDS
+        if (
+          !credentials ||
+          typeof credentials.email !== "string" ||
+          typeof credentials.password !== "string"
+        ) {
+          return null;
         }
 
-        // ✅ Explicitly cast AFTER validation
-        const email = credentials.email as string
-        const password = credentials.password as string
-
         const user = await prisma.user.findUnique({
-          where: { email },
-          include: { accounts: true },
-        })
+          where: {
+            email: credentials.email,
+          },
+        });
 
-        if (!user) return null
+        if (!user) return null;
 
-        const credentialsAccount = user.accounts.find(
-          (account) => account.provider === "credentials"
-        )
+        const account = await prisma.account.findFirst({
+          where: {
+            userId: user.id,
+            provider: "credentials",
+          },
+        });
 
-        if (!credentialsAccount?.access_token) return null
+        if (!account?.access_token) return null;
 
         const isValid = await bcrypt.compare(
-          password,
-          credentialsAccount.access_token
-        )
+          credentials.password,
+          account.access_token
+        );
 
-        if (!isValid) return null
+        if (!isValid) return null;
 
         return {
           id: user.id,
           email: user.email,
           name: user.name,
-        }
+        };
       },
     }),
 
     // =========================
-    // Google (OIDC)
+    // GOOGLE (OIDC – KEEP AS IS)
     // =========================
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -77,60 +83,59 @@ export const authOptions: NextAuthConfig = {
     }),
 
     // =========================
-    // LinkedIn (OAuth2 – NOT OIDC)
+    // LINKEDIN (OAUTH – BLOCK IF NO EMAIL)
     // =========================
     LinkedInProvider({
       clientId: process.env.LINKEDIN_CLIENT_ID!,
       clientSecret: process.env.LINKEDIN_CLIENT_SECRET!,
 
       authorization: {
-        url: "https://www.linkedin.com/oauth/v2/authorization",
         params: {
-          scope: "openid profile email w_member_social",
+          scope: "r_liteprofile r_emailaddress w_member_social",
         },
       },
 
-      token: "https://www.linkedin.com/oauth/v2/accessToken",
-      userinfo: "https://api.linkedin.com/v2/userinfo",
-
       profile(profile) {
+        if (!profile.email) {
+          throw new Error(
+            "LinkedIn did not share your email. Please enable email access."
+          );
+        }
+
         return {
-          id: profile.sub,
-          name: profile.name,
+          id: profile.id,
+          name: profile.name ?? "LinkedIn User",
           email: profile.email,
           image: profile.picture,
-        }
+        };
       },
     }),
   ],
 
   callbacks: {
-    async jwt(params) {
-      const token = authConfig.callbacks?.jwt
-        ? await authConfig.callbacks.jwt(params as any)
-        : params.token
-
-      if (params.user) {
-        token.id = params.user.id
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.email = user.email;
       }
-
-      return token
+      return token;
     },
 
-    async session(params) {
-      const session = authConfig.callbacks?.session
-        ? await authConfig.callbacks.session(params as any)
-        : params.session
-
-      if (session.user && params.token?.id) {
-        session.user.id = params.token.id as string
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.id = token.id as string;
+        session.user.email = token.email as string;
       }
-
-      return session
+      return session;
     },
   },
 
-  debug: process.env.NODE_ENV === "development",
-}
+  pages: {
+    signIn: "/login",
+    error: "/auth-error",
+  },
 
-export const { handlers, auth, signIn, signOut } = NextAuth(authOptions)
+  debug: true,
+};
+
+export const { handlers, auth, signIn, signOut } = NextAuth(authOptions);

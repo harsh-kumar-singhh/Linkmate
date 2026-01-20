@@ -1,4 +1,5 @@
-import type { NextAuthConfig } from "next-auth"
+// ❗ DO NOT type this as NextAuthConfig
+// This is a PARTIAL config merged later
 
 export const authConfig = {
   pages: {
@@ -6,48 +7,23 @@ export const authConfig = {
   },
 
   callbacks: {
-    authorized({ auth, request: { nextUrl } }) {
-      const isLoggedIn = !!auth?.user
+    authorized({ auth, request: { nextUrl } }: any) {
+      const isLoggedIn = !!auth?.user;
 
-      // NEVER touch auth callback routes
-      if (nextUrl.pathname.startsWith("/api/auth")) {
-        return true
-      }
+      const protectedRoutes = [
+        "/dashboard",
+        "/posts",
+        "/calendar",
+        "/settings",
+      ];
 
-      const protectedRoutes =
-        nextUrl.pathname.startsWith("/dashboard") ||
-        nextUrl.pathname.startsWith("/posts") ||
-        nextUrl.pathname.startsWith("/calendar") ||
-        nextUrl.pathname.startsWith("/settings")
+      const isProtected = protectedRoutes.some((route) =>
+        nextUrl.pathname.startsWith(route)
+      );
 
-      const authRoutes =
-        nextUrl.pathname === "/login" ||
-        nextUrl.pathname === "/signup"
+      if (isProtected && !isLoggedIn) return false;
 
-      if (protectedRoutes && !isLoggedIn) {
-        return false
-      }
-
-      if (authRoutes && isLoggedIn) {
-        return Response.redirect(new URL("/dashboard", nextUrl))
-      }
-
-      return true
-    },
-
-    async jwt({ token, user, account }) {
-      if (user) token.id = user.id
-      if (account) token.accessToken = account.access_token
-      return token
-    },
-
-    async session({ session, token }) {
-      if (session.user && token.id) {
-        session.user.id = token.id as string
-      }
-      return session
+      return true;
     },
   },
-
-  providers: [],
-} satisfies NextAuthConfig
+};
