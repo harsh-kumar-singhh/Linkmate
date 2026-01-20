@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
+  // 1. Ensure user is logged in
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -14,9 +15,10 @@ export async function GET(req: Request) {
     );
   }
 
-  // CSRF-safe state: userId + random nonce
+  // 2. CSRF-safe state: userId + random nonce
   const state = `${session.user.id}:${crypto.randomUUID()}`;
 
+  // 3. Build LinkedIn authorization URL
   const params = new URLSearchParams({
     response_type: "code",
     client_id: process.env.LINKEDIN_CLIENT_ID!,
@@ -25,6 +27,7 @@ export async function GET(req: Request) {
     state,
   });
 
+  // 4. Redirect user to LinkedIn OAuth
   return NextResponse.redirect(
     `https://www.linkedin.com/oauth/v2/authorization?${params.toString()}`
   );
