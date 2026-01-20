@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     client_id: process.env.LINKEDIN_CLIENT_ID!,
     redirect_uri: `${process.env.NEXTAUTH_URL}/api/linkedin/callback`,
     scope: "r_liteprofile r_emailaddress",
-    state: session.user.id, // used safely
+    state: crypto.randomUUID(), // used safely
   });
 
   const linkedinAuthUrl =

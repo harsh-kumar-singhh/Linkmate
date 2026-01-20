@@ -17,12 +17,11 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Get logged-in user from session
+  // ✅ Get user from session, NOT from state
   const session = await auth();
-
   if (!session?.user?.id) {
     return NextResponse.redirect(
-      new URL("/login?callbackUrl=/settings", req.url)
+      new URL("/login", req.url)
     );
   }
 
@@ -65,13 +64,12 @@ export async function GET(req: NextRequest) {
   const profile = await profileRes.json();
 
   if (!profile?.id) {
-    console.error("LinkedIn profile error:", profile);
     return NextResponse.redirect(
       new URL("/settings?linkedin=failed", req.url)
     );
   }
 
-  // Save / update LinkedIn account for THIS USER
+  // Save / update account
   await prisma.account.upsert({
     where: {
       provider_providerAccountId: {
