@@ -1,29 +1,37 @@
-// ❗ DO NOT type this as NextAuthConfig
-// This is a PARTIAL config merged later
+// lib/auth.config.ts
+import type { NextAuthConfig } from "next-auth"
 
-export const authConfig = {
+export const authConfig: NextAuthConfig = {
   pages: {
     signIn: "/login",
   },
-
+  providers: [], // REQUIRED for NextAuthConfig typing
   callbacks: {
-    authorized({ auth, request: { nextUrl } }: any) {
-      const isLoggedIn = !!auth?.user;
-
-      const protectedRoutes = [
+    authorized({ auth, request: { nextUrl } }) {
+      const isLoggedIn = !!auth?.user
+      const protectedPaths = [
         "/dashboard",
         "/posts",
         "/calendar",
         "/settings",
-      ];
+      ]
 
-      const isProtected = protectedRoutes.some((route) =>
-        nextUrl.pathname.startsWith(route)
-      );
+      const isProtected = protectedPaths.some((path) =>
+        nextUrl.pathname.startsWith(path)
+      )
 
-      if (isProtected && !isLoggedIn) return false;
+      if (isProtected && !isLoggedIn) {
+        return false
+      }
 
-      return true;
+      if (
+        isLoggedIn &&
+        (nextUrl.pathname === "/login" || nextUrl.pathname === "/signup")
+      ) {
+        return Response.redirect(new URL("/dashboard", nextUrl))
+      }
+
+      return true
     },
   },
-};
+}

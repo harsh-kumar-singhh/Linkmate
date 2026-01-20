@@ -1,141 +1,117 @@
-import NextAuth from "next-auth";
-import type { NextAuthConfig } from "next-auth";
-import { PrismaAdapter } from "@auth/prisma-adapter";
-import { getPrisma } from "./prisma";
+import NextAuth, { type NextAuthConfig } from "next-auth"
+import CredentialsProvider from "next-auth/providers/credentials"
+import GoogleProvider from "next-auth/providers/google"
+import LinkedInProvider from "next-auth/providers/linkedin"
+import { PrismaAdapter } from "@auth/prisma-adapter"
+import bcrypt from "bcryptjs"
 
-import CredentialsProvider from "next-auth/providers/credentials";
-import GoogleProvider from "next-auth/providers/google";
-import LinkedInProvider from "next-auth/providers/linkedin";
+import { getPrisma } from "./prisma"
+import { authConfig } from "./auth.config"
 
-import bcrypt from "bcryptjs";
-import { authConfig } from "./auth.config";
-
-const prisma = getPrisma();
+const prisma = getPrisma()
 
 export const authOptions: NextAuthConfig = {
   ...authConfig,
-
   adapter: PrismaAdapter(prisma),
+  secret: process.env.NEXTAUTH_SECRET,
+  session: { strategy: "jwt" },
 
-  session: {
-    strategy: "jwt",
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user?.id) token.id = user.id
+      return token
+    },
+
+    async session({ session, token }) {
+      if (session.user && token.id) {
+        session.user.id = token.id as string
+      }
+      return session
+    },
   },
 
   providers: [
-    // =========================
-    // CREDENTIALS (EMAIL/PASSWORD)
-    // =========================
+    // ------------------------
+    // EMAIL / PASSWORD
+    // ------------------------
     CredentialsProvider({
-      name: "Credentials",
+      name: "Email",
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-
       async authorize(credentials) {
-        // ✅ HARD GUARDS
         if (
           !credentials ||
           typeof credentials.email !== "string" ||
           typeof credentials.password !== "string"
         ) {
-          return null;
+          return null
         }
 
         const user = await prisma.user.findUnique({
-          where: {
-            email: credentials.email,
-          },
-        });
+          where: { email: credentials.email },
+          include: { accounts: true },
+        })
 
-        if (!user) return null;
+        if (!user) return null
 
-        const account = await prisma.account.findFirst({
-          where: {
-            userId: user.id,
-            provider: "credentials",
-          },
-        });
+        const credentialsAccount = user.accounts.find(
+          (acc: { provider: string }) => acc.provider === "credentials"
+        )
 
-        if (!account?.access_token) return null;
+        if (!credentialsAccount?.access_token) return null
 
-        const isValid = await bcrypt.compare(
+        const valid = await bcrypt.compare(
           credentials.password,
-          account.access_token
-        );
+          credentialsAccount.access_token
+        )
 
-        if (!isValid) return null;
+        if (!valid) return null
 
         return {
           id: user.id,
           email: user.email,
           name: user.name,
-        };
+        }
       },
     }),
 
-    // =========================
-    // GOOGLE (OIDC – KEEP AS IS)
-    // =========================
+    // ------------------------
+    // GOOGLE (OIDC – STABLE)
+    // ------------------------
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
 
-    // =========================
-    // LINKEDIN (OAUTH – BLOCK IF NO EMAIL)
-    // =========================
+    // ------------------------
+    // LINKEDIN (LEGACY OAUTH)
+    // ------------------------
     LinkedInProvider({
       clientId: process.env.LINKEDIN_CLIENT_ID!,
       clientSecret: process.env.LINKEDIN_CLIENT_SECRET!,
-
       authorization: {
         params: {
           scope: "r_liteprofile r_emailaddress w_member_social",
         },
       },
-
+      token: "https://www.linkedin.com/oauth/v2/accessToken",
+      userinfo: "https://api.linkedin.com/v2/me",
       profile(profile) {
-        if (!profile.email) {
-          throw new Error(
-            "LinkedIn did not share your email. Please enable email access."
-          );
-        }
-
         return {
           id: profile.id,
-          name: profile.name ?? "LinkedIn User",
-          email: profile.email,
-          image: profile.picture,
-        };
+          name:
+            `${profile.localizedFirstName ?? ""} ${profile.localizedLastName ?? ""}`.trim() ||
+            "LinkedIn User",
+          email: null, // ✔ allowed by module augmentation
+          image: null,
+        }
       },
     }),
   ],
 
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-        token.email = user.email;
-      }
-      return token;
-    },
+  debug: process.env.NODE_ENV === "development",
+}
 
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id as string;
-        session.user.email = token.email as string;
-      }
-      return session;
-    },
-  },
-
-  pages: {
-    signIn: "/login",
-    error: "/auth-error",
-  },
-
-  debug: true,
-};
-
-export const { handlers, auth, signIn, signOut } = NextAuth(authOptions);
+export const { handlers, auth, signIn, signOut } = NextAuth(authOptions)
