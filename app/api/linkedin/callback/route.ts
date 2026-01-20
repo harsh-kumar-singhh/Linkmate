@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,23 +9,27 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
 
   const code = searchParams.get("code");
+  const state = searchParams.get("state");
 
-  if (!code) {
+  // 1️⃣ Basic validation
+  if (!code || !state || !state.includes(":")) {
+    console.error("LinkedIn callback missing code or state", { code, state });
     return NextResponse.redirect(
       new URL("/settings?linkedin=failed", req.url)
     );
   }
 
-  const session = await auth();
+  // 2️⃣ Extract userId from state
+  const userId = state.split(":")[0];
 
-  if (!session?.user?.id) {
+  if (!userId) {
+    console.error("Invalid state, userId missing:", state);
     return NextResponse.redirect(
-      new URL("/login", req.url)
+      new URL("/settings?linkedin=failed", req.url)
     );
   }
 
-  const userId = session.user.id;
-
+  // 3️⃣ Exchange authorization code for access token
   const tokenRes = await fetch(
     "https://www.linkedin.com/oauth/v2/accessToken",
     {
@@ -37,7 +40,7 @@ export async function GET(req: NextRequest) {
       body: new URLSearchParams({
         grant_type: "authorization_code",
         code,
-        redirect_uri: "https://linkmate-bp2u.vercel.app/api/linkedin/callback",
+        redirect_uri: `${process.env.NEXTAUTH_URL}/api/linkedin/callback`,
         client_id: process.env.LINKEDIN_CLIENT_ID!,
         client_secret: process.env.LINKEDIN_CLIENT_SECRET!,
       }),
@@ -47,12 +50,13 @@ export async function GET(req: NextRequest) {
   const tokenData = await tokenRes.json();
 
   if (!tokenRes.ok || !tokenData.access_token) {
-    console.error("LinkedIn token error:", tokenData);
+    console.error("LinkedIn token exchange failed:", tokenData);
     return NextResponse.redirect(
       new URL("/settings?linkedin=failed", req.url)
     );
   }
 
+  // 4️⃣ Fetch LinkedIn profile
   const profileRes = await fetch("https://api.linkedin.com/v2/me", {
     headers: {
       Authorization: `Bearer ${tokenData.access_token}`,
@@ -62,11 +66,13 @@ export async function GET(req: NextRequest) {
   const profile = await profileRes.json();
 
   if (!profile?.id) {
+    console.error("LinkedIn profile fetch failed:", profile);
     return NextResponse.redirect(
       new URL("/settings?linkedin=failed", req.url)
     );
   }
 
+  // 5️⃣ Save / update LinkedIn account
   await prisma.account.upsert({
     where: {
       provider_providerAccountId: {
@@ -87,6 +93,7 @@ export async function GET(req: NextRequest) {
     },
   });
 
+  // 6️⃣ Success redirect
   return NextResponse.redirect(
     new URL("/settings?linkedin=connected", req.url)
   );
