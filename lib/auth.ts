@@ -1,6 +1,6 @@
 import NextAuth from "next-auth"
 import Google from "next-auth/providers/google"
-import LinkedIn from "next-auth/providers/linkedin"
+
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { getPrisma } from "@/lib/prisma"
 import type { NextAuthConfig } from "next-auth"
@@ -22,37 +22,69 @@ export const authConfig: NextAuthConfig = {
     }),
 
     // ---------------- LINKEDIN (LEGACY OAUTH) ----------------
-    LinkedIn({
+    // ---------------- LINKEDIN (CUSTOM LEGACY OAUTH) ----------------
+    {
+      id: "linkedin",
+      name: "LinkedIn",
+      type: "oauth",
       clientId: process.env.LINKEDIN_CLIENT_ID!,
       clientSecret: process.env.LINKEDIN_CLIENT_SECRET!,
-
-      // Explicitly request scopes for legacy flow
       authorization: {
+        url: "https://www.linkedin.com/oauth/v2/authorization",
         params: {
           scope: "r_liteprofile r_emailaddress w_member_social",
+          response_type: "code",
+        },
+      },
+      token: "https://www.linkedin.com/oauth/v2/accessToken",
+      userinfo: {
+        url: "https://api.linkedin.com/v2/me",
+        async request({ tokens, client }: { tokens: any, client: any }) {
+          // 1. Fetch Basic Profile
+          const profile = await client.userinfo(tokens.access_token!) as any
+
+          // 2. Fetch Email (Separate API call required for Legacy LinkedIn)
+          // We use fetch directly as the client.userinfo is bound to the profile URL
+          const emailResponse = await fetch(
+            "https://api.linkedin.com/v2/emailAddress?q=members&projection=(elements*(handle~))",
+            {
+              headers: { Authorization: `Bearer ${tokens.access_token}` },
+            }
+          )
+
+          let emailData = null
+          if (emailResponse.ok) {
+            emailData = await emailResponse.json()
+          }
+
+          // Combine data for the profile callback
+          return {
+            ...profile,
+            emailData,
+          }
         },
       },
 
-      // 🔑 CRITICAL: Handle missing email safely. Do NOT fallback to fake email.
-      profile(profile) {
+      profile(profile: any) {
         const id = profile.id as string
 
-        const firstName =
-          (profile as any).localizedFirstName ?? "LinkedIn"
-        const lastName =
-          (profile as any).localizedLastName ?? "User"
+        const firstName = profile.localizedFirstName ?? "LinkedIn"
+        const lastName = profile.localizedLastName ?? "User"
 
-        // LinkedIn API might not return email if not granted or accounted for
-        const email = (profile as any).emailAddress || null
+        // Extract email from the combined data we fetched in userinfo()
+        let email = null
+        if (profile.emailData?.elements?.[0]?.["handle~"]?.emailAddress) {
+          email = profile.emailData.elements[0]["handle~"].emailAddress
+        }
 
         return {
           id,
           name: `${firstName} ${lastName}`,
-          email, // Can be null now
+          email, // Can be null
           image: null,
         }
       },
-    }),
+    },
   ],
 
   callbacks: {
