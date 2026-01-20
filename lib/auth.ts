@@ -2,47 +2,61 @@ import NextAuth from "next-auth"
 import Google from "next-auth/providers/google"
 import LinkedIn from "next-auth/providers/linkedin"
 import { PrismaAdapter } from "@auth/prisma-adapter"
-import type { Session, User, Account } from "next-auth"
-import type { JWT } from "next-auth/jwt"
 import { getPrisma } from "@/lib/prisma"
+import type { NextAuthConfig } from "next-auth"
 
 const prisma = getPrisma()
 
-export const authOptions = {
+export const authConfig: NextAuthConfig = {
   adapter: PrismaAdapter(prisma),
 
   session: {
-    strategy: "jwt" as const,
+    strategy: "jwt",
   },
 
   providers: [
+    // ---------------- GOOGLE (OIDC – works fine) ----------------
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
 
-    // ✅ Legacy LinkedIn OAuth (NOT OIDC)
+    // ---------------- LINKEDIN (LEGACY OAUTH) ----------------
     LinkedIn({
       clientId: process.env.LINKEDIN_CLIENT_ID!,
       clientSecret: process.env.LINKEDIN_CLIENT_SECRET!,
+
       authorization: {
         params: {
           scope: "r_liteprofile r_emailaddress w_member_social",
         },
       },
+
+      // 🔑 CRITICAL: normalize profile + fallback email
+      profile(profile) {
+        const id = profile.id as string
+
+        const firstName =
+          (profile as any).localizedFirstName ?? "LinkedIn"
+        const lastName =
+          (profile as any).localizedLastName ?? "User"
+
+        const email =
+          (profile as any).emailAddress ??
+          `linkedin_${id}@linkmate.local`
+
+        return {
+          id,
+          name: `${firstName} ${lastName}`,
+          email,
+          image: null,
+        }
+      },
     }),
   ],
 
   callbacks: {
-    async jwt({
-      token,
-      user,
-      account,
-    }: {
-      token: JWT
-      user?: User
-      account?: Account | null
-    }) {
+    async jwt({ token, user, account }) {
       if (user?.id) {
         token.id = user.id
       }
@@ -54,13 +68,7 @@ export const authOptions = {
       return token
     },
 
-    async session({
-      session,
-      token,
-    }: {
-      session: Session
-      token: JWT
-    }) {
+    async session({ session, token }) {
       if (session.user && token.id) {
         session.user.id = token.id
       }
@@ -77,8 +85,5 @@ export const authOptions = {
   debug: process.env.NODE_ENV === "development",
 }
 
-// ✅ THIS is what your build was missing
-export const {
-  handlers,
-  auth,
-} = NextAuth(authOptions)
+// ✅ REQUIRED for App Router
+export const { handlers, auth } = NextAuth(authConfig)
