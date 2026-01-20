@@ -3,42 +3,32 @@ import { PrismaAdapter } from "@auth/prisma-adapter"
 import { getPrisma } from "./prisma"
 
 import CredentialsProvider from "next-auth/providers/credentials"
-import LinkedInProvider from "next-auth/providers/linkedin"
 import GoogleProvider from "next-auth/providers/google"
+import LinkedInProvider from "next-auth/providers/linkedin"
 
 import bcrypt from "bcryptjs"
 import { authConfig } from "./auth.config"
 
-const useSecureCookies = process.env.NODE_ENV === "production"
-const cookiePrefix = useSecureCookies ? "__Secure-" : ""
+const secret = process.env.NEXTAUTH_SECRET
+
+if (!secret) {
+  console.warn("⚠️ NEXTAUTH_SECRET is missing")
+}
 
 export const authOptions: NextAuthConfig = {
   ...authConfig,
 
-  secret: process.env.NEXTAUTH_SECRET,
+  secret,
   adapter: PrismaAdapter(getPrisma()),
 
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60,
-  },
-
-  cookies: {
-    sessionToken: {
-      name: `${cookiePrefix}next-auth.session-token`,
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: useSecureCookies,
-      },
-    },
   },
 
   callbacks: {
     async signIn({ user, account }) {
       if (account?.provider === "linkedin") {
-        console.log("[LINKEDIN_OIDC] signIn success", {
+        console.log("[LINKEDIN] signIn ok", {
           userId: user.id,
           email: user.email,
         })
@@ -50,10 +40,11 @@ export const authOptions: NextAuthConfig = {
       if (user) {
         token.id = user.id
       }
-      if (account) {
-        token.provider = account.provider
-        token.accessToken = account.access_token
+
+      if (account?.provider === "linkedin") {
+        token.linkedinAccessToken = account.access_token
       }
+
       return token
     },
 
@@ -67,70 +58,75 @@ export const authOptions: NextAuthConfig = {
 
   providers: [
     CredentialsProvider({
-      name: "Email",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-      },
+  name: "Email",
+  credentials: {
+    email: { label: "Email", type: "email" },
+    password: { label: "Password", type: "password" },
+  },
+  async authorize(credentials) {
+    if (!credentials?.email || !credentials?.password) {
+      return null
+    }
 
-      async authorize(credentials) {
-        // ✅ HARD TYPE GUARDS (THIS FIXES ALL ERRORS)
-        if (
-          !credentials ||
-          typeof credentials.email !== "string" ||
-          typeof credentials.password !== "string"
-        ) {
-          return null
-        }
+    const email = credentials.email as string
+    const password = credentials.password as string
 
-        const prisma = getPrisma()
+    const prisma = getPrisma()
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-          include: { accounts: true }, // ✅ explicitly include relation
-        })
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: { accounts: true },
+    })
 
-        if (!user) return null
+    if (!user) {
+      return null
+    }
 
-        const credentialsAccount = user.accounts.find(
-          (account) => account.provider === "credentials"
-        )
+    const credentialsAccount = user.accounts.find(
+      (a: { provider: string; access_token: string | null }) =>
+        a.provider === "credentials"
+    )
 
-        if (!credentialsAccount?.access_token) return null
+    if (!credentialsAccount?.access_token) {
+      return null
+    }
 
-        const isValid = await bcrypt.compare(
-          credentials.password,
-          credentialsAccount.access_token
-        )
+    const isValid = await bcrypt.compare(
+      password,
+      credentialsAccount.access_token
+    )
 
-        if (!isValid) return null
+    if (!isValid) {
+      return null
+    }
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-        }
-      },
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+    }
+  },
+}),
+
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
 
+    // ✅ PURE OIDC LINKEDIN — NO LEGACY OVERRIDES
     LinkedInProvider({
       clientId: process.env.LINKEDIN_CLIENT_ID!,
       clientSecret: process.env.LINKEDIN_CLIENT_SECRET!,
-
       issuer: "https://www.linkedin.com/oauth",
       wellKnown:
         "https://www.linkedin.com/oauth/openid/.well-known/openid-configuration",
-
       authorization: {
         params: {
           scope: "openid profile email w_member_social",
         },
       },
-
       checks: ["pkce", "state"],
-
       profile(profile) {
-        console.log("[LINKEDIN_OIDC] profile", profile)
         return {
           id: profile.sub,
           name: profile.name,
@@ -138,11 +134,6 @@ export const authOptions: NextAuthConfig = {
           image: profile.picture,
         }
       },
-    }),
-
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
   ],
 
