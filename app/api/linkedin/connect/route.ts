@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const params = new URLSearchParams({
     response_type: "code",
     client_id: process.env.LINKEDIN_CLIENT_ID!,
-    redirect_uri: `${process.env.NEXTAUTH_URL}/api/linkedin/callback`,
+    redirect_uri: "https://linkmate-bp2u.vercel.app/api/linkedin/callback",
     scope: "r_liteprofile r_emailaddress",
     state: crypto.randomUUID(), // used safely
   });

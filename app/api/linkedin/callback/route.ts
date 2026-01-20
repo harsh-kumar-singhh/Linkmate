@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
       body: new URLSearchParams({
         grant_type: "authorization_code",
         code,
-        redirect_uri: `${process.env.NEXTAUTH_URL}/api/linkedin/callback`,
+        redirect_uri: "https://linkmate-bp2u.vercel.app/api/linkedin/callback",
         client_id: process.env.LINKEDIN_CLIENT_ID!,
         client_secret: process.env.LINKEDIN_CLIENT_SECRET!,
       }),
