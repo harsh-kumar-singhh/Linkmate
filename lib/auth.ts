@@ -12,7 +12,7 @@ export const authOptions = {
   adapter: PrismaAdapter(prisma),
 
   session: {
-    strategy: "jwt" as const, // 👈 THIS FIXES YOUR ERROR
+    strategy: "jwt" as const,
   },
 
   providers: [
@@ -21,7 +21,7 @@ export const authOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
 
-    // ✅ Legacy OAuth (NOT OIDC)
+    // ✅ Legacy LinkedIn OAuth (NOT OIDC)
     LinkedIn({
       clientId: process.env.LINKEDIN_CLIENT_ID!,
       clientSecret: process.env.LINKEDIN_CLIENT_SECRET!,
@@ -77,7 +77,8 @@ export const authOptions = {
   debug: process.env.NODE_ENV === "development",
 }
 
+// ✅ THIS is what your build was missing
 export const {
-  handlers: { GET, POST },
+  handlers,
   auth,
 } = NextAuth(authOptions)
