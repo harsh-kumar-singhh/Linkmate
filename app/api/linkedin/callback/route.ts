@@ -17,8 +17,8 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // ✅ Get user from session, NOT from state
   const session = await auth();
+
   if (!session?.user?.id) {
     return NextResponse.redirect(
       new URL("/login", req.url)
@@ -27,7 +27,6 @@ export async function GET(req: NextRequest) {
 
   const userId = session.user.id;
 
-  // Exchange code for access token
   const tokenRes = await fetch(
     "https://www.linkedin.com/oauth/v2/accessToken",
     {
@@ -54,7 +53,6 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Fetch LinkedIn profile
   const profileRes = await fetch("https://api.linkedin.com/v2/me", {
     headers: {
       Authorization: `Bearer ${tokenData.access_token}`,
@@ -69,7 +67,6 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Save / update account
   await prisma.account.upsert({
     where: {
       provider_providerAccountId: {
