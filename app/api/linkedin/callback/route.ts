@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,27 +10,22 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
 
   const code = searchParams.get("code");
-  const state = searchParams.get("state");
 
-  // 1️⃣ Basic validation
-  if (!code || !state || !state.includes(":")) {
-    console.error("LinkedIn callback missing code or state", { code, state });
+  if (!code) {
+    console.error("[LinkedIn] Missing code");
     return NextResponse.redirect(
       new URL("/settings?linkedin=failed", req.url)
     );
   }
 
-  // 2️⃣ Extract userId from state
-  const userId = state.split(":")[0];
+  const session = await auth();
 
-  if (!userId) {
-    console.error("Invalid state, userId missing:", state);
+  if (!session?.user?.id) {
     return NextResponse.redirect(
-      new URL("/settings?linkedin=failed", req.url)
+      new URL("/login", req.url)
     );
   }
 
-  // 3️⃣ Exchange authorization code for access token
   const tokenRes = await fetch(
     "https://www.linkedin.com/oauth/v2/accessToken",
     {
@@ -50,29 +46,30 @@ export async function GET(req: NextRequest) {
   const tokenData = await tokenRes.json();
 
   if (!tokenRes.ok || !tokenData.access_token) {
-    console.error("LinkedIn token exchange failed:", tokenData);
+    console.error("[LinkedIn] Token error", tokenData);
     return NextResponse.redirect(
       new URL("/settings?linkedin=failed", req.url)
     );
   }
 
-  // 4️⃣ Fetch LinkedIn profile
-  const profileRes = await fetch("https://api.linkedin.com/v2/me", {
-    headers: {
-      Authorization: `Bearer ${tokenData.access_token}`,
-    },
-  });
+  const profileRes = await fetch(
+    "https://api.linkedin.com/v2/me",
+    {
+      headers: {
+        Authorization: `Bearer ${tokenData.access_token}`,
+      },
+    }
+  );
 
   const profile = await profileRes.json();
 
   if (!profile?.id) {
-    console.error("LinkedIn profile fetch failed:", profile);
+    console.error("[LinkedIn] Profile fetch failed", profile);
     return NextResponse.redirect(
       new URL("/settings?linkedin=failed", req.url)
     );
   }
 
-  // 5️⃣ Save / update LinkedIn account
   await prisma.account.upsert({
     where: {
       provider_providerAccountId: {
@@ -82,10 +79,10 @@ export async function GET(req: NextRequest) {
     },
     update: {
       access_token: tokenData.access_token,
-      userId,
+      userId: session.user.id,
     },
     create: {
-      userId,
+      userId: session.user.id,
       type: "oauth",
       provider: "linkedin",
       providerAccountId: profile.id,
@@ -93,7 +90,6 @@ export async function GET(req: NextRequest) {
     },
   });
 
-  // 6️⃣ Success redirect
   return NextResponse.redirect(
     new URL("/settings?linkedin=connected", req.url)
   );

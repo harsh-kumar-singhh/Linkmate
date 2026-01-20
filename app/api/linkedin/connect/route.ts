@@ -1,13 +1,20 @@
-import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import crypto from "crypto";
 
-export async function GET() {
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export async function GET(req: Request) {
   const session = await auth();
+
   if (!session?.user?.id) {
-    return NextResponse.redirect("/login");
+    return NextResponse.redirect(
+      new URL("/login", req.url)
+    );
   }
 
+  // CSRF-safe state: userId + random nonce
   const state = `${session.user.id}:${crypto.randomUUID()}`;
 
   const params = new URLSearchParams({
