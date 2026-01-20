@@ -1,25 +1,22 @@
-import NextAuth from "next-auth"
-import type { NextAuthConfig } from "next-auth"
+import NextAuth, { type NextAuthConfig } from "next-auth"
 import { PrismaAdapter } from "@auth/prisma-adapter"
+import { getPrisma } from "./prisma"
 
 import CredentialsProvider from "next-auth/providers/credentials"
-import GoogleProvider from "next-auth/providers/google"
 import LinkedInProvider from "next-auth/providers/linkedin"
+import GoogleProvider from "next-auth/providers/google"
 
 import bcrypt from "bcryptjs"
-import { getPrisma } from "./prisma"
 import { authConfig } from "./auth.config"
 
-const prisma = getPrisma()
-
-const isProduction = process.env.NODE_ENV === "production"
-const useSecureCookies = isProduction
+const useSecureCookies = process.env.NODE_ENV === "production"
 const cookiePrefix = useSecureCookies ? "__Secure-" : ""
 
 export const authOptions: NextAuthConfig = {
-  secret: process.env.NEXTAUTH_SECRET,
+  ...authConfig,
 
-  adapter: PrismaAdapter(prisma),
+  secret: process.env.NEXTAUTH_SECRET,
+  adapter: PrismaAdapter(getPrisma()),
 
   session: {
     strategy: "jwt",
@@ -38,10 +35,37 @@ export const authOptions: NextAuthConfig = {
     },
   },
 
-  pages: authConfig.pages,
+  callbacks: {
+    async signIn({ user, account }) {
+      if (account?.provider === "linkedin") {
+        console.log("[LINKEDIN_OIDC] signIn success", {
+          userId: user.id,
+          email: user.email,
+        })
+      }
+      return true
+    },
+
+    async jwt({ token, user, account }) {
+      if (user) {
+        token.id = user.id
+      }
+      if (account) {
+        token.provider = account.provider
+        token.accessToken = account.access_token
+      }
+      return token
+    },
+
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.id = token.id as string
+      }
+      return session
+    },
+  },
 
   providers: [
-    // ================= CREDENTIALS =================
     CredentialsProvider({
       name: "Email",
       credentials: {
@@ -50,6 +74,7 @@ export const authOptions: NextAuthConfig = {
       },
 
       async authorize(credentials) {
+        // ✅ HARD TYPE GUARDS (THIS FIXES ALL ERRORS)
         if (
           !credentials ||
           typeof credentials.email !== "string" ||
@@ -58,52 +83,36 @@ export const authOptions: NextAuthConfig = {
           return null
         }
 
-        const email = credentials.email
-        const password = credentials.password
+        const prisma = getPrisma()
 
         const user = await prisma.user.findUnique({
-          where: { email },
-          include: {
-            accounts: {
-              where: { provider: "credentials" },
-            },
-          },
+          where: { email: credentials.email },
+          include: { accounts: true }, // ✅ explicitly include relation
         })
 
-        if (!user || user.accounts.length === 0) {
-          return null
-        }
+        if (!user) return null
 
-        const account = user.accounts[0]
-
-        if (!account.access_token) {
-          return null
-        }
-
-        const isValid = await bcrypt.compare(
-          password,
-          account.access_token
+        const credentialsAccount = user.accounts.find(
+          (account) => account.provider === "credentials"
         )
 
-        if (!isValid) {
-          return null
-        }
+        if (!credentialsAccount?.access_token) return null
+
+        const isValid = await bcrypt.compare(
+          credentials.password,
+          credentialsAccount.access_token
+        )
+
+        if (!isValid) return null
 
         return {
           id: user.id,
           email: user.email,
-          name: user.name ?? undefined,
+          name: user.name,
         }
       },
     }),
 
-    // ================= GOOGLE =================
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
-
-    // ================= LINKEDIN (OIDC) =================
     LinkedInProvider({
       clientId: process.env.LINKEDIN_CLIENT_ID!,
       clientSecret: process.env.LINKEDIN_CLIENT_SECRET!,
@@ -120,52 +129,24 @@ export const authOptions: NextAuthConfig = {
 
       checks: ["pkce", "state"],
 
-      async profile(profile) {
-        if (!profile.sub || !profile.email) {
-          throw new Error("Invalid LinkedIn profile")
-        }
-
+      profile(profile) {
+        console.log("[LINKEDIN_OIDC] profile", profile)
         return {
           id: profile.sub,
+          name: profile.name,
           email: profile.email,
-          name: profile.name ?? undefined,
-          image: profile.picture ?? undefined,
+          image: profile.picture,
         }
       },
     }),
+
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    }),
   ],
 
-  callbacks: {
-    authorized: authConfig.callbacks?.authorized,
-
-    async signIn({ account, user }) {
-      if (account?.provider === "linkedin") {
-        console.log("[LINKEDIN] signIn success", user?.email)
-      }
-      return true
-    },
-
-    async jwt({ token, user, account }) {
-      if (user?.id) {
-        token.id = user.id
-      }
-
-      if (account?.access_token) {
-        token.accessToken = account.access_token
-      }
-
-      return token
-    },
-
-    async session({ session, token }) {
-      if (session.user && typeof token.id === "string") {
-        session.user.id = token.id
-      }
-      return session
-    },
-  },
-
-  debug: !isProduction,
+  debug: true,
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth(authOptions)
