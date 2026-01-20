@@ -9,123 +9,90 @@ import LinkedInProvider from "next-auth/providers/linkedin"
 import bcrypt from "bcryptjs"
 import { authConfig } from "./auth.config"
 
-const secret = process.env.NEXTAUTH_SECRET
-
-if (!secret) {
-  console.warn("⚠️ NEXTAUTH_SECRET is missing")
-}
+const prisma = getPrisma()
 
 export const authOptions: NextAuthConfig = {
   ...authConfig,
 
-  secret,
-  adapter: PrismaAdapter(getPrisma()),
+  adapter: PrismaAdapter(prisma),
 
   session: {
     strategy: "jwt",
-  },
-
-  callbacks: {
-    async signIn({ user, account }) {
-      if (account?.provider === "linkedin") {
-        console.log("[LINKEDIN] signIn ok", {
-          userId: user.id,
-          email: user.email,
-        })
-      }
-      return true
-    },
-
-    async jwt({ token, user, account }) {
-      if (user) {
-        token.id = user.id
-      }
-
-      if (account?.provider === "linkedin") {
-        token.linkedinAccessToken = account.access_token
-      }
-
-      return token
-    },
-
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id as string
-      }
-      return session
-    },
+    maxAge: 30 * 24 * 60 * 60,
   },
 
   providers: [
+    // =========================
+    // Credentials Provider
+    // =========================
     CredentialsProvider({
-  name: "Email",
-  credentials: {
-    email: { label: "Email", type: "email" },
-    password: { label: "Password", type: "password" },
-  },
-  async authorize(credentials) {
-    if (!credentials?.email || !credentials?.password) {
-      return null
-    }
+      name: "Email",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          return null
+        }
 
-    const email = credentials.email as string
-    const password = credentials.password as string
+        // ✅ Explicitly cast AFTER validation
+        const email = credentials.email as string
+        const password = credentials.password as string
 
-    const prisma = getPrisma()
+        const user = await prisma.user.findUnique({
+          where: { email },
+          include: { accounts: true },
+        })
 
-    const user = await prisma.user.findUnique({
-      where: { email },
-      include: { accounts: true },
-    })
+        if (!user) return null
 
-    if (!user) {
-      return null
-    }
+        const credentialsAccount = user.accounts.find(
+          (account) => account.provider === "credentials"
+        )
 
-    const credentialsAccount = user.accounts.find(
-      (a: { provider: string; access_token: string | null }) =>
-        a.provider === "credentials"
-    )
+        if (!credentialsAccount?.access_token) return null
 
-    if (!credentialsAccount?.access_token) {
-      return null
-    }
+        const isValid = await bcrypt.compare(
+          password,
+          credentialsAccount.access_token
+        )
 
-    const isValid = await bcrypt.compare(
-      password,
-      credentialsAccount.access_token
-    )
+        if (!isValid) return null
 
-    if (!isValid) {
-      return null
-    }
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        }
+      },
+    }),
 
-    return {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-    }
-  },
-}),
-
+    // =========================
+    // Google (OIDC)
+    // =========================
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
 
-    // ✅ PURE OIDC LINKEDIN — NO LEGACY OVERRIDES
+    // =========================
+    // LinkedIn (OAuth2 – NOT OIDC)
+    // =========================
     LinkedInProvider({
       clientId: process.env.LINKEDIN_CLIENT_ID!,
       clientSecret: process.env.LINKEDIN_CLIENT_SECRET!,
-      issuer: "https://www.linkedin.com/oauth",
-      wellKnown:
-        "https://www.linkedin.com/oauth/openid/.well-known/openid-configuration",
+
       authorization: {
+        url: "https://www.linkedin.com/oauth/v2/authorization",
         params: {
           scope: "openid profile email w_member_social",
         },
       },
-      checks: ["pkce", "state"],
+
+      token: "https://www.linkedin.com/oauth/v2/accessToken",
+      userinfo: "https://api.linkedin.com/v2/userinfo",
+
       profile(profile) {
         return {
           id: profile.sub,
@@ -137,7 +104,33 @@ export const authOptions: NextAuthConfig = {
     }),
   ],
 
-  debug: true,
+  callbacks: {
+    async jwt(params) {
+      const token = authConfig.callbacks?.jwt
+        ? await authConfig.callbacks.jwt(params as any)
+        : params.token
+
+      if (params.user) {
+        token.id = params.user.id
+      }
+
+      return token
+    },
+
+    async session(params) {
+      const session = authConfig.callbacks?.session
+        ? await authConfig.callbacks.session(params as any)
+        : params.session
+
+      if (session.user && params.token?.id) {
+        session.user.id = params.token.id as string
+      }
+
+      return session
+    },
+  },
+
+  debug: process.env.NODE_ENV === "development",
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth(authOptions)
