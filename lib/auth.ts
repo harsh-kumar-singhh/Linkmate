@@ -49,6 +49,7 @@ export const authConfig: NextAuthConfig = {
       token: "https://www.linkedin.com/oauth/v2/accessToken",
 
       userinfo: {
+        url: "https://api.linkedin.com/v2/me",
         // 3. Manually fetch profile to avoid OIDC auto-discovery logic
         request: async ({ tokens, client }: any) => {
           if (!tokens?.access_token) {
