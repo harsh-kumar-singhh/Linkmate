@@ -22,13 +22,23 @@ export const authConfig: NextAuthConfig = {
     }),
 
     // ---------------- LINKEDIN (LEGACY OAUTH) ----------------
-    // ---------------- LINKEDIN (CUSTOM LEGACY OAUTH) ----------------
+    // ---------------- LINKEDIN (STRICT LEGACY OAUTH 2.0) ----------------
     {
       id: "linkedin",
       name: "LinkedIn",
       type: "oauth",
-      clientId: process.env.LINKEDIN_CLIENT_ID!,
-      clientSecret: process.env.LINKEDIN_CLIENT_SECRET!,
+      clientId: process.env.LINKEDIN_CLIENT_ID,
+      clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
+
+      // CRITICAL: Force Legacy behavior
+      // 1. Disable PKCE (LinkedIn Legacy doesn't support it)
+      checks: ['state'],
+
+      // 2. Force POST for token exchange (standard for legacy)
+      client: {
+        token_endpoint_auth_method: "client_secret_post",
+      },
+
       authorization: {
         url: "https://www.linkedin.com/oauth/v2/authorization",
         params: {
@@ -37,52 +47,58 @@ export const authConfig: NextAuthConfig = {
         },
       },
       token: "https://www.linkedin.com/oauth/v2/accessToken",
-      userinfo: {
-        url: "https://api.linkedin.com/v2/me",
-        async request({ tokens, client }: { tokens: any, client: any }) {
-          // 1. Fetch Basic Profile
-          const profile = await client.userinfo(tokens.access_token!) as any
 
-          // 2. Fetch Email (Separate API call required for Legacy LinkedIn)
-          // We use fetch directly as the client.userinfo is bound to the profile URL
-          const emailResponse = await fetch(
+      userinfo: {
+        // 3. Manually fetch profile to avoid OIDC auto-discovery logic
+        request: async ({ tokens, client }: any) => {
+          if (!tokens?.access_token) {
+            throw new Error("LinkedIn Access Token missing");
+          }
+
+          // Fetch Basic Profile
+          const profileRes = await fetch("https://api.linkedin.com/v2/me", {
+            headers: { Authorization: `Bearer ${tokens.access_token}` },
+          });
+
+          if (!profileRes.ok) throw new Error("Failed to fetch LinkedIn Profile");
+          const profile = await profileRes.json();
+
+          // Fetch Email (Separate API call)
+          const emailRes = await fetch(
             "https://api.linkedin.com/v2/emailAddress?q=members&projection=(elements*(handle~))",
             {
               headers: { Authorization: `Bearer ${tokens.access_token}` },
             }
-          )
+          );
 
-          let emailData = null
-          if (emailResponse.ok) {
-            emailData = await emailResponse.json()
+          let emailData = null;
+          if (emailRes.ok) {
+            emailData = await emailRes.json();
           }
 
-          // Combine data for the profile callback
           return {
             ...profile,
             emailData,
-          }
+          };
         },
       },
 
       profile(profile: any) {
-        const id = profile.id as string
+        const id = profile.id;
+        const firstName = profile.localizedFirstName ?? "LinkedIn";
+        const lastName = profile.localizedLastName ?? "User";
 
-        const firstName = profile.localizedFirstName ?? "LinkedIn"
-        const lastName = profile.localizedLastName ?? "User"
-
-        // Extract email from the combined data we fetched in userinfo()
-        let email = null
+        let email = null;
         if (profile.emailData?.elements?.[0]?.["handle~"]?.emailAddress) {
-          email = profile.emailData.elements[0]["handle~"].emailAddress
+          email = profile.emailData.elements[0]["handle~"].emailAddress;
         }
 
         return {
           id,
           name: `${firstName} ${lastName}`,
-          email, // Can be null
+          email: email,
           image: null,
-        }
+        };
       },
     },
   ],
