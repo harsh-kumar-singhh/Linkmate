@@ -1,5 +1,6 @@
 import NextAuth from "next-auth"
 import Google from "next-auth/providers/google"
+import LinkedIn from "next-auth/providers/linkedin"
 
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { getPrisma } from "@/lib/prisma"
@@ -15,93 +16,48 @@ export const authConfig: NextAuthConfig = {
   },
 
   providers: [
-    // ---------------- GOOGLE (OIDC – works fine) ----------------
+    // ---------- GOOGLE (OIDC, stable) ----------
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
 
-    // ---------------- LINKEDIN (LEGACY OAUTH) ----------------
-    // ---------------- LINKEDIN (STRICT LEGACY OAUTH 2.0) ----------------
-    {
-      id: "linkedin",
-      name: "LinkedIn",
-      type: "oauth",
-      clientId: process.env.LINKEDIN_CLIENT_ID,
-      clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
+    // ---------- LINKEDIN (LEGACY OAUTH, SAFE) ----------
+    LinkedIn({
+      clientId: process.env.LINKEDIN_CLIENT_ID!,
+      clientSecret: process.env.LINKEDIN_CLIENT_SECRET!,
 
-      // CRITICAL: Force Legacy behavior
-      // 1. Disable PKCE (LinkedIn Legacy doesn't support it)
-      checks: ['state'],
-
-      // 2. Force POST for token exchange (standard for legacy)
-      client: {
-        token_endpoint_auth_method: "client_secret_post",
-      },
+      // Disable PKCE → legacy compatible
+      checks: ["state"],
 
       authorization: {
-        url: "https://www.linkedin.com/oauth/v2/authorization",
         params: {
           scope: "r_liteprofile r_emailaddress w_member_social",
-          response_type: "code",
-        },
-      },
-      token: "https://www.linkedin.com/oauth/v2/accessToken",
-
-      userinfo: {
-        url: "https://api.linkedin.com/v2/me",
-        // 3. Manually fetch profile to avoid OIDC auto-discovery logic
-        request: async ({ tokens, client }: any) => {
-          if (!tokens?.access_token) {
-            throw new Error("LinkedIn Access Token missing");
-          }
-
-          // Fetch Basic Profile
-          const profileRes = await fetch("https://api.linkedin.com/v2/me", {
-            headers: { Authorization: `Bearer ${tokens.access_token}` },
-          });
-
-          if (!profileRes.ok) throw new Error("Failed to fetch LinkedIn Profile");
-          const profile = await profileRes.json();
-
-          // Fetch Email (Separate API call)
-          const emailRes = await fetch(
-            "https://api.linkedin.com/v2/emailAddress?q=members&projection=(elements*(handle~))",
-            {
-              headers: { Authorization: `Bearer ${tokens.access_token}` },
-            }
-          );
-
-          let emailData = null;
-          if (emailRes.ok) {
-            emailData = await emailRes.json();
-          }
-
-          return {
-            ...profile,
-            emailData,
-          };
         },
       },
 
-      profile(profile: any) {
-        const id = profile.id;
-        const firstName = profile.localizedFirstName ?? "LinkedIn";
-        const lastName = profile.localizedLastName ?? "User";
+      profile(profile) {
+        const id = profile.id
 
-        let email = null;
-        if (profile.emailData?.elements?.[0]?.["handle~"]?.emailAddress) {
-          email = profile.emailData.elements[0]["handle~"].emailAddress;
-        }
+        const firstName =
+          (profile as any).localizedFirstName ?? "LinkedIn"
+        const lastName =
+          (profile as any).localizedLastName ?? "User"
+
+        // Email MAY be missing → must be nullable
+        const email =
+          (profile as any)?.emailAddress ??
+          (profile as any)?.elements?.[0]?.["handle~"]?.emailAddress ??
+          null
 
         return {
           id,
           name: `${firstName} ${lastName}`,
-          email: email,
+          email,
           image: null,
-        };
+        }
       },
-    },
+    }),
   ],
 
   callbacks: {
@@ -121,7 +77,6 @@ export const authConfig: NextAuthConfig = {
       if (session.user && token.id) {
         session.user.id = token.id
       }
-
       return session
     },
   },
@@ -134,5 +89,4 @@ export const authConfig: NextAuthConfig = {
   debug: process.env.NODE_ENV === "development",
 }
 
-// ✅ REQUIRED for App Router
 export const { handlers, auth } = NextAuth(authConfig)
