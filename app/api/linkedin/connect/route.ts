@@ -1,21 +1,28 @@
-import { NextResponse } from "next/server";
-import crypto from "crypto";
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const state = crypto.randomBytes(16).toString("hex");
+export async function GET(req: NextRequest) {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return NextResponse.redirect(
+      new URL("/login", req.url)
+    );
+  }
 
   const params = new URLSearchParams({
     response_type: "code",
     client_id: process.env.LINKEDIN_CLIENT_ID!,
     redirect_uri: `${process.env.NEXTAUTH_URL}/api/linkedin/callback`,
     scope: "r_liteprofile r_emailaddress w_member_social",
-    state,
+    state: session.user.id, // used safely
   });
 
-  const authUrl = `https://www.linkedin.com/oauth/v2/authorization?${params.toString()}`;
+  const linkedinAuthUrl =
+    `https://www.linkedin.com/oauth/v2/authorization?${params.toString()}`;
 
-  return NextResponse.redirect(authUrl);
+  return NextResponse.redirect(linkedinAuthUrl);
 }
