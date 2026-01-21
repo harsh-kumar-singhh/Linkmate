@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import crypto from "crypto";
+import { encryptState } from "@/lib/oauth-state";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
-  // 1. Ensure user is logged in
+  // 1. Ensure user is logged in (session checked ONLY at start)
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -15,8 +15,8 @@ export async function GET(req: Request) {
     );
   }
 
-  // 2. CSRF-safe state: userId + random nonce
-  const state = `${session.user.id}:${crypto.randomUUID()}`;
+  // 2. Generate encrypted state containing userId, timestamp, and nonce
+  const state = encryptState(session.user.id);
 
   // 3. Build LinkedIn authorization URL
   const params = new URLSearchParams({
