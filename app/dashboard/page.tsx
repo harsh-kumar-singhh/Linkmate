@@ -5,55 +5,44 @@ export const dynamic = "force-dynamic";
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { AnimatedCard } from "@/components/animated/AnimatedCard"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Plus, Calendar as CalendarIcon, FileText, Send, Clock, CheckCircle, PenSquare, ArrowRight, Sparkles, X } from "lucide-react"
+import {
+  Plus,
+  Calendar as CalendarIcon,
+  FileText,
+  Clock,
+  CheckCircle,
+  PenSquare,
+  ArrowRight,
+  Sparkles,
+  X
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export default function DashboardPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+
   const [posts, setPosts] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isConnected, setIsConnected] = useState(true)
   const [notifications, setNotifications] = useState<any[]>([])
 
+  // Redirect unauthenticated users
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login")
     }
   }, [status, router])
 
-  useEffect(() => {
-    if (status === "authenticated") {
-      fetchData()
-
-      // Heartbeat: Trigger scheduler every 60 seconds
-      const heartbeat = setInterval(async () => {
-        try {
-          // Trigger the background scheduler
-          const res = await fetch("/api/scheduler/run", { method: "POST" });
-          const data = await res.json();
-
-          if (data.processed > 0) {
-            console.log(`[HEARTBEAT] Processed ${data.processed} posts.`);
-            // Refetch posts to see the new status and trigger notifications
-            await fetchData();
-          }
-        } catch (e) {
-          console.error("Heartbeat error:", e);
-        }
-      }, 60000);
-
-      return () => clearInterval(heartbeat);
-    }
-  }, [status])
-
-  const fetchData = async () => {
+  // ✅ FIXED: fetchData wrapped in useCallback
+  const fetchData = useCallback(async () => {
     try {
-      setIsLoading(true || !posts.length) // Only show loader on first fetch
+      setIsLoading(true)
+
       const [postsRes, userRes] = await Promise.all([
         fetch("/api/posts"),
         fetch("/api/user/me")
@@ -64,8 +53,10 @@ export default function DashboardPage() {
         const fetchedPosts = data.posts || []
         setPosts(fetchedPosts)
 
-        // Process Notifications: Find published posts that haven't been notified
-        const unnotified = fetchedPosts.filter((p: any) => p.status === "PUBLISHED" && p.notified === false)
+        const unnotified = fetchedPosts.filter(
+          (p: any) => p.status === "PUBLISHED" && p.notified === false
+        )
+
         if (unnotified.length > 0) {
           setNotifications(prev => [...prev, ...unnotified])
         }
@@ -75,28 +66,48 @@ export default function DashboardPage() {
         const data = await userRes.json()
         setIsConnected(data.user.isConnected)
       }
-    } catch (error) {
-      console.error("Error fetching dashboard data:", error)
+    } catch (err) {
+      console.error("Dashboard fetch error:", err)
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
+
+  // Fetch data + heartbeat
+  useEffect(() => {
+    if (status !== "authenticated") return
+
+    fetchData()
+
+    const heartbeat = setInterval(async () => {
+      try {
+        const res = await fetch("/api/scheduler/run", { method: "POST" })
+        const data = await res.json()
+
+        if (data.processed > 0) {
+          await fetchData()
+        }
+      } catch (err) {
+        console.error("Heartbeat error:", err)
+      }
+    }, 60000)
+
+    return () => clearInterval(heartbeat)
+  }, [status, fetchData])
 
   const dismissNotification = async (postId: string) => {
     try {
       await fetch(`/api/posts/${postId}/notified`, { method: "PATCH" })
       setNotifications(prev => prev.filter(n => n.id !== postId))
-    } catch (e) {
-      console.error("Failed to dismiss notification", e)
+    } catch (err) {
+      console.error("Dismiss notification error:", err)
     }
   }
 
   if (status === "loading" || isLoading) {
     return (
       <div className="min-h-full flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-        </div>
+        <div className="w-12 h-12 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -105,208 +116,64 @@ export default function DashboardPage() {
 
   const stats = [
     { title: "Total Posts", value: posts.length, icon: FileText },
-    { title: "Scheduled", value: posts.filter((p: any) => p.status === "SCHEDULED").length, icon: Clock },
-    { title: "Published", value: posts.filter((p: any) => p.status === "PUBLISHED").length, icon: CheckCircle },
+    { title: "Scheduled", value: posts.filter(p => p.status === "SCHEDULED").length, icon: Clock },
+    { title: "Published", value: posts.filter(p => p.status === "PUBLISHED").length, icon: CheckCircle }
   ]
 
   return (
-
     <div className="space-y-12 max-w-6xl mx-auto py-8">
-      {/* Notifications Area */}
+      {/* Notifications */}
       {notifications.length > 0 && (
         <div className="fixed top-24 right-8 z-50 w-80 space-y-4">
-          {notifications.map((n) => (
+          {notifications.map(n => (
             <AnimatedCard key={n.id} animation="slide-up">
-              <div className="bg-blue-600 text-white p-4 rounded-2xl shadow-premium relative group">
+              <div className="bg-blue-600 text-white p-4 rounded-2xl relative">
                 <button
                   onClick={() => dismissNotification(n.id)}
-                  className="absolute top-2 right-2 p-1 hover:bg-white/20 rounded-lg transition-colors"
+                  className="absolute top-2 right-2"
                 >
                   <X className="w-4 h-4" />
                 </button>
-                <div className="flex items-start gap-3 pr-6">
-                  <div className="bg-white/20 p-2 rounded-xl">
-                    <CheckCircle className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">Published Now</p>
-                    <p className="text-sm font-medium line-clamp-2">{n.content}</p>
-                  </div>
-                </div>
+                <p className="text-sm font-medium line-clamp-2">{n.content}</p>
               </div>
             </AnimatedCard>
           ))}
         </div>
       )}
 
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div className="space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight text-foreground">Overview</h1>
-          <p className="text-muted-foreground text-lg font-light leading-relaxed max-w-md">
-            Your content pipeline is looking healthy. Ready for the next one?
+      {/* Header */}
+      <div className="flex justify-between items-end">
+        <div>
+          <h1 className="text-4xl font-bold">Overview</h1>
+          <p className="text-muted-foreground">
+            Your content pipeline is looking healthy.
           </p>
         </div>
         <Link href="/posts/new">
-          <Button size="lg" className="h-14 px-8 rounded-2xl shadow-premium">
-            <Plus className="w-5 h-5 mr-3" />
-            <span>Create new post</span>
+          <Button size="lg">
+            <Plus className="w-5 h-5 mr-2" />
+            Create post
           </Button>
         </Link>
       </div>
 
-      {!isConnected && (
-        <AnimatedCard
-          animation="default"
-          className="bg-secondary/50 dark:bg-secondary/20 p-6 md:p-10 rounded-[32px] md:rounded-[40px] border border-primary/10 flex flex-col md:flex-row items-center justify-between gap-6 md:gap-8 relative overflow-hidden group"
-        >
-          <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -mr-32 -mt-32 blur-3xl transition-transform group-hover:scale-110" />
-          <div className="space-y-4 text-center md:text-left relative z-10">
-            <h3 className="text-2xl md:text-3xl font-bold tracking-tight text-site-fg">Link your Identity</h3>
-            <p className="text-muted-foreground text-base md:text-lg font-light leading-relaxed max-w-lg">
-              Authorized access is required to broadcast your thoughts to the professional world.
-            </p>
-          </div>
-          <Link href="/settings" className="relative z-10 shrink-0 w-full md:w-auto">
-            <Button size="lg" className="h-14 md:h-16 px-10 rounded-2xl shadow-premium hover:shadow-xl transition-all w-full md:w-auto">
-              Connect Profile
-            </Button>
-          </Link>
-        </AnimatedCard>
-      )}
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
-        {stats.map((stat, i) => {
+      {/* Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        {stats.map(stat => {
           const Icon = stat.icon
           return (
-            <AnimatedCard
-              key={stat.title}
-              animation="slide-up"
-              index={i}
-            >
-              <Card className="border-none bg-secondary/30 dark:bg-secondary/10 shadow-none rounded-[24px] hover:bg-secondary/40 transition-colors">
-                <CardContent className="p-6 md:p-8">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold tracking-[0.2em] text-muted-foreground uppercase">{stat.title}</p>
-                      <h3 className="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400">{stat.value}</h3>
-                    </div>
-                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-site-bg flex items-center justify-center text-blue-300 dark:text-blue-700 shadow-sm group-hover:text-blue-600 transition-colors">
-                      <Icon className="w-5 h-5" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </AnimatedCard>
+            <Card key={stat.title}>
+              <CardContent className="p-6 flex justify-between items-center">
+                <div>
+                  <p className="text-xs uppercase text-muted-foreground">{stat.title}</p>
+                  <p className="text-2xl font-bold">{stat.value}</p>
+                </div>
+                <Icon className="w-6 h-6 text-blue-500" />
+              </CardContent>
+            </Card>
           )
         })}
-
-        {/* Insight Moment */}
-        <AnimatedCard
-          animation="slide-up"
-          delay={0.3}
-        >
-          <Card className="border-none bg-blue-100 dark:bg-blue-900/20 shadow-blue-glow rounded-[24px] relative overflow-hidden group border-t-2 border-blue-600 dark:border-blue-500">
-            <CardContent className="p-6 md:p-8">
-              <div className="space-y-1 relative z-10">
-                <p className="text-[10px] font-bold tracking-[0.2em] text-blue-600 dark:text-blue-400 uppercase">Network Resonance</p>
-                <h3 className="text-2xl md:text-3xl font-bold text-site-fg">Steady</h3>
-                <p className="text-[11px] text-muted-foreground leading-relaxed mt-2 max-w-[120px]">
-                  Your consistency is building a compound effect.
-                </p>
-              </div>
-              <Sparkles className="absolute -bottom-2 -right-2 w-12 h-12 md:w-16 md:h-16 text-blue-600/10 group-hover:scale-110 transition-transform" />
-            </CardContent>
-          </Card>
-        </AnimatedCard>
-      </div>
-
-      <div className="blue-gradient-divider opacity-50" />
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-        {/* Recent Posts List */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-[11px] font-bold tracking-[0.2em] text-muted-foreground uppercase">Recent drafts</h2>
-            <Link href="/calendar" className="text-[11px] font-bold text-blue-600 flex items-center gap-2 hover:opacity-70 transition-opacity uppercase tracking-widest">
-              <span>Explore Archive</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          <div className="space-y-4">
-            {posts.length === 0 ? (
-              <div className="text-center py-20 bg-secondary/20 rounded-[32px] border-2 border-dashed border-border">
-                <p className="text-muted-foreground font-light text-lg mb-6">Your feed is waiting for your first spark.</p>
-                <Link href="/posts/new">
-                  <Button variant="outline" size="lg" className="rounded-2xl h-14 px-8">Start writing</Button>
-                </Link>
-              </div>
-            ) : (
-              posts.slice(0, 5).map((post: any, i) => (
-                <div key={post.id} className="group flex items-center justify-between p-4 md:p-6 bg-card border border-border rounded-[24px] hover:shadow-premium transition-all duration-300">
-                  <div className="flex items-center gap-4 md:gap-6 min-w-0 flex-1">
-                    <div className={cn(
-                      "w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center flex-shrink-0 transition-colors",
-                      post.status === 'PUBLISHED' ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400" :
-                        post.status === 'SCHEDULED' ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" :
-                          post.status === 'FAILED' ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400" :
-                            "bg-secondary text-primary"
-                    )}>
-                      {post.status === 'PUBLISHED' ? <CheckCircle className="w-5 h-5" /> :
-                        post.status === 'SCHEDULED' ? <CalendarIcon className="w-5 h-5" /> :
-                          post.status === 'FAILED' ? <X className="w-5 h-5" /> :
-                            <PenSquare className="w-5 h-5" />}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-base md:text-lg font-medium text-foreground truncate">{post.content}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className={cn(
-                          "text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full",
-                          post.status === 'PUBLISHED' ? "text-green-600 bg-green-100 dark:bg-green-900/30" :
-                            post.status === 'SCHEDULED' ? "text-blue-600 bg-blue-100 dark:bg-blue-900/30" :
-                              post.status === 'FAILED' ? "text-red-600 bg-red-100 dark:bg-red-900/30" :
-                                "text-muted-foreground bg-secondary"
-                        )}>
-                          {post.status}
-                        </span>
-                        <span className="text-[11px] text-muted-foreground truncate">
-                          {post.scheduledFor ? new Date(post.scheduledFor).toLocaleDateString() : new Date(post.createdAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <Link href={`/posts/new?id=${post.id}`} className="ml-2">
-                    <Button variant="ghost" size="icon" className="rounded-full w-10 h-10 md:w-12 md:h-12 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                      <PenSquare className="w-4 h-4" />
-                    </Button>
-                  </Link>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Quick Actions / Tips */}
-        <div className="space-y-8">
-          <div className="text-xl font-bold tracking-tight uppercase opacity-50">Pro Tip</div>
-          <Card className="border-none bg-secondary/50 rounded-[32px] overflow-hidden">
-            <CardContent className="p-10 space-y-6">
-              <p className="text-xl font-light leading-relaxed text-foreground">
-                Consistency is a superpower. Try to batch <span className="font-bold">5 posts</span> every Sunday evening.
-              </p>
-              <Link href="/posts/new" className="block">
-                <Button className="w-full h-14 rounded-2xl">
-                  Draft Batch
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
       </div>
     </div>
-
   )
 }
-
-
