@@ -1,4 +1,4 @@
-import NextAuth from "next-auth"
+import type { NextAuthConfig } from "next-auth"
 import Google from "next-auth/providers/google"
 import LinkedIn from "next-auth/providers/linkedin"
 import { PrismaAdapter } from "@auth/prisma-adapter"
@@ -6,7 +6,7 @@ import { getPrisma } from "@/lib/prisma"
 
 const prisma = getPrisma()
 
-export const auth = NextAuth({
+export const authConfig: NextAuthConfig = {
   adapter: PrismaAdapter(prisma),
 
   session: {
@@ -32,9 +32,7 @@ export const auth = NextAuth({
 
   callbacks: {
     async jwt({ token, user }) {
-      if (user?.id) {
-        token.id = user.id
-      }
+      if (user?.id) token.id = user.id
       return token
     },
 
@@ -49,4 +47,4 @@ export const auth = NextAuth({
   pages: {
     signIn: "/login",
   },
-})
+}
