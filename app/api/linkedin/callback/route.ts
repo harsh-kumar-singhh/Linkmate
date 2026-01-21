@@ -61,11 +61,17 @@ export async function GET(req: NextRequest) {
   const tokenData = await tokenRes.json();
 
   if (!tokenRes.ok || !tokenData.access_token) {
-    console.error("[LinkedIn] Token exchange failed:", tokenData);
+    console.error("[LinkedIn] Token exchange failed:", {
+      status: tokenRes.status,
+      statusText: tokenRes.statusText,
+      error: tokenData,
+    });
     return NextResponse.redirect(
       new URL("/settings?linkedin=failed&error=token_exchange", req.url)
     );
   }
+
+  console.log("[LinkedIn] Access token obtained successfully");
 
   // Fetch LinkedIn profile
   const profileRes = await fetch(
@@ -79,11 +85,49 @@ export async function GET(req: NextRequest) {
 
   const profile = await profileRes.json();
 
-  if (!profile?.id) {
-    console.error("[LinkedIn] Profile fetch failed:", profile);
+  if (!profileRes.ok || !profile?.id) {
+    console.error("[LinkedIn] Profile fetch failed:", {
+      status: profileRes.status,
+      statusText: profileRes.statusText,
+      profile,
+    });
     return NextResponse.redirect(
       new URL("/settings?linkedin=failed&error=profile_fetch", req.url)
     );
+  }
+
+  console.log("[LinkedIn] Profile fetched successfully:", {
+    id: profile.id,
+    firstName: profile.localizedFirstName,
+    lastName: profile.localizedLastName,
+  });
+
+  // Fetch LinkedIn email address
+  let email: string | null = null;
+  try {
+    const emailRes = await fetch(
+      "https://api.linkedin.com/v2/emailAddress?q=members&projection=(elements*(handle~))",
+      {
+        headers: {
+          Authorization: `Bearer ${tokenData.access_token}`,
+        },
+      }
+    );
+
+    if (emailRes.ok) {
+      const emailData = await emailRes.json();
+      if (emailData?.elements?.[0]?.["handle~"]?.emailAddress) {
+        email = emailData.elements[0]["handle~"].emailAddress;
+        console.log("[LinkedIn] Email fetched successfully");
+      }
+    } else {
+      console.warn("[LinkedIn] Email fetch failed (non-critical):", {
+        status: emailRes.status,
+        statusText: emailRes.statusText,
+      });
+    }
+  } catch (error) {
+    console.warn("[LinkedIn] Email fetch error (non-critical):", error);
   }
 
   // Store LinkedIn account credentials
@@ -96,15 +140,17 @@ export async function GET(req: NextRequest) {
     },
     update: {
       access_token: tokenData.access_token,
-      userId: userId, // userId from decrypted state
-    },
+      userId: userId,
+      email: email,
+    } as any,
     create: {
-      userId: userId, // userId from decrypted state
+      userId: userId,
       type: "oauth",
       provider: "linkedin",
       providerAccountId: profile.id,
       access_token: tokenData.access_token,
-    },
+      email: email,
+    } as any,
   });
 
   console.log("[LinkedIn] Account connected successfully for user:", userId);

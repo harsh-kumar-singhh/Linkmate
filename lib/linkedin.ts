@@ -14,6 +14,8 @@ export async function publishToLinkedIn(userId: string, content: string) {
     throw new Error("LinkedIn account not connected");
   }
 
+  console.log("[LinkedIn] Attempting to post with author URN:", `urn:li:person:${account.providerAccountId}`);
+
   const response = await fetch(
     "https://api.linkedin.com/v2/ugcPosts",
     {
@@ -46,12 +48,28 @@ export async function publishToLinkedIn(userId: string, content: string) {
 
   try {
     data = text ? JSON.parse(text) : {};
-  } catch {}
+  } catch { }
 
   if (!response.ok) {
-    console.error("LinkedIn UGC error:", data);
-    throw new Error(data.message || "LinkedIn publish failed");
+    console.error("[LinkedIn] Post failed:", {
+      status: response.status,
+      statusText: response.statusText,
+      error: data,
+      message: data.message,
+      serviceErrorCode: data.serviceErrorCode,
+    });
+
+    // Provide specific error messages for common issues
+    if (response.status === 401) {
+      throw new Error("LinkedIn authorization expired. Please reconnect your LinkedIn account in Settings.");
+    } else if (response.status === 403) {
+      throw new Error("LinkedIn posting permission denied. Please reconnect your LinkedIn account with posting permissions.");
+    } else {
+      throw new Error(data.message || `LinkedIn publish failed (${response.status})`);
+    }
   }
+
+  console.log("[LinkedIn] Post published successfully:", data.id);
 
   return {
     success: true,

@@ -67,7 +67,7 @@ window.location.href = "/api/linkedin/connect"
      response_type: "code",
      client_id: LINKEDIN_CLIENT_ID,
      redirect_uri: "https://yourapp.com/api/linkedin/callback",
-     scope: "r_liteprofile",
+     scope: "r_liteprofile r_emailaddress w_member_social", // Legacy OAuth with posting
      state: encryptedState
    };
    ```

@@ -18,12 +18,12 @@ export async function GET(req: Request) {
   // 2. Generate encrypted state containing userId, timestamp, and nonce
   const state = encryptState(session.user.id);
 
-  // 3. Build LinkedIn authorization URL
+  // 3. Build LinkedIn authorization URL with Legacy OAuth scopes
   const params = new URLSearchParams({
     response_type: "code",
     client_id: process.env.LINKEDIN_CLIENT_ID!,
     redirect_uri: `${process.env.NEXTAUTH_URL}/api/linkedin/callback`,
-    scope: "r_liteprofile",
+    scope: "r_liteprofile r_emailaddress w_member_social", // Legacy OAuth scopes for posting
     state,
   });
 
