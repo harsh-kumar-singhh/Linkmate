@@ -1,14 +1,12 @@
-import NextAuth, { type NextAuthConfig } from "next-auth";
-import Google from "next-auth/providers/google";
-import LinkedIn from "next-auth/providers/linkedin";
-import { PrismaAdapter } from "@auth/prisma-adapter";
-import { getPrisma } from "@/lib/prisma";
-import type { JWT } from "next-auth/jwt";
-import type { Session, User, Account } from "next-auth";
+import NextAuth from "next-auth"
+import Google from "next-auth/providers/google"
+import LinkedIn from "next-auth/providers/linkedin"
+import { PrismaAdapter } from "@auth/prisma-adapter"
+import { getPrisma } from "@/lib/prisma"
 
-const prisma = getPrisma();
+const prisma = getPrisma()
 
-export const authConfig: NextAuthConfig = {
+export const auth = NextAuth({
   adapter: PrismaAdapter(prisma),
 
   session: {
@@ -26,50 +24,29 @@ export const authConfig: NextAuthConfig = {
       clientSecret: process.env.LINKEDIN_CLIENT_SECRET!,
       authorization: {
         params: {
-          scope: "openid profile email w_member_social",
+          scope: "r_liteprofile r_emailaddress w_member_social",
         },
       },
     }),
   ],
 
   callbacks: {
-    async jwt({
-      token,
-      user,
-      account,
-    }: {
-      token: JWT;
-      user?: User;
-      account?: Account | null;
-    }) {
+    async jwt({ token, user }) {
       if (user?.id) {
-        token.id = user.id;
+        token.id = user.id
       }
-
-      if (account?.provider === "linkedin" && account.access_token) {
-        token.linkedinAccessToken = account.access_token;
-      }
-
-      return token;
+      return token
     },
 
-    async session({
-      session,
-      token,
-    }: {
-      session: Session;
-      token: JWT;
-    }) {
+    async session({ session, token }) {
       if (session.user && token.id) {
-        session.user.id = token.id as string;
+        session.user.id = token.id as string
       }
-      return session;
+      return session
     },
   },
 
   pages: {
     signIn: "/login",
   },
-};
-
-export const { handlers, auth } = NextAuth(authConfig);
+})
