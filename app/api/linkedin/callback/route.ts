@@ -87,13 +87,6 @@ export async function GET(request: Request) {
         console.log(`[LinkedIn Callback] Updating user ${session.user.id} with LinkedIn connection...`)
 
         await prisma.$transaction([
-            prisma.user.update({
-                where: { id: session.user.id },
-                data: {
-                    linkedinConnected: true,
-                    linkedinMemberId: linkedinMemberId,
-                }
-            }),
             prisma.account.upsert({
                 where: {
                     provider_providerAccountId: {

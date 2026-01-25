@@ -19,8 +19,6 @@ model User {
   image         String?
   writingStyle  String?
   theme         String?   @default("system")
-  linkedinConnected Boolean   @default(false)
-  linkedinMemberId  String?    @unique
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   
