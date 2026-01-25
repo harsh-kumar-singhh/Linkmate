@@ -62,18 +62,8 @@ export async function GET(request: Request) {
         console.log("[LinkedIn Callback] Profile response status:", profileResponse.status)
 
         if (!profileResponse.ok) {
-            // Fallback to v2/me if userinfo fails (legacy compatibility)
-            console.log("[LinkedIn Callback] userinfo failed, trying /v2/me...")
-            const meResponse = await fetch("https://api.linkedin.com/v2/me", {
-                headers: { Authorization: `Bearer ${accessToken}` },
-            })
-            const meData = await meResponse.json()
-            if (meResponse.ok) {
-                profileData.sub = meData.id
-            } else {
-                console.error("[LinkedIn Callback] Profile fetch failed:", profileData)
-                return NextResponse.json({ error: "Profile fetch failed", details: profileData }, { status: 400 })
-            }
+            console.error("[LinkedIn Callback] Profile fetch failed:", profileData)
+            return NextResponse.json({ error: "Profile fetch failed", details: profileData }, { status: 400 })
         }
 
         const linkedinMemberId = profileData.sub || profileData.id
