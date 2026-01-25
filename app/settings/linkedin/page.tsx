@@ -23,15 +23,10 @@ export default async function LinkedInSettingsPage() {
 
     const prisma = getPrisma();
     const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        include: {
-            accounts: {
-                where: { provider: "linkedin" }
-            }
-        }
+        where: { id: session.user.id },
     });
 
-    const isConnected = !!(user?.accounts && user.accounts.length > 0);
+    const isConnected = !!user?.linkedinConnected;
 
     return (
         <div className="max-w-5xl mx-auto py-12 px-8 space-y-16 mt-8">

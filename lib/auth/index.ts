@@ -1,6 +1,6 @@
+import NextAuth from "next-auth"
 import type { NextAuthConfig } from "next-auth"
 import Google from "next-auth/providers/google"
-import LinkedIn from "next-auth/providers/linkedin"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { getPrisma } from "@/lib/prisma"
 
@@ -17,16 +17,6 @@ export const authConfig: NextAuthConfig = {
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
-
-    LinkedIn({
-      clientId: process.env.LINKEDIN_CLIENT_ID!,
-      clientSecret: process.env.LINKEDIN_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          scope: "r_liteprofile r_emailaddress w_member_social",
-        },
-      },
     }),
   ],
 
@@ -48,3 +38,5 @@ export const authConfig: NextAuthConfig = {
     signIn: "/login",
   },
 }
+
+export const { auth, handlers, signIn, signOut } = NextAuth(authConfig)
