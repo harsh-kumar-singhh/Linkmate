@@ -88,6 +88,7 @@ export async function GET(request: Request) {
                     access_token: accessToken,
                     expires_at: expiresAt,
                     scope: tokenData.scope,
+                    email: profileData.email,
                 },
                 create: {
                     userId: session.user.id,
@@ -97,6 +98,7 @@ export async function GET(request: Request) {
                     access_token: accessToken,
                     expires_at: expiresAt,
                     scope: tokenData.scope,
+                    email: profileData.email,
                 }
             })
         ])
