@@ -2,13 +2,15 @@ export const dynamic = "force-dynamic";
 
 import { auth } from "@/lib/auth";
 import { getPrisma } from "@/lib/prisma";
-import { ConnectLinkedInButton } from "./connect-button";
+
 import { CheckCircle2, XCircle, ArrowRight, LayoutDashboard, Sparkles, Calendar, Zap, ShieldCheck, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { RefreshTrigger } from "./refresh-trigger";
+import { headers } from "next/headers";
+import { LinkedInConnectionStatus } from "./connection-status";
 
 export default async function LinkedInSettingsPage() {
+    headers(); // Force dynamic rendering at request time
     const session = await auth();
 
     if (!session?.user?.email) {
@@ -37,7 +39,6 @@ export default async function LinkedInSettingsPage() {
 
     return (
         <div className="max-w-5xl mx-auto py-12 px-8 space-y-16 mt-8">
-            <RefreshTrigger />
             <div className="space-y-2">
                 <h1 className="text-[12px] font-bold tracking-[0.2em] text-muted-foreground uppercase">Integration</h1>
                 <h2 className="text-4xl font-bold tracking-tight text-foreground">LinkedIn Connectivity</h2>
@@ -52,35 +53,7 @@ export default async function LinkedInSettingsPage() {
                             <div className="h-px flex-1 bg-border mx-6 opacity-50" />
                         </div>
 
-                        <div className="bg-secondary/30 rounded-[40px] p-10 space-y-8">
-                            <div className="space-y-6">
-                                <div className="flex items-center gap-4">
-                                    {isConnected ? (
-                                        <div className="w-16 h-16 rounded-[20px] bg-primary/10 flex items-center justify-center text-primary">
-                                            <ShieldCheck className="w-8 h-8" />
-                                        </div>
-                                    ) : (
-                                        <div className="w-16 h-16 rounded-[20px] bg-secondary flex items-center justify-center text-muted-foreground">
-                                            <Zap className="w-8 h-8" />
-                                        </div>
-                                    )}
-                                    <div className="space-y-1">
-                                        <h4 className="text-2xl font-bold tracking-tight">
-                                            {isConnected ? "Securely Linked" : "Awaiting Connection"}
-                                        </h4>
-                                        <p className="text-muted-foreground font-light">
-                                            {isConnected
-                                                ? "Linkmate is authorized to broadcast your thoughts."
-                                                : "Link your identity to enable automated distribution."}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="pt-4">
-                                    <ConnectLinkedInButton isConnected={isConnected} />
-                                </div>
-                            </div>
-                        </div>
+                        <LinkedInConnectionStatus initialIsConnected={isConnected} />
                     </div>
 
                     <div className="space-y-6">
