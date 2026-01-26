@@ -6,6 +6,7 @@ import { ConnectLinkedInButton } from "./connect-button";
 import { CheckCircle2, XCircle, ArrowRight, LayoutDashboard, Sparkles, Calendar, Zap, ShieldCheck, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { RefreshTrigger } from "./refresh-trigger";
 
 export default async function LinkedInSettingsPage() {
     const session = await auth();
@@ -36,6 +37,7 @@ export default async function LinkedInSettingsPage() {
 
     return (
         <div className="max-w-5xl mx-auto py-12 px-8 space-y-16 mt-8">
+            <RefreshTrigger />
             <div className="space-y-2">
                 <h1 className="text-[12px] font-bold tracking-[0.2em] text-muted-foreground uppercase">Integration</h1>
                 <h2 className="text-4xl font-bold tracking-tight text-foreground">LinkedIn Connectivity</h2>

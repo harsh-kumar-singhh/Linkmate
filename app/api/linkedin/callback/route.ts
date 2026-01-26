@@ -104,6 +104,14 @@ export async function GET(request: Request) {
         ])
 
         console.log("[LinkedIn Callback] Synchronization complete.")
+
+        // Clear caches for pages that depend on LinkedIn connection status
+        const { revalidatePath } = await import("next/cache")
+        revalidatePath("/settings")
+        revalidatePath("/settings/linkedin")
+        revalidatePath("/dashboard")
+        revalidatePath("/api/user/me")
+
         return NextResponse.redirect(new URL("/settings/linkedin?success=true", request.url))
 
     } catch (err: any) {
