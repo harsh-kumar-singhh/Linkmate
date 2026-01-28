@@ -12,8 +12,6 @@ interface LinkedInConnectionStatusProps {
 export function LinkedInConnectionStatus({ initialIsConnected }: LinkedInConnectionStatusProps) {
     const [isConnected, setIsConnected] = useState(initialIsConnected);
     const [isVerifying, setIsVerifying] = useState(false);
-    // Track when we last verified a connection successfully on the client
-    const [lastVerifiedTime, setLastVerifiedTime] = useState<number>(0);
 
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -21,57 +19,37 @@ export function LinkedInConnectionStatus({ initialIsConnected }: LinkedInConnect
     useEffect(() => {
         const success = searchParams.get("success");
 
-        if (success === "true") {
+        if (success === "true" && !isConnected) {
             setIsVerifying(true);
 
+            // Give the server a moment to settle, then verify
+            // In the new architecture, the server has already written to the User table
+            // so this check should be immediate and reliable.
             fetch("/api/user/me", {
                 cache: "no-store",
                 headers: {
                     "Cache-Control": "no-cache, no-store, must-revalidate",
-                    "Pragma": "no-cache"
                 }
             })
-                .then((res) => {
-                    if (!res.ok) throw new Error("Failed to fetch user data");
-                    return res.json();
-                })
-                .then((data) => {
+                .then(res => res.json())
+                .then(data => {
                     if (data.user?.isConnected) {
                         setIsConnected(true);
-                        setLastVerifiedTime(Date.now());
-
-                        const newUrl = window.location.pathname;
-                        window.history.replaceState({}, "", newUrl);
-
                         router.refresh();
                     }
-                })
-                .catch((err) => {
-                    console.error("Failed to verify LinkedIn status:", err);
                 })
                 .finally(() => {
                     setIsVerifying(false);
                 });
         }
-    }, [searchParams, router]);
+    }, [searchParams, isConnected, router]);
 
-    // React to server prop updates, but gracefully handle race conditions
+    // Sync with server state if it changes
     useEffect(() => {
         if (initialIsConnected) {
-            // Server agrees we are connected. Sync state.
             setIsConnected(true);
-        } else {
-            // Server says NOT connected.
-            // Check if we just verified a connection locally within the last 5 seconds.
-            // If so, the server prop might be stale (race condition), so we ignore it.
-            const timeSinceVerification = Date.now() - lastVerifiedTime;
-            const isJustVerified = lastVerifiedTime > 0 && timeSinceVerification < 5000;
-
-            if (!isJustVerified) {
-                setIsConnected(false);
-            }
         }
-    }, [initialIsConnected, lastVerifiedTime]);
+    }, [initialIsConnected]);
 
     return (
         <div className="bg-secondary/30 rounded-[40px] p-10 space-y-8">

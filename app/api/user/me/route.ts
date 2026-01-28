@@ -20,19 +20,21 @@ export async function GET() {
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      include: {
-        accounts: {
-          where: { provider: "linkedin" },
-          select: { access_token: true },
-        },
-      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        writingStyle: true,
+        theme: true,
+        linkedinConnected: true,
+      }
     })
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
-    const isConnected = user.accounts.some(a => !!a.access_token)
+    const isConnected = user.linkedinConnected === true
 
     return NextResponse.json({
       user: {

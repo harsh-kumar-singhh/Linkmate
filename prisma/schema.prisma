@@ -18,6 +18,7 @@ model User {
   emailVerified DateTime?
   image         String?
   writingStyle  String?
+  linkedinConnected Boolean @default(false)
   theme         String?   @default("system")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

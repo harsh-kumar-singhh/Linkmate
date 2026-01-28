@@ -101,6 +101,10 @@ export async function GET(request: Request) {
                     scope: tokenData.scope,
                     email: profileData.email,
                 }
+            }),
+            prisma.user.update({
+                where: { id: session.user.id },
+                data: { linkedinConnected: true }
             })
         ])
 
