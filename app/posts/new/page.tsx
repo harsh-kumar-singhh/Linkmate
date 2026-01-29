@@ -190,7 +190,7 @@ function EditorContent() {
     return (
         <div className="bg-background min-h-screen">
             {/* Scrollable Content Area */}
-            <main className="max-w-6xl mx-auto px-4 md:px-8 pt-8 md:pt-12 pb-[120px]">
+            <main className="max-w-6xl mx-auto px-4 md:px-8 pt-8 md:pt-12 pb-[160px]">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
 
                     {/* Left Column: Composition */}
@@ -327,27 +327,45 @@ function EditorContent() {
                                 <h3 className="font-bold text-2xl tracking-tight">Schedule</h3>
 
                                 <div className="space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-4">
                                         <div className="space-y-2">
-                                            <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Post Date & Time</label>
+                                            <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Post Date</label>
                                             <div className="relative group">
                                                 <input
-                                                    type="datetime-local"
+                                                    type="date"
+                                                    placeholder="Select a date"
                                                     className="w-full h-12 pl-11 pr-4 rounded-xl border border-border/80 bg-background text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all cursor-pointer hover:bg-secondary/20"
-                                                    value={scheduledFor}
-                                                    onChange={(e) => setScheduledFor(e.target.value)}
-                                                    min={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+                                                    value={scheduledFor ? scheduledFor.split('T')[0] : ""}
+                                                    onChange={(e) => {
+                                                        const timePart = scheduledFor ? scheduledFor.split('T')[1] || "09:00" : "09:00";
+                                                        setScheduledFor(`${e.target.value}T${timePart}`);
+                                                    }}
                                                 />
                                                 <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary pointer-events-none" />
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center">
-                                            <div className="bg-blue-50/80 dark:bg-blue-900/10 rounded-xl p-4 w-full">
-                                                <p className="text-[12px] text-blue-700/80 dark:text-blue-400 font-medium leading-relaxed">
-                                                    <span className="font-bold">Pro-tip:</span> Weekdays between 9-11 AM are generally best for LinkedIn.
-                                                </p>
+                                        <div className="space-y-2">
+                                            <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Post Time</label>
+                                            <div className="relative group">
+                                                <input
+                                                    type="time"
+                                                    placeholder="Select time"
+                                                    className="w-full h-12 pl-11 pr-4 rounded-xl border border-border/80 bg-background text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all cursor-pointer hover:bg-secondary/20"
+                                                    value={scheduledFor ? scheduledFor.split('T')[1] : ""}
+                                                    onChange={(e) => {
+                                                        const datePart = scheduledFor ? scheduledFor.split('T')[0] : new Date().toISOString().split('T')[0];
+                                                        setScheduledFor(`${datePart}T${e.target.value}`);
+                                                    }}
+                                                />
+                                                <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary pointer-events-none" />
                                             </div>
+                                        </div>
+
+                                        <div className="bg-blue-50/80 dark:bg-blue-900/10 rounded-xl p-4 w-full">
+                                            <p className="text-[12px] text-blue-700/80 dark:text-blue-400 font-medium leading-relaxed">
+                                                <span className="font-bold">Pro-tip:</span> Weekdays between 9-11 AM are generally best for LinkedIn.
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
@@ -398,7 +416,7 @@ function EditorContent() {
             </main>
 
             {/* FIXED BOTTOM ACTION BAR - Stable and Grounded */}
-            <footer className="fixed bottom-0 left-0 right-0 z-[60] bg-background/95 backdrop-blur-md border-t border-border h-[80px] md:h-[90px] flex items-center justify-center shadow-[0_-4px_24px_rgba(0,0,0,0.02)]">
+            <footer className="fixed bottom-[64px] left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t border-border h-[80px] md:h-[90px] flex items-center justify-center shadow-[0_-4px_24px_rgba(0,0,0,0.02)]">
                 <nav className="max-w-6xl w-full flex items-center gap-4 px-6 md:px-8">
                     <Button
                         variant="ghost"
