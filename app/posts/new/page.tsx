@@ -8,29 +8,52 @@ import { AnimatedCard } from "@/components/animated/AnimatedCard"
 import TextareaAutosize from "react-textarea-autosize"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Calendar as CalendarIcon, Clock, Image as ImageIcon, Smile, X, MoreHorizontal, ThumbsUp, MessageCircle, Share2, Send, Sparkles, ArrowRight, Trash2 } from "lucide-react"
-import { AIModal } from "@/components/ai-modal"
+import { Input } from "@/components/ui/input"
+import {
+    Calendar,
+    Clock,
+    Image as ImageIcon,
+    X,
+    MoreHorizontal,
+    Send,
+    Sparkles,
+    ArrowRight,
+    Trash2,
+    PenTool,
+    Loader2,
+    CheckCircle2
+} from "lucide-react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 
 function EditorContent() {
-    const { status } = useSession()
+    const { status, data: session } = useSession()
     const searchParams = useSearchParams()
     const router = useRouter()
+
+    // State
+    const [mode, setMode] = useState<"ai" | "manual" | "template">("ai")
     const [content, setContent] = useState("")
-    const [showAIDialog, setShowAIDialog] = useState(false)
     const [isGenerating, setIsGenerating] = useState(false)
     const [scheduledFor, setScheduledFor] = useState<string>("")
-    const [showScheduler, setShowScheduler] = useState(false)
     const [isInitialLoading, setIsInitialLoading] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
+
+    // AI State
+    const [topic, setTopic] = useState("")
+    const [style, setStyle] = useState("Professional")
+    const styles = ["Professional", "Casual", "Enthusiastic", "Storytelling", "Write Like Me"]
+
     const postId = searchParams.get("id")
 
+    // Auth redirection
     useEffect(() => {
         if (status === "unauthenticated") {
             router.push("/login")
         }
     }, [status, router])
 
+    // Fetch existing post
     useEffect(() => {
         const fetchPost = async () => {
             if (!postId || status !== "authenticated") return
@@ -40,12 +63,13 @@ function EditorContent() {
                 if (response.ok) {
                     const data = await response.json()
                     setContent(data.content)
+                    // If editing, switch to manual mode automatically
+                    setMode("manual")
+
                     if (data.scheduledFor) {
-                        // Correctly convert UTC string from DB to local datetime-local format
                         const date = new Date(data.scheduledFor);
                         const localYMDHM = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
                         setScheduledFor(localYMDHM);
-                        setShowScheduler(true);
                     }
                 }
             } catch (error) {
@@ -57,21 +81,21 @@ function EditorContent() {
 
         fetchPost()
 
+        // Handle date param from calendar
         const dateParam = searchParams.get("date")
         if (dateParam && !postId) {
             const date = new Date(dateParam)
             if (date < new Date()) {
                 date.setDate(date.getDate() + 1)
             }
-            // Correctly convert to local datetime-local format
             const localYMDHM = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
             setScheduledFor(localYMDHM);
-            setShowScheduler(true)
         }
     }, [searchParams, postId, status])
 
-    const handleGenerate = async ({ topic, style }: { topic: string; style: string }) => {
-        if (status !== "authenticated") return
+    // Handlers
+    const handleGenerate = async () => {
+        if (status !== "authenticated" || !topic) return
 
         setIsGenerating(true)
         try {
@@ -89,11 +113,11 @@ function EditorContent() {
 
             if (data.content) {
                 setContent(data.content)
-                setShowAIDialog(false)
+                setMode("manual") // Switch to manual to edit the result
             }
         } catch (error) {
             console.error("Generation failed", error)
-            alert(error instanceof Error ? error.message : "Failed to generate post. Please check your API key.")
+            alert(error instanceof Error ? error.message : "Failed to generate post.")
         } finally {
             setIsGenerating(false)
         }
@@ -102,11 +126,11 @@ function EditorContent() {
     const handleSavePost = async (statusArg: "DRAFT" | "SCHEDULED" | "PUBLISHED") => {
         if (!content.trim() || status !== "authenticated") return
 
+        setIsSaving(true)
         try {
             let url = postId ? `/api/posts/${postId}` : "/api/posts"
             let method = postId ? "PUT" : "POST"
 
-            // Special handling for scheduled posts to use the dedicated schedule API
             if (statusArg === "SCHEDULED") {
                 url = "/api/posts/schedule"
                 method = "POST"
@@ -118,7 +142,6 @@ function EditorContent() {
                 body: JSON.stringify({
                     content,
                     status: statusArg,
-                    // Send as a full UTC ISO string by creating a Date object from the local string
                     scheduledFor: statusArg === "SCHEDULED" ? new Date(scheduledFor).toISOString() : undefined,
                     postId: statusArg === "SCHEDULED" ? postId : undefined
                 }),
@@ -130,7 +153,6 @@ function EditorContent() {
             }
 
             if (statusArg !== "DRAFT") {
-                setContent("")
                 router.push("/calendar")
             } else {
                 router.push("/dashboard")
@@ -138,6 +160,8 @@ function EditorContent() {
         } catch (error) {
             console.error("Error saving post:", error);
             alert(error instanceof Error ? error.message : "Failed to save post");
+        } finally {
+            setIsSaving(false)
         }
     }
 
@@ -164,182 +188,232 @@ function EditorContent() {
     }
 
     return (
+        <div className="max-w-6xl mx-auto px-4 md:px-8 py-8 md:py-12 grid grid-cols-1 lg:grid-cols-2 gap-12">
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 h-full py-12">
-            <AIModal
-                isOpen={showAIDialog}
-                onClose={() => setShowAIDialog(false)}
-                onGenerate={handleGenerate}
-            />
+            {/* Left Column: Composition */}
+            <div className="space-y-8">
 
-            {/* Editor Column */}
-            <div className="space-y-12">
-                <div className="flex items-end justify-between">
-                    <div className="space-y-1">
-                        <h1 className="text-[12px] font-bold tracking-[0.2em] text-muted-foreground uppercase">Composition</h1>
-                        <h2 className="text-4xl font-bold tracking-tight text-site-fg">
-                            {postId ? "Refine publication" : "New publication"}
-                        </h2>
+                {/* Header */}
+                <div className="flex items-start justify-between">
+                    <div>
+                        <h1 className="text-3xl font-bold tracking-tight text-foreground">Create New Post</h1>
+                        <p className="text-muted-foreground mt-1">Generate AI content or write your own</p>
                     </div>
-
                     {postId && (
-                        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive transition-colors" onClick={handleDelete}>
+                        <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10" onClick={handleDelete}>
                             <Trash2 className="w-5 h-5" />
                         </Button>
                     )}
                 </div>
 
-                <div className="space-y-8">
-                    <div className="space-y-6">
-                        <div className="flex items-center justify-between px-1">
-                            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Post Content</span>
+                {/* Mode Switch */}
+                <div className="bg-secondary/50 p-1 rounded-xl flex items-center font-medium">
+                    <button
+                        onClick={() => setMode("ai")}
+                        className={cn(
+                            "flex-1 py-2.5 px-4 rounded-lg text-sm transition-all flex items-center justify-center gap-2",
+                            mode === "ai" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                        )}
+                    >
+                        <Sparkles className="w-4 h-4" />
+                        AI Generate
+                    </button>
+                    <button
+                        onClick={() => setMode("manual")}
+                        className={cn(
+                            "flex-1 py-2.5 px-4 rounded-lg text-sm transition-all flex items-center justify-center gap-2",
+                            mode === "manual" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                        )}
+                    >
+                        <PenTool className="w-4 h-4" />
+                        Write Manually
+                    </button>
+                    <button disabled className="flex-1 py-2.5 px-4 rounded-lg text-sm text-muted-foreground/50 flex items-center justify-center gap-2 cursor-not-allowed">
+                        Use Template
+                    </button>
+                </div>
+
+                {/* Content Area */}
+                <div className="space-y-6">
+                    {mode === "ai" ? (
+                        <AnimatedCard animation="fade-in-scale" className="space-y-6 bg-card border border-border rounded-2xl p-6 shadow-sm">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Sparkles className="w-5 h-5 text-blue-500" />
+                                <h3 className="font-semibold text-lg">AI Content Generator</h3>
+                            </div>
+
+                            <div className="space-y-3">
+                                <label className="text-sm font-medium text-foreground">Topic</label>
+                                <Input
+                                    placeholder="e.g., Remote work productivity tips"
+                                    value={topic}
+                                    onChange={(e) => setTopic(e.target.value)}
+                                    className="bg-secondary/20"
+                                />
+                            </div>
+
+                            <div className="space-y-3">
+                                <label className="text-sm font-medium text-foreground">Tone</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {styles.map((s) => (
+                                        <button
+                                            key={s}
+                                            onClick={() => setStyle(s)}
+                                            className={cn(
+                                                "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+                                                style === s
+                                                    ? "bg-blue-600 border-blue-600 text-white"
+                                                    : "bg-transparent border-border text-muted-foreground hover:border-blue-500 hover:text-blue-500"
+                                            )}
+                                        >
+                                            {s}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
                             <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 gap-2 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-full px-4"
-                                onClick={() => setShowAIDialog(true)}
-                                disabled={isGenerating}
+                                className="w-full h-12 rounded-xl text-base gap-2 mt-4"
+                                onClick={handleGenerate}
+                                disabled={!topic || isGenerating}
                             >
-                                <Sparkles className="w-3.5 h-3.5" />
-                                <span className="text-[12px] font-bold tracking-tight">AI Assistant</span>
+                                {isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+                                Generate Content
                             </Button>
-                        </div>
-                        <div className="relative group">
-                            <TextareaAutosize
-                                minRows={8}
-                                placeholder="What's worth sharing today?"
-                                className="w-full resize-none text-xl md:text-2xl font-light leading-relaxed text-site-fg placeholder:text-muted-foreground/30 bg-transparent focus:outline-none transition-all pr-12"
-                                value={content}
-                                onChange={(e) => setContent(e.target.value)}
-                                autoFocus
-                            />
-                            <div className="absolute right-0 bottom-0 text-[11px] font-bold text-muted-foreground/40 tabular-nums uppercase tracking-widest">
-                                {content.length} / 3000
+                        </AnimatedCard>
+                    ) : (
+                        <AnimatedCard animation="fade-in-scale" className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h3 className="font-semibold text-lg">Post Content</h3>
+                                <span className="text-xs text-muted-foreground font-mono">{content.length}/3000</span>
+                            </div>
+                            <div className="relative">
+                                <TextareaAutosize
+                                    minRows={12}
+                                    placeholder="Start writing your post..."
+                                    className="w-full resize-none p-4 rounded-2xl bg-card border border-border text-lg leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/40"
+                                    value={content}
+                                    onChange={(e) => setContent(e.target.value)}
+                                    autoFocus
+                                />
+                            </div>
+                        </AnimatedCard>
+                    )}
+
+                    {/* Scheduling Section */}
+                    <div className="pt-4 border-t border-border/50">
+                        <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+                            <h3 className="font-semibold text-lg flex items-center gap-2">
+                                <Clock className="w-5 h-5 text-muted-foreground" />
+                                Schedule
+                            </h3>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm text-muted-foreground">Post Time</label>
+                                    <input
+                                        type="datetime-local"
+                                        className="w-full h-10 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        value={scheduledFor}
+                                        onChange={(e) => setScheduledFor(e.target.value)}
+                                        min={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+                                    />
+                                </div>
+                                <div className="bg-secondary/30 rounded-xl p-3 text-xs text-muted-foreground flex items-center">
+                                    <p>
+                                        <span className="font-semibold text-foreground">Best time to post:</span> Weekdays between 9-11 AM based on your audience.
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
-
-                    <div className="pt-8 space-y-6 md:space-y-8">
-                        <div className="flex items-center gap-4">
-                            <Button
-                                variant="outline"
-                                className={cn("h-12 md:h-14 px-4 md:px-6 rounded-2xl gap-3 transition-all", showScheduler && "border-blue-600 text-blue-600 bg-blue-100 dark:bg-blue-900/30 shadow-none")}
-                                onClick={() => setShowScheduler(!showScheduler)}
-                            >
-                                <CalendarIcon className="w-5 h-5" />
-                                <span className="font-bold tracking-tight">Schedule</span>
-                            </Button>
-
-                            <Button variant="ghost" size="icon" className="h-12 md:h-14 w-12 md:w-14 rounded-2xl text-muted-foreground hover:bg-secondary/50 transition-colors">
-                                <Smile className="w-5 h-5" />
-                            </Button>
-                        </div>
-
-                        {showScheduler && (
-                            <AnimatedCard
-                                animation="slide-up-sm"
-                                className="p-6 md:p-8 bg-secondary/30 dark:bg-secondary/10 rounded-[28px] md:rounded-[32px] space-y-4"
-                            >
-                                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Preferred Release</label>
-                                <input
-                                    type="datetime-local"
-                                    className="w-full h-12 md:h-14 bg-background border border-border rounded-xl px-4 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary/20 transition-all dark:color-scheme-dark"
-                                    value={scheduledFor}
-                                    onChange={(e) => setScheduledFor(e.target.value)}
-                                    // Ensure min is also local YMDHM
-                                    min={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
-                                />
-                            </AnimatedCard>
-                        )}
-                    </div>
                 </div>
 
-                <div className="pt-8 md:pt-12 flex flex-col md:flex-row items-center justify-between border-t border-border gap-6">
-                    <Button variant="ghost" className="h-12 rounded-xl px-6 text-muted-foreground font-bold text-[13px] uppercase tracking-widest hover:text-site-fg hover:bg-transparent w-full md:w-auto" onClick={() => handleSavePost("DRAFT")}>
-                        Hold as draft
+                {/* Actions */}
+                <div className="flex items-center gap-4 pt-4 sticky bottom-4 md:static z-20">
+                    <Button
+                        variant="outline"
+                        className="flex-1 h-12 rounded-xl border-border bg-background"
+                        onClick={() => handleSavePost("DRAFT")}
+                        disabled={!content || isSaving}
+                    >
+                        Save Draft
                     </Button>
-                    <div className="flex items-center gap-4 w-full md:w-auto">
-                        {showScheduler ? (
-                            <Button
-                                size="lg"
-                                className="h-14 md:h-16 px-10 rounded-2xl shadow-premium gap-3 w-full"
-                                onClick={() => {
-                                    if (scheduledFor) handleSavePost("SCHEDULED")
-                                    else alert("Please pick a date.")
-                                }}
-                            >
-                                <span>Schedule post</span>
-                                <ArrowRight className="w-5 h-5" />
-                            </Button>
-                        ) : (
-                            <Button
-                                size="lg"
-                                className="h-14 md:h-16 px-10 rounded-2xl shadow-premium shadow-blue-600/20 gap-3 w-full"
-                                onClick={() => handleSavePost("PUBLISHED")}
-                                disabled={!content.trim()}
-                            >
-                                <span>Publish now</span>
-                                <Send className="w-5 h-5" />
-                            </Button>
-                        )}
-                    </div>
+                    {scheduledFor ? (
+                        <Button
+                            className="flex-[2] h-12 rounded-xl shadow-lg shadow-primary/20 text-base"
+                            onClick={() => handleSavePost("SCHEDULED")}
+                            disabled={!content || isSaving}
+                        >
+                            {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Calendar className="w-5 h-5 mr-2" />}
+                            Schedule Post
+                        </Button>
+                    ) : (
+                        <Button
+                            className="flex-[2] h-12 rounded-xl shadow-lg shadow-primary/20 text-base"
+                            onClick={() => handleSavePost("PUBLISHED")}
+                            disabled={!content || isSaving}
+                        >
+                            {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5 mr-2" />}
+                            Publish Now
+                        </Button>
+                    )}
                 </div>
             </div>
 
-            {/* Preview Column */}
-            <div className="hidden lg:block space-y-12">
-                <div className="space-y-1">
-                    <h1 className="text-[12px] font-bold tracking-[0.2em] text-blue-600 uppercase">Perspective</h1>
-                    <h2 className="text-4xl font-bold tracking-tight text-site-fg">Preview</h2>
+            {/* Right Column: Live Preview */}
+            <div className="hidden lg:block space-y-6 sticky top-8 h-fit">
+                <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-primary" />
+                    <h2 className="text-xl font-bold">Preview</h2>
                 </div>
 
-                <div className="relative">
-                    <div className="absolute inset-0 bg-primary/5 rounded-[48px] blur-3xl -z-10" />
-                    <AnimatedCard
-                        animation="fade-in-up"
-                        className="bg-card border border-border rounded-[40px] shadow-premium overflow-hidden max-w-lg mx-auto"
-                    >
-                        <div className="p-8">
-                            <div className="flex items-center gap-4 mb-8">
-                                <div className="w-14 h-14 rounded-2xl bg-secondary flex items-center justify-center text-muted-foreground">
-                                    <ImageIcon className="w-6 h-6" />
-                                </div>
-                                <div className="space-y-0.5">
-                                    <div className="text-sm font-semibold text-site-fg">Your Name</div>
-                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                        Posting now <span className="text-[10px]">•</span> 🌐
-                                    </div>
-                                </div>
+                <AnimatedCard animation="fade-in-up" className="bg-card border border-border rounded-[24px] shadow-sm overflow-hidden">
+                    <div className="p-6 space-y-6">
+                        {/* Fake Header */}
+                        <div className="flex items-start gap-3">
+                            <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center text-lg font-bold text-muted-foreground">
+                                {session?.user?.name?.[0] || "U"}
                             </div>
-
-                            <div className="min-h-[200px] mb-12">
-                                <p className="text-lg font-light leading-relaxed text-site-fg whitespace-pre-wrap">
-                                    {content || <span className="text-muted-foreground italic">The distribution of ideas begins with a single line...</span>}
-                                </p>
-                            </div>
-
-                            <div className="flex items-center justify-between border-t border-border pt-6 text-muted-foreground/60">
-                                {['Like', 'Comment', 'Share'].map((action) => (
-                                    <div key={action} className="text-[13px] font-bold uppercase tracking-widest">{action}</div>
-                                ))}
+                            <div className="flex-1">
+                                <p className="font-semibold text-sm text-foreground">{session?.user?.name || "Your Name"}</p>
+                                <p className="text-xs text-muted-foreground">Your Headline • Now • <span className="text-[10px]">🌐</span></p>
                             </div>
                         </div>
-                    </AnimatedCard>
+
+                        {/* Content */}
+                        <div className="min-h-[160px] text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
+                            {content || <span className="text-muted-foreground italic">Your post content will appear here...</span>}
+                        </div>
+
+                        {/* Fake Actions */}
+                        <div className="pt-4 border-t border-border flex items-center justify-between text-muted-foreground">
+                            {['Like', 'Comment', 'Repost', 'Send'].map((action) => (
+                                <div key={action} className="flex flex-col items-center gap-1 cursor-default hover:bg-secondary/50 p-2 rounded-lg transition-colors">
+                                    <span className="text-xs font-medium">{action}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </AnimatedCard>
+
+                <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl p-4 text-sm text-blue-600 dark:text-blue-400">
+                    <p className="flex gap-2">
+                        <Sparkles className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                        Preview shows how your post will look on LinkedIn Desktop.
+                    </p>
                 </div>
             </div>
         </div>
-
     )
 }
 
 export default function NewPostPage() {
     return (
-        <div className="max-w-7xl mx-auto px-8">
-            <Suspense fallback={<div className="flex items-center justify-center min-h-screen">
-                <div className="w-12 h-12 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            </div>}>
-                <EditorContent />
-            </Suspense>
-        </div>
+        <Suspense fallback={<div className="flex items-center justify-center min-h-screen">
+            <div className="w-12 h-12 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>}>
+            <EditorContent />
+        </Suspense>
     )
 }
