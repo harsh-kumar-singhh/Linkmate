@@ -42,6 +42,7 @@ function EditorContent() {
     // AI State
     const [topic, setTopic] = useState("")
     const [style, setStyle] = useState("Professional")
+    const [targetLength, setTargetLength] = useState(1000)
     const styles = ["Professional", "Casual", "Enthusiastic", "Storytelling", "Write Like Me"]
 
     const postId = searchParams.get("id")
@@ -102,7 +103,7 @@ function EditorContent() {
             const response = await fetch("/api/generate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ topic, style }),
+                body: JSON.stringify({ topic, style, targetLength }),
             })
 
             const data = await response.json()
@@ -253,6 +254,27 @@ function EditorContent() {
                             </div>
 
                             <div className="space-y-3">
+                                <label className="text-sm font-medium text-foreground flex justify-between">
+                                    <span>Target Length</span>
+                                    <span className="text-blue-600 font-bold">{targetLength} chars</span>
+                                </label>
+                                <input
+                                    type="range"
+                                    min="300"
+                                    max="3000"
+                                    step="100"
+                                    value={targetLength}
+                                    onChange={(e) => setTargetLength(parseInt(e.target.value))}
+                                    className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                />
+                                <div className="flex justify-between text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
+                                    <span>Short</span>
+                                    <span>Medium</span>
+                                    <span>Long</span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
                                 <label className="text-sm font-medium text-foreground">Tone</label>
                                 <div className="flex flex-wrap gap-2">
                                     {styles.map((s) => (
@@ -330,7 +352,7 @@ function EditorContent() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-4 pt-4 sticky bottom-4 md:static z-20">
+                <div className="flex items-center gap-4 p-4 md:p-0 border-t md:border-none border-border bg-background/80 md:bg-transparent backdrop-blur-md md:backdrop-blur-none fixed bottom-[71px] left-0 right-0 md:static z-20">
                     <Button
                         variant="outline"
                         className="flex-1 h-12 rounded-xl border-border bg-background"
@@ -404,7 +426,7 @@ function EditorContent() {
                     </p>
                 </div>
             </div>
-        </div>
+        </div >
     )
 }
 

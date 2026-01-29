@@ -17,9 +17,10 @@ export interface GeneratePostOptions {
     topic: string;
     style?: string; // "Professional", "Casual", "Write Like Me", etc.
     userWritingSample?: string; // Content to mimic
+    targetLength?: number; // In characters
 }
 
-export async function generatePost({ topic, style, userWritingSample }: GeneratePostOptions) {
+export async function generatePost({ topic, style, userWritingSample, targetLength = 1000 }: GeneratePostOptions) {
     if (!topic) throw new Error("Topic is required for AI generation.");
 
     let prompt = `Write a LinkedIn post about "${topic}".`;
@@ -30,7 +31,11 @@ export async function generatePost({ topic, style, userWritingSample }: Generate
         prompt += `\n\nStyle: ${style}`;
     }
 
-    prompt += `\n\nEnsure it has a good hook, engaging body, and a clear call to action. Use appropriate emojis but don't overdo it. Keep it under 3000 characters.`;
+    if (targetLength) {
+        prompt += `\n\nTarget Length: Approximately ${targetLength} characters.`;
+    }
+
+    prompt += `\n\nEnsure it has a good hook, engaging body, and a clear call to action. Use appropriate emojis but don't overdo it. Keep it strictly under 3000 characters.`;
 
     let lastError: any = null;
 
