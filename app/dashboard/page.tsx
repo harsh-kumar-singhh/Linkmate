@@ -14,18 +14,35 @@ import {
   Calendar,
   Eye,
   TrendingUp,
-  X
+  X,
+  Clock,
+  CheckCircle2,
+  FileEdit,
+  ArrowUpRight,
+  MoreVertical,
+  AlertCircle
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { format } from "date-fns"
+
+interface Post {
+  id: string
+  content: string
+  status: "DRAFT" | "SCHEDULED" | "PUBLISHED" | "FAILED"
+  scheduledFor: string | null
+  publishedAt: string | null
+  notified: boolean
+  failureReason: string | null
+}
 
 export default function DashboardPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
 
-  const [posts, setPosts] = useState<any[]>([])
+  const [posts, setPosts] = useState<Post[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isConnected, setIsConnected] = useState(true)
-  const [notifications, setNotifications] = useState<any[]>([])
+  const [notifications, setNotifications] = useState<Post[]>([])
 
   // Redirect unauthenticated users
   useEffect(() => {
@@ -34,7 +51,7 @@ export default function DashboardPage() {
     }
   }, [status, router])
 
-  // ✅ FIXED: fetchData wrapped in useCallback
+  // fetchData wrapped in useCallback
   const fetchData = useCallback(async () => {
     try {
       setIsLoading(true)
@@ -46,15 +63,21 @@ export default function DashboardPage() {
 
       if (postsRes.ok) {
         const data = await postsRes.json()
-        const fetchedPosts = data.posts || []
+        const fetchedPosts: Post[] = data.posts || []
         setPosts(fetchedPosts)
 
+        // Only show notifications for specifically scheduled posts that just went live
+        // or any newly published post that hasn't been notified yet
         const unnotified = fetchedPosts.filter(
-          (p: any) => p.status === "PUBLISHED" && p.notified === false
+          (p) => p.status === "PUBLISHED" && p.notified === false
         )
 
         if (unnotified.length > 0) {
-          setNotifications(prev => [...prev, ...unnotified])
+          setNotifications(prev => {
+            const existingIds = prev.map(n => n.id);
+            const newNotifications = unnotified.filter(n => !existingIds.includes(n.id));
+            return [...prev, ...newNotifications];
+          })
         }
       }
 
@@ -113,21 +136,35 @@ export default function DashboardPage() {
   // Get first name for greeting
   const firstName = session.user?.name?.split(' ')[0] || "there"
 
+  const scheduledPosts = posts.filter(p => p.status === "SCHEDULED")
+  const publishedPosts = posts.filter(p => p.status === "PUBLISHED").slice(0, 5) // Recent 5
+  const drafts = posts.filter(p => p.status === "DRAFT")
+
   return (
     <div className="space-y-10 max-w-2xl mx-auto py-8 px-4 md:px-0">
       {/* Notifications */}
       {notifications.length > 0 && (
-        <div className="fixed top-24 right-8 z-50 w-80 space-y-4 pointer-events-none">
+        <div className="fixed top-24 right-4 md:right-8 z-50 w-[calc(100%-2rem)] md:w-80 space-y-4 pointer-events-none">
           {notifications.map(n => (
             <AnimatedCard key={n.id} animation="slide-up">
-              <div className="bg-blue-600 text-white p-4 rounded-2xl relative shadow-lg pointer-events-auto">
+              <div className="bg-white dark:bg-zinc-900 border border-emerald-500/20 shadow-2xl p-5 rounded-2xl relative pointer-events-auto overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500" />
                 <button
                   onClick={() => dismissNotification(n.id)}
-                  className="absolute top-2 right-2 text-white/80 hover:text-white"
+                  className="absolute top-3 right-3 text-muted-foreground hover:text-foreground"
                 >
                   <X className="w-4 h-4" />
                 </button>
-                <p className="text-sm font-medium line-clamp-2 pr-6">{n.content}</p>
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-bold">Successfully Published!</h4>
+                    <p className="text-xs text-muted-foreground line-clamp-2 pr-4">{n.content}</p>
+                    <p className="text-[10px] text-emerald-600 font-medium">Your scheduled post is now live on LinkedIn</p>
+                  </div>
+                </div>
               </div>
             </AnimatedCard>
           ))}
@@ -143,85 +180,183 @@ export default function DashboardPage() {
       </AnimatedCard>
 
       {/* Stats */}
-      <AnimatedCard animation="stagger-container" className="grid gap-4">
-        {/* Scheduled */}
-        <Card className="rounded-2xl border-border/50 shadow-sm hover:shadow-md transition-shadow">
-          <CardContent className="p-6 flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-muted-foreground">Posts Queued</p>
-              <p className="text-3xl font-bold tracking-tight text-foreground">
-                {posts.filter(p => p.status === "SCHEDULED").length}
-              </p>
-            </div>
-            <div className="h-10 w-10 text-primary bg-primary/10 rounded-full flex items-center justify-center">
-              <Calendar className="w-5 h-5" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Views (Placeholder) */}
-        <Card className="rounded-2xl border-border/50 shadow-sm hover:shadow-md transition-shadow">
-          <CardContent className="p-6 flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-muted-foreground">Total Views</p>
-              <p className="text-3xl font-bold tracking-tight text-foreground">0</p>
-            </div>
-            <div className="h-10 w-10 text-blue-500 bg-blue-500/10 rounded-full flex items-center justify-center">
-              <Eye className="w-5 h-5" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Engagement (Placeholder) */}
-        <Card className="rounded-2xl border-border/50 shadow-sm hover:shadow-md transition-shadow">
-          <CardContent className="p-6 flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-muted-foreground">Engagement</p>
-              <p className="text-3xl font-bold tracking-tight text-foreground">0%</p>
-            </div>
-            <div className="h-10 w-10 text-green-500 bg-green-500/10 rounded-full flex items-center justify-center">
-              <TrendingUp className="w-5 h-5" />
-            </div>
-          </CardContent>
-        </Card>
+      <AnimatedCard animation="stagger-container" className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <StatCard
+          label="Posts Queued"
+          value={scheduledPosts.length}
+          icon={<Calendar className="w-5 h-5" />}
+          color="text-primary bg-primary/10"
+        />
+        <StatCard
+          label="Total Views"
+          value="0"
+          icon={<Eye className="w-5 h-5" />}
+          color="text-blue-500 bg-blue-500/10"
+        />
+        <StatCard
+          label="Engagement"
+          value="0%"
+          icon={<TrendingUp className="w-5 h-5" />}
+          color="text-emerald-500 bg-emerald-500/10"
+        />
       </AnimatedCard>
 
       {/* Your Posts Section */}
-      <div className="space-y-6 pt-2">
+      <div className="space-y-8 pt-2">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold tracking-tight">Your Posts</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Post Manager</h2>
           <Link href="/posts/new">
-            <Button size="icon" className="h-10 w-10 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20">
-              <Plus className="w-5 h-5" />
+            <Button className="rounded-xl h-10 px-4 gap-2 font-bold shadow-lg shadow-primary/20">
+              <Plus className="w-4 h-4" />
+              Create Post
             </Button>
           </Link>
         </div>
 
         {posts.length === 0 ? (
-          <AnimatedCard animation="fade-in-scale" className="border-2 border-dashed border-border/60 rounded-3xl p-12 flex flex-col items-center justify-center text-center space-y-4">
-            <div className="w-12 h-12 bg-secondary rounded-full flex items-center justify-center text-muted-foreground">
-              <Plus className="w-6 h-6" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-lg font-semibold text-foreground">No posts yet</h3>
-              <p className="text-muted-foreground max-w-xs mx-auto">Create your first post to get started with your consistent journey.</p>
-            </div>
-            <Link href="/posts/new">
-              <Button variant="outline" className="rounded-full mt-2">
-                Create Post
-              </Button>
-            </Link>
-          </AnimatedCard>
+          <EmptyState />
         ) : (
-          <div className="space-y-3">
-            <div className="p-6 border border-border/50 rounded-2xl bg-card/50 text-center text-muted-foreground">
-              <p>Post list view coming soon.</p>
-            </div>
+          <div className="space-y-10">
+            {/* Scheduled Section */}
+            {scheduledPosts.length > 0 && (
+              <PostSection title="Scheduled Posts" icon={<Clock className="w-4 h-4 text-primary" />}>
+                {scheduledPosts.map((p, i) => (
+                  <PostCard key={p.id} post={p} index={i} />
+                ))}
+              </PostSection>
+            )}
+
+            {/* Recently Published Section */}
+            {publishedPosts.length > 0 && (
+              <PostSection title="Recently Published" icon={<CheckCircle2 className="w-4 h-4 text-emerald-500" />}>
+                {publishedPosts.map((p, i) => (
+                  <PostCard key={p.id} post={p} index={i} />
+                ))}
+              </PostSection>
+            )}
+
+            {/* Drafts Section */}
+            {drafts.length > 0 && (
+              <PostSection title="Drafts" icon={<FileEdit className="w-4 h-4 text-zinc-500" />}>
+                {drafts.map((p, i) => (
+                  <PostCard key={p.id} post={p} index={i} />
+                ))}
+              </PostSection>
+            )}
           </div>
         )}
       </div>
 
-      <div className="h-24"></div> {/* Bottom spacer for nav */}
+      <div className="h-24"></div>
     </div>
+  )
+}
+
+function StatCard({ label, value, icon, color }: { label: string, value: string | number, icon: React.ReactNode, color: string }) {
+  return (
+    <Card className="rounded-2xl border-border/50 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+      <CardContent className="p-6 flex items-center justify-between">
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-muted-foreground">{label}</p>
+          <p className="text-3xl font-bold tracking-tight text-foreground">{value}</p>
+        </div>
+        <div className={cn("h-10 w-10 rounded-full flex items-center justify-center", color)}>
+          {icon}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function PostSection({ title, children, icon }: { title: string, children: React.ReactNode, icon: React.ReactNode }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 pl-1">
+        {icon}
+        <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">{title}</h3>
+      </div>
+      <div className="space-y-3">
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function PostCard({ post, index }: { post: Post, index: number }) {
+  const isScheduled = post.status === "SCHEDULED"
+  const isPublished = post.status === "PUBLISHED"
+  const isDraft = post.status === "DRAFT"
+
+  return (
+    <AnimatedCard animation="slide-up" index={index}>
+      <Card className="rounded-2xl border-border/50 hover:border-primary/20 hover:shadow-md transition-all group">
+        <CardContent className="p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-3 flex-1">
+              <p className="text-[15px] text-foreground/90 line-clamp-2 leading-relaxed font-medium">
+                {post.content}
+              </p>
+
+              <div className="flex flex-wrap items-center gap-3">
+                {isScheduled && post.scheduledFor && (
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-primary/5 text-primary text-[11px] font-bold border border-primary/10">
+                    <Clock className="w-3 h-3" />
+                    {format(new Date(post.scheduledFor), "MMM d, h:mm a")}
+                  </div>
+                )}
+
+                {isPublished && post.publishedAt && (
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-500/5 text-emerald-600 text-[11px] font-bold border border-emerald-500/10">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Published {format(new Date(post.publishedAt), "MMM d")}
+                  </div>
+                )}
+
+                {isDraft && (
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-[11px] font-bold">
+                    <FileEdit className="w-3 h-3" />
+                    Draft
+                  </div>
+                )}
+
+                {post.status === "FAILED" && (
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-red-500/5 text-red-600 text-[11px] font-bold border border-red-500/10">
+                    <AlertCircle className="w-3 h-3" />
+                    Failed
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1 shrink-0">
+              <Link href={isPublished ? `/stats` : `/posts/new?id=${post.id}`}>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-primary/10 hover:text-primary transition-colors">
+                  {isPublished ? <ArrowUpRight className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </AnimatedCard>
+  )
+}
+
+function EmptyState() {
+  return (
+    <AnimatedCard animation="fade-in-scale" className="border-2 border-dashed border-border/60 rounded-3xl p-12 flex flex-col items-center justify-center text-center space-y-4">
+      <div className="w-12 h-12 bg-secondary rounded-full flex items-center justify-center text-muted-foreground">
+        <Plus className="w-6 h-6" />
+      </div>
+      <div className="space-y-1">
+        <h3 className="text-lg font-semibold text-foreground">No posts yet</h3>
+        <p className="text-muted-foreground max-w-xs mx-auto">Create your first post to get started with your consistent journey.</p>
+      </div>
+      <Link href="/posts/new">
+        <Button variant="outline" className="rounded-full mt-2">
+          Create Post
+        </Button>
+      </Link>
+    </AnimatedCard>
   )
 }
