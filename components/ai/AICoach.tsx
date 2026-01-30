@@ -100,22 +100,26 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
     return (
         <>
             {/* Floating Button */}
-            <motion.div
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="fixed bottom-24 right-6 z-40"
-            >
-                <Button
-                    onClick={() => setIsOpen(true)}
-                    className="h-14 px-6 rounded-2xl bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 border border-zinc-700/50 shadow-2xl hover:scale-105 active:scale-95 transition-all group flex items-center gap-2"
+            {(motion.div as any).initial && (
+                <motion.div
+                    {...({
+                        initial: { scale: 0, opacity: 0 },
+                        animate: { scale: 1, opacity: 1 },
+                        className: "fixed bottom-24 right-6 z-40"
+                    } as any)}
                 >
-                    <div className="relative">
-                        <Sparkles className="w-5 h-5 text-amber-400 animate-pulse" />
-                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-amber-400 rounded-full animate-ping opacity-75" />
-                    </div>
-                    <span className="font-bold tracking-tight">AI Coach</span>
-                </Button>
-            </motion.div>
+                    <Button
+                        onClick={() => setIsOpen(true)}
+                        className="h-14 px-6 rounded-2xl bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 border border-zinc-700/50 shadow-2xl hover:scale-105 active:scale-95 transition-all group flex items-center gap-2"
+                    >
+                        <div className="relative">
+                            <Sparkles className="w-5 h-5 text-amber-400 animate-pulse" />
+                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-amber-400 rounded-full animate-ping opacity-75" />
+                        </div>
+                        <span className="font-bold tracking-tight">AI Coach</span>
+                    </Button>
+                </motion.div>
+            )}
 
             {/* Side Panel / Modal */}
             <AnimatePresence>
@@ -123,20 +127,24 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                     <>
                         {/* Backdrop */}
                         <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            onClick={() => setIsOpen(false)}
-                            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50"
+                            {...({
+                                initial: { opacity: 0 },
+                                animate: { opacity: 1 },
+                                exit: { opacity: 0 },
+                                onClick: () => setIsOpen(false),
+                                className: "fixed inset-0 bg-black/20 backdrop-blur-sm z-50"
+                            } as any)}
                         />
 
                         {/* Panel */}
                         <motion.div
-                            initial={{ x: "100%" }}
-                            animate={{ x: 0 }}
-                            exit={{ x: "100%" }}
-                            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                            className="fixed top-0 right-0 h-full w-full md:w-[450px] bg-white dark:bg-zinc-950 z-[60] shadow-2xl flex flex-col border-l border-zinc-200 dark:border-zinc-800"
+                            {...({
+                                initial: { x: "100%" },
+                                animate: { x: 0 },
+                                exit: { x: "100%" },
+                                transition: { type: "spring", damping: 25, stiffness: 200 },
+                                className: "fixed top-0 right-0 h-full w-full md:w-[450px] bg-white dark:bg-zinc-950 z-[60] shadow-2xl flex flex-col border-l border-zinc-200 dark:border-zinc-800"
+                            } as any)}
                         >
                             {/* Header */}
                             <div className="p-6 border-b border-zinc-100 dark:border-zinc-900 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/50">
