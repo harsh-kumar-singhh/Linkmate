@@ -116,6 +116,7 @@ export default function SignupPage() {
                 width={20}
                 height={20}
                 className="object-contain"
+                unoptimized
               />
               <span>Sign up with Google</span>
             </Button>

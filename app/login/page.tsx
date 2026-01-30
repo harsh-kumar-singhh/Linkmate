@@ -101,6 +101,7 @@ export default function LoginPage() {
                 width={20}
                 height={20}
                 className="object-contain"
+                unoptimized
               />
               <span>Continue with Google</span>
             </Button>
