@@ -21,10 +21,12 @@ import {
     Trash2,
     PenTool,
     Loader2,
-    CheckCircle2
+    CheckCircle2,
+    Globe
 } from "lucide-react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { LinkedInPreview } from "@/components/posts/LinkedInPreview"
 
 function EditorContent() {
     const { status, data: session } = useSession()
@@ -323,133 +325,126 @@ function EditorContent() {
                             )}
 
                             {/* Scheduling Section */}
-                            <div className="bg-card border border-border/60 rounded-2xl p-6 space-y-6 shadow-sm">
-                                <h3 className="font-bold text-2xl tracking-tight">Schedule</h3>
+                            <div className="bg-card border border-border/60 rounded-[28px] p-8 space-y-8 shadow-sm">
+                                <div className="space-y-1">
+                                    <h3 className="font-bold text-2xl tracking-tight text-foreground">Schedule</h3>
+                                    <p className="text-muted-foreground text-sm font-medium">When should this post go live?</p>
+                                </div>
 
                                 <div className="space-y-6">
-                                    <div className="space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="space-y-2">
-                                            <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Post Date</label>
+                                            <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Post Date</label>
                                             <div className="relative group">
                                                 <input
                                                     type="date"
-                                                    placeholder="Select a date"
-                                                    className="w-full h-12 pl-11 pr-4 rounded-xl border border-border/80 bg-background text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all cursor-pointer hover:bg-secondary/20"
-                                                    value={scheduledFor ? scheduledFor.split('T')[0] : ""}
+                                                    className="w-full h-14 pl-12 pr-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-[15px] font-medium focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 shadow-sm"
+                                                    value={scheduledFor ? (scheduledFor.split('T')[0] || new Date().toISOString().split('T')[0]) : ""}
                                                     onChange={(e) => {
-                                                        const timePart = scheduledFor ? scheduledFor.split('T')[1] || "09:00" : "09:00";
+                                                        const timePart = scheduledFor ? (scheduledFor.split('T')[1] || "09:00") : "09:00";
                                                         setScheduledFor(`${e.target.value}T${timePart}`);
                                                     }}
                                                 />
-                                                <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary pointer-events-none" />
+                                                <Calendar className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-primary pointer-events-none" />
                                             </div>
                                         </div>
 
                                         <div className="space-y-2">
-                                            <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Post Time</label>
+                                            <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Post Time</label>
                                             <div className="relative group">
                                                 <input
                                                     type="time"
-                                                    placeholder="Select time"
-                                                    className="w-full h-12 pl-11 pr-4 rounded-xl border border-border/80 bg-background text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all cursor-pointer hover:bg-secondary/20"
-                                                    value={scheduledFor ? scheduledFor.split('T')[1] : ""}
+                                                    className="w-full h-14 pl-12 pr-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-[15px] font-medium focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 shadow-sm"
+                                                    value={scheduledFor ? (scheduledFor.split('T')[1] || "09:00") : "09:00"}
                                                     onChange={(e) => {
-                                                        const datePart = scheduledFor ? scheduledFor.split('T')[0] : new Date().toISOString().split('T')[0];
+                                                        const datePart = scheduledFor ? (scheduledFor.split('T')[0] || new Date().toISOString().split('T')[0]) : new Date().toISOString().split('T')[0];
                                                         setScheduledFor(`${datePart}T${e.target.value}`);
                                                     }}
                                                 />
-                                                <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary pointer-events-none" />
+                                                <Clock className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-primary pointer-events-none" />
                                             </div>
                                         </div>
+                                    </div>
 
-                                        <div className="bg-blue-50/80 dark:bg-blue-900/10 rounded-xl p-4 w-full">
-                                            <p className="text-[12px] text-blue-700/80 dark:text-blue-400 font-medium leading-relaxed">
-                                                <span className="font-bold">Pro-tip:</span> Weekdays between 9-11 AM are generally best for LinkedIn.
-                                            </p>
-                                        </div>
+                                    <div className="bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl p-5 border border-zinc-100 dark:border-zinc-800/50 w-full">
+                                        <p className="text-[13px] text-zinc-600 dark:text-zinc-400 font-medium leading-relaxed">
+                                            <span className="font-bold text-zinc-900 dark:text-zinc-200">Best time to post:</span> Weekdays between 9-11 AM based on your audience.
+                                        </p>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+
+                        {/* LinkedIn Post Preview */}
+                        <div className="space-y-4 pt-4">
+                            <div className="flex items-center gap-2">
+                                <Globe className="w-5 h-5 text-primary" />
+                                <h3 className="font-bold text-lg">Post Preview</h3>
+                            </div>
+                            <LinkedInPreview content={content} />
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="pt-8 space-y-4">
+                            <div className="flex flex-col md:flex-row gap-4">
+                                <Button
+                                    variant="outline"
+                                    className="h-14 flex-1 border border-border/80 bg-background hover:bg-secondary/50 rounded-2xl px-6 text-[15px] font-bold transition-all active:scale-[0.98]"
+                                    onClick={() => handleSavePost("DRAFT")}
+                                    disabled={!content || isSaving}
+                                >
+                                    Save Draft
+                                </Button>
+
+                                {scheduledFor ? (
+                                    <Button
+                                        className="h-14 flex-[2] rounded-2xl shadow-lg shadow-primary/20 text-[15px] font-black gap-2 bg-primary hover:bg-primary/90 active:scale-[0.98] transition-all"
+                                        onClick={() => handleSavePost("SCHEDULED")}
+                                        disabled={!content || isSaving}
+                                    >
+                                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calendar className="w-4 h-4" />}
+                                        Schedule Post
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        className="h-14 flex-[2] rounded-2xl shadow-lg shadow-primary/20 text-[15px] font-black gap-2 bg-primary hover:bg-primary/90 active:scale-[0.98] transition-all"
+                                        onClick={() => handleSavePost("PUBLISHED")}
+                                        disabled={!content || isSaving}
+                                    >
+                                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                        Publish Now
+                                    </Button>
+                                )}
                             </div>
                         </div>
                     </div>
 
-                    {/* Right Column: Live Preview */}
+                    {/* Right Column: Information/Tips */}
                     <div className="hidden lg:block space-y-6 sticky top-8 h-fit">
-                        <div className="flex items-center gap-2">
-                            <CheckCircle2 className="w-5 h-5 text-primary" />
-                            <h2 className="text-xl font-bold">Preview</h2>
-                        </div>
-
-                        <AnimatedCard animation="fade-in-up" className="bg-card border border-border/80 rounded-[28px] shadow-sm overflow-hidden border-t-4 border-t-primary/10">
-                            <div className="p-6 space-y-6">
-                                {/* Fake Header */}
-                                <div className="flex items-start gap-3">
-                                    <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center text-lg font-bold text-primary/80">
-                                        {session?.user?.name?.[0] || "U"}
-                                    </div>
-                                    <div className="flex-1">
-                                        <p className="font-bold text-sm text-foreground">{session?.user?.name || "Your Name"}</p>
-                                        <p className="text-[11px] text-muted-foreground">Dynamic Professional • Now • <span className="text-[10px]">🌐</span></p>
-                                    </div>
+                        <div className="bg-background border border-border/80 rounded-[28px] p-8 space-y-6 shadow-sm">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                    <Sparkles className="w-5 h-5 text-primary" />
                                 </div>
-
-                                {/* Content */}
-                                <div className="min-h-[160px] text-[14px] leading-relaxed whitespace-pre-wrap text-foreground/90 font-inter">
-                                    {content || <span className="text-muted-foreground italic font-normal">Your masterpiece will appear here...</span>}
-                                </div>
-
-                                {/* Fake Actions */}
-                                <div className="pt-4 border-t border-border/60 flex items-center justify-between text-muted-foreground font-bold text-[10px] uppercase tracking-widest px-2">
-                                    {['Like', 'Comment', 'Share', 'Send'].map((action) => (
-                                        <span key={action} className="hover:text-primary transition-colors cursor-pointer">{action}</span>
-                                    ))}
-                                </div>
+                                <h2 className="text-xl font-bold tracking-tight">Pro Tips</h2>
                             </div>
-                        </AnimatedCard>
-
-                        <div className="bg-background border border-border/80 rounded-2xl p-4 text-[13px] text-muted-foreground flex items-center gap-3">
-                            <Sparkles className="w-4 h-4 text-primary flex-shrink-0" />
-                            <p>Showing optimized LinkedIn desktop view.</p>
+                            <div className="space-y-4">
+                                {[
+                                    { title: "Hashtags", desc: "Use 3-5 relevant hashtags for better reach." },
+                                    { title: "Hook", desc: "The first 2 lines are critical; make them hooky." },
+                                    { title: "Links", desc: "Avoid outbound links in the body; use 'link in comments'." },
+                                    { title: "Tags", desc: "Only tag people if genuinely relevant." }
+                                ].map((tip, i) => (
+                                    <div key={i} className="space-y-1">
+                                        <p className="text-sm font-bold text-foreground">{tip.title}</p>
+                                        <p className="text-[13px] text-muted-foreground leading-relaxed">{tip.desc}</p>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </div>
             </main>
-
-            {/* FIXED BOTTOM ACTION BAR - Stable and Grounded */}
-            <footer className="fixed bottom-[64px] left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t border-border h-[80px] md:h-[90px] flex items-center justify-center shadow-[0_-4px_24px_rgba(0,0,0,0.02)]">
-                <nav className="max-w-6xl w-full flex items-center gap-4 px-6 md:px-8">
-                    <Button
-                        variant="ghost"
-                        className="h-12 border border-border/80 bg-background hover:bg-secondary/50 rounded-xl px-6 text-sm font-bold transition-all whitespace-nowrap active:scale-[0.98]"
-                        onClick={() => handleSavePost("DRAFT")}
-                        disabled={!content || isSaving}
-                    >
-                        Save Draft
-                    </Button>
-
-                    <div className="flex-1 flex gap-2">
-                        {scheduledFor ? (
-                            <Button
-                                className="flex-1 h-12 rounded-xl shadow-lg shadow-primary/20 text-sm font-black gap-2 bg-primary hover:bg-primary/90 active:scale-[0.98] transition-all"
-                                onClick={() => handleSavePost("SCHEDULED")}
-                                disabled={!content || isSaving}
-                            >
-                                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calendar className="w-4 h-4" />}
-                                Schedule for Post
-                            </Button>
-                        ) : (
-                            <Button
-                                className="flex-1 h-12 rounded-xl shadow-lg shadow-primary/20 text-sm font-black gap-2 bg-primary hover:bg-primary/90 active:scale-[0.98] transition-all"
-                                onClick={() => handleSavePost("PUBLISHED")}
-                                disabled={!content || isSaving}
-                            >
-                                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                                Publish Now
-                            </Button>
-                        )}
-                    </div>
-                </nav>
-            </footer>
         </div>
     )
 }

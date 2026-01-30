@@ -40,14 +40,14 @@ export default function StatsPage() {
                     <h1 className="text-3xl font-bold tracking-tight text-foreground">Analytics</h1>
                     <p className="text-muted-foreground text-sm font-medium">Track your LinkedIn performance</p>
                 </div>
-                <div className="flex items-center gap-3">
-                    <div className="relative group">
-                        <Button variant="outline" className="h-10 px-4 rounded-xl border-border/80 gap-2 font-bold text-sm">
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="relative group flex-1 md:flex-none">
+                        <Button variant="outline" className="w-full md:w-auto h-10 px-4 rounded-xl border-border/80 gap-2 font-bold text-sm">
                             {dateRange}
                             <ChevronDown className="w-4 h-4 text-muted-foreground" />
                         </Button>
                     </div>
-                    <Button variant="outline" className="h-10 px-4 rounded-xl border-border/80 gap-2 font-bold text-sm">
+                    <Button variant="outline" className="flex-1 md:flex-none h-10 px-4 rounded-xl border-border/80 gap-2 font-bold text-sm">
                         <Download className="w-4 h-4" />
                         Download Report
                     </Button>

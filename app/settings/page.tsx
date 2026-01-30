@@ -60,7 +60,7 @@ export default async function SettingsPage() {
                             )}
                         </div>
 
-                        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div className="flex flex-col md:flex-row items-center justify-between gap-6 pr-2 md:pr-0">
                             <div className="space-y-2 text-center md:text-left">
                                 <h4 className="text-xl font-bold">LinkedIn Profile</h4>
                                 <p className="text-muted-foreground text-sm max-w-sm">
@@ -69,12 +69,12 @@ export default async function SettingsPage() {
                                         : "Connect your profile to start automating your LinkedIn presence."}
                                 </p>
                             </div>
-                            <div className="flex gap-3 w-full md:w-auto">
+                            <div className="flex gap-3 w-full md:w-auto justify-center md:justify-end">
                                 <div className="flex-1 md:w-auto">
                                     <ConnectLinkedInButton isConnected={isConnected} />
                                 </div>
                                 {isConnected && (
-                                    <Link href="/settings/linkedin">
+                                    <Link href="/settings/linkedin" className="shrink-0">
                                         <Button variant="outline" size="icon" className="h-12 w-12 rounded-xl border-border/80">
                                             <ArrowRight className="w-4 h-4" />
                                         </Button>
