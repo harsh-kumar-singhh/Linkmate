@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { AICoach } from "@/components/ai/AICoach"
 
 export default function StatsPage() {
     const [dateRange, setDateRange] = useState("Last 30 days")
@@ -148,6 +149,7 @@ export default function StatsPage() {
                     </div>
                 </div>
             </div>
+            <AICoach />
         </div>
     )
 }

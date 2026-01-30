@@ -27,6 +27,7 @@ import {
 import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { LinkedInPreview } from "@/components/posts/LinkedInPreview"
+import { AICoach } from "@/components/ai/AICoach"
 
 function EditorContent() {
     const { status, data: session } = useSession()
@@ -455,6 +456,7 @@ function EditorContent() {
                     </div>
                 </div>
             </main>
+            <AICoach draftContent={content} />
         </div>
     )
 }
