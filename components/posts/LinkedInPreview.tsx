@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react"
 import { Globe, MoreHorizontal, ThumbsUp, MessageSquare, Send } from "lucide-react"
 import { cn } from "@/lib/utils"
+import Image from "next/image"
 
 interface LinkedInPreviewProps {
     content: string
@@ -18,7 +19,14 @@ export function LinkedInPreview({ content, className }: LinkedInPreviewProps) {
             <div className="p-3 pb-2 flex items-start gap-2">
                 <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex-shrink-0 overflow-hidden border border-zinc-200/50 dark:border-zinc-700/50">
                     {session?.user?.image ? (
-                        <img src={session.user.image} alt={session.user.name || "User"} className="w-full h-full object-cover" />
+                        <Image
+                            src={session.user.image}
+                            alt={session.user.name || "User"}
+                            width={48}
+                            height={48}
+                            className="w-full h-full object-cover"
+                            unoptimized
+                        />
                     ) : (
                         <div className="w-full h-full flex items-center justify-center bg-[#E5E5E5] dark:bg-[#38434F]">
                             <span className="text-xl font-bold text-[#666666] dark:text-[#A1A1A1]">{session?.user?.name?.[0] || "U"}</span>

@@ -279,9 +279,9 @@ function CoachSuggestionCard() {
                   <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
                   <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">AI Strategist Recommendation</span>
                 </div>
-                <h3 className="text-lg font-bold tracking-tight">You haven't scheduled anything for tomorrow</h3>
+                <h3 className="text-lg font-bold tracking-tight">You haven&apos;t scheduled anything for tomorrow</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Based on your audience's active times, a post at <span className="text-foreground font-bold italic underline decoration-amber-500/30">9:30 AM tomorrow</span> could see 25% more engagement.
+                  Based on your audience&apos;s active times, a post at <span className="text-foreground font-bold italic underline decoration-amber-500/30">9:30 AM tomorrow</span> could see 25% more engagement.
                 </p>
               </div>
               <div className="flex items-center gap-3 pt-1">

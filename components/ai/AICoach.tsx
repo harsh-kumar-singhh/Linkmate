@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { usePathname } from "next/navigation"
+import { useCallback } from "react"
 
 interface Insight {
     type: "trend" | "warning" | "success"
@@ -47,7 +48,7 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
     const pathname = usePathname()
     const scrollRef = useRef<HTMLDivElement>(null)
 
-    const fetchAdvice = async (query?: string) => {
+    const fetchAdvice = useCallback(async (query?: string) => {
         setIsLoading(true)
         if (query) {
             setChatHistory(prev => [...prev, { role: "user", content: query }])
@@ -74,14 +75,14 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
         } finally {
             setIsLoading(false)
         }
-    }
+    }, [pathname, draftContent])
 
     // Initial fetch when opened
     useEffect(() => {
         if (isOpen && chatHistory.length === 0) {
             fetchAdvice()
         }
-    }, [isOpen])
+    }, [isOpen, chatHistory.length, fetchAdvice])
 
     // Scroll to bottom
     useEffect(() => {
@@ -209,7 +210,7 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                                                                         <h4 className="text-sm font-bold leading-tight">{suggestion.title}</h4>
                                                                     </div>
                                                                     <div className="bg-zinc-50 dark:bg-zinc-900/80 p-3 rounded-xl border border-zinc-100 dark:border-zinc-800">
-                                                                        <p className="text-[12px] italic text-muted-foreground">"{suggestion.hook}"</p>
+                                                                        <p className="text-[12px] italic text-muted-foreground">&quot;{suggestion.hook}&quot;</p>
                                                                     </div>
                                                                     <p className="text-[11px] text-muted-foreground leading-relaxed">
                                                                         <span className="font-bold text-foreground">Why:</span> {suggestion.why}

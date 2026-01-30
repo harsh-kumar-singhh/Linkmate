@@ -10,6 +10,7 @@ import Link from "next/link"
 import { ArrowLeft, Sparkles, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import Image from "next/image"
 
 export default function SignupPage() {
   const router = useRouter()
@@ -109,10 +110,12 @@ export default function SignupPage() {
               onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
               disabled={isLoading}
             >
-              <img
+              <Image
                 src="https://www.gstatic.com/images/branding/product/1x/googleg_48dp.png"
                 alt="Google"
-                className="w-5 h-5 object-contain"
+                width={20}
+                height={20}
+                className="object-contain"
               />
               <span>Sign up with Google</span>
             </Button>
