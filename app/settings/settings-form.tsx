@@ -67,15 +67,14 @@ export function SettingsForm({ user }: SettingsFormProps) {
     const { setTheme, theme } = useTheme();
     const router = useRouter();
 
-    const handleSave = async (field: string) => {
+    const handleSave = async (field: string, value?: any) => {
         setIsSaving(true);
         try {
             const body: any = {};
             if (field === 'writingStyle') body.writingStyle = writingStyle;
             if (field === 'account') body.name = name;
+            if (field === 'theme') body.theme = value;
 
-            // Only writingStyle is currently supported by the existing API
-            // but we'll simulate success for others to match UI request
             const response = await fetch("/api/user/settings", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
@@ -92,6 +91,11 @@ export function SettingsForm({ user }: SettingsFormProps) {
         } finally {
             setIsSaving(false);
         }
+    };
+
+    const updateTheme = (newTheme: string) => {
+        setTheme(newTheme);
+        handleSave('theme', newTheme);
     };
 
     return (
@@ -268,7 +272,7 @@ export function SettingsForm({ user }: SettingsFormProps) {
                         ].map((item) => (
                             <button
                                 key={item.id}
-                                onClick={() => setTheme(item.id)}
+                                onClick={() => updateTheme(item.id)}
                                 className={cn(
                                     "flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all gap-3",
                                     theme === item.id
