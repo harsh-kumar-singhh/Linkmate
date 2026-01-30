@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { AnimatedCard } from "@/components/animated/AnimatedCard"
 import {
     Eye,
@@ -11,39 +11,19 @@ import {
     ChevronDown,
     Plus,
     Calendar,
-    BarChart3,
-    Loader2
+    BarChart3
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 export default function StatsPage() {
     const [dateRange, setDateRange] = useState("Last 30 days")
-    const [isLoading, setIsLoading] = useState(true)
-    const [data, setData] = useState<any>(null)
 
-    useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                const response = await fetch("/api/stats")
-                if (response.ok) {
-                    const statsData = await response.json()
-                    setData(statsData)
-                }
-            } catch (error) {
-                console.error("Failed to fetch stats", error)
-            } finally {
-                setIsLoading(false)
-            }
-        }
-        fetchStats()
-    }, [])
-
-    const defaultStats = [
-        { title: "Total Views", value: "0", icon: Eye, color: "text-blue-500", label: "From all your posts" },
-        { title: "Total Likes", value: "0", icon: Heart, color: "text-red-500", label: "Total engagement" },
-        { title: "Comments", value: "0", icon: MessageCircle, color: "text-green-500", label: "Total interactions" },
-        { title: "Avg Engagement", value: "0.0%", icon: TrendingUp, color: "text-orange-500", label: "Engagement rate" }
+    const stats = [
+        { title: "Total Views", value: "1,284", icon: Eye, color: "text-blue-500", label: "From all your posts" },
+        { title: "Total Likes", value: "342", icon: Heart, color: "text-red-500", label: "Total engagement" },
+        { title: "Comments", value: "89", icon: MessageCircle, color: "text-green-500", label: "Total interactions" },
+        { title: "Avg Engagement", value: "4.2%", icon: TrendingUp, color: "text-orange-500", label: "Engagement rate" }
     ]
 
     const bestTimes = [
@@ -51,8 +31,6 @@ export default function StatsPage() {
         { day: "Wednesday", time: "11:00 AM", level: "Very High", color: "text-emerald-600 bg-emerald-50" },
         { day: "Friday", time: "2:00 PM", level: "Medium", color: "text-amber-600 bg-amber-50" }
     ]
-
-    const stats = data?.stats || defaultStats
 
     return (
         <div className="max-w-4xl mx-auto py-8 px-4 md:px-0 space-y-8 pb-24">
@@ -82,14 +60,10 @@ export default function StatsPage() {
                     <AnimatedCard key={i} animation="fade-in-up" className="bg-card border border-border/60 rounded-2xl p-4 md:p-5 shadow-sm space-y-4">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{stat.title}</span>
-                            {isLoading ? <Loader2 className="w-4 h-4 animate-spin text-primary/30" /> : <stat.icon className={cn("w-4 h-4", stat.color)} />}
+                            <stat.icon className={cn("w-4 h-4", stat.color)} />
                         </div>
                         <div className="space-y-1">
-                            {isLoading ? (
-                                <div className="h-9 w-16 bg-secondary/50 animate-pulse rounded-lg" />
-                            ) : (
-                                <h2 className="text-3xl font-bold tracking-tight">{stat.value}</h2>
-                            )}
+                            <h2 className="text-3xl font-bold tracking-tight">{stat.value}</h2>
                             <p className="text-[10px] text-muted-foreground font-medium">{stat.label}</p>
                         </div>
                     </AnimatedCard>
@@ -103,24 +77,18 @@ export default function StatsPage() {
                     <BarChart3 className="w-5 h-5 text-muted-foreground" />
                 </div>
                 <div className="h-48 w-full flex items-end justify-between gap-2 md:gap-4 px-2">
-                    {isLoading ? (
-                        Array(15).fill(0).map((_, i) => (
-                            <div key={i} className="flex-1 bg-secondary/30 animate-pulse rounded-t-lg" style={{ height: `${20 + (i * 5) % 60}%` }} />
-                        ))
-                    ) : (
-                        (data?.chartData || [35, 65, 45, 85, 55, 95, 75, 60, 40, 50, 90, 70, 80, 100, 75]).map((h: number, i: number) => (
-                            <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                                <div
-                                    className="w-full bg-primary/20 hover:bg-primary/40 transition-colors rounded-t-lg relative group cursor-pointer"
-                                    style={{ height: `${Math.max(10, h * 10)}%` }}
-                                >
-                                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-foreground text-background text-[10px] font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                                        {h}% rate
-                                    </div>
+                    {[35, 65, 45, 85, 55, 95, 75, 60, 40, 50, 90, 70, 80, 100, 75].map((h: number, i: number) => (
+                        <div key={i} className="flex-1 flex flex-col items-center gap-2">
+                            <div
+                                className="w-full bg-primary/20 hover:bg-primary/40 transition-colors rounded-t-lg relative group cursor-pointer"
+                                style={{ height: `${h}%` }}
+                            >
+                                <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-foreground text-background text-[10px] font-bold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                    {h} pts
                                 </div>
                             </div>
-                        ))
-                    )}
+                        </div>
+                    ))}
                 </div>
                 <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-2">
                     <span>Performance (Latest Posts)</span>
@@ -135,39 +103,26 @@ export default function StatsPage() {
                         <h3 className="text-xl font-bold tracking-tight">Top Performing Posts</h3>
                     </div>
 
-                    {isLoading ? (
-                        <div className="space-y-4">
-                            {[1, 2, 3].map(i => (
-                                <div key={i} className="h-16 w-full bg-secondary/30 animate-pulse rounded-2xl" />
-                            ))}
-                        </div>
-                    ) : data?.topPosts && data.topPosts.length > 0 ? (
-                        <div className="space-y-4">
-                            {data.topPosts.map((post: any) => (
-                                <div key={post.id} className="p-4 rounded-2xl bg-secondary/10 border border-border/40 hover:bg-secondary/20 transition-all cursor-default flex items-center justify-between gap-4">
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-foreground line-clamp-1 truncate">{post.content}</p>
-                                        <p className="text-[10px] text-muted-foreground font-bold uppercase mt-1">
-                                            {post.views} Views • {post.engagement}% Eng.
-                                        </p>
-                                    </div>
-                                    <div className="flex items-center gap-1.5 text-red-500 font-bold text-xs bg-red-500/5 px-2 py-1 rounded-lg">
-                                        <Heart className="w-3 h-3 fill-current" />
-                                        {post.likes}
-                                    </div>
+                    <div className="space-y-4">
+                        {[
+                            { content: "Exploring the future of AI in content strategy...", views: 452, eng: "5.2%", likes: 24 },
+                            { content: "How to maintain consistency in your posting schedule.", views: 312, eng: "4.8%", likes: 18 },
+                            { content: "3 tips for better LinkedIn engagement in 2026.", views: 284, eng: "3.9%", likes: 12 }
+                        ].map((post: any, i: number) => (
+                            <div key={i} className="p-4 rounded-2xl bg-secondary/10 border border-border/40 hover:bg-secondary/20 transition-all cursor-default flex items-center justify-between gap-4">
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-foreground line-clamp-1 truncate">{post.content}</p>
+                                    <p className="text-[10px] text-muted-foreground font-bold uppercase mt-1">
+                                        {post.views} Views • {post.eng} Eng.
+                                    </p>
                                 </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="flex flex-col items-center justify-center py-10 text-center space-y-3">
-                            <div className="w-12 h-12 bg-secondary/50 rounded-full flex items-center justify-center text-muted-foreground">
-                                <BarChart3 className="w-6 h-6" />
+                                <div className="flex items-center gap-1.5 text-red-500 font-bold text-xs bg-red-500/5 px-2 py-1 rounded-lg">
+                                    <Heart className="w-3 h-3 fill-current" />
+                                    {post.likes}
+                                </div>
                             </div>
-                            <p className="text-sm text-muted-foreground max-w-[200px] font-medium leading-relaxed">
-                                No posts yet. Create your first post to see analytics!
-                            </p>
-                        </div>
-                    )}
+                        ))}
+                    </div>
                 </div>
 
                 {/* Best Times to Post Section */}

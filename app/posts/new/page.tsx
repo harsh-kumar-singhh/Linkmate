@@ -337,9 +337,14 @@ function EditorContent() {
                                             <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Post Date</label>
                                             <div className="relative group">
                                                 <input
-                                                    type="date"
+                                                    type="text"
+                                                    placeholder="Select post date"
+                                                    onFocus={(e) => (e.target.type = "date")}
+                                                    onBlur={(e) => {
+                                                        if (!e.target.value) e.target.type = "text";
+                                                    }}
                                                     className="w-full h-14 pl-12 pr-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-[15px] font-medium focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 shadow-sm"
-                                                    value={scheduledFor ? (scheduledFor.split('T')[0] || new Date().toISOString().split('T')[0]) : ""}
+                                                    value={scheduledFor ? (scheduledFor.split('T')[0] || "") : ""}
                                                     onChange={(e) => {
                                                         const timePart = scheduledFor ? (scheduledFor.split('T')[1] || "09:00") : "09:00";
                                                         setScheduledFor(`${e.target.value}T${timePart}`);
@@ -353,9 +358,14 @@ function EditorContent() {
                                             <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Post Time</label>
                                             <div className="relative group">
                                                 <input
-                                                    type="time"
+                                                    type="text"
+                                                    placeholder="Select post time"
+                                                    onFocus={(e) => (e.target.type = "time")}
+                                                    onBlur={(e) => {
+                                                        if (!e.target.value) e.target.type = "text";
+                                                    }}
                                                     className="w-full h-14 pl-12 pr-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-[15px] font-medium focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 shadow-sm"
-                                                    value={scheduledFor ? (scheduledFor.split('T')[1] || "09:00") : "09:00"}
+                                                    value={scheduledFor ? (scheduledFor.split('T')[1] || "") : ""}
                                                     onChange={(e) => {
                                                         const datePart = scheduledFor ? (scheduledFor.split('T')[0] || new Date().toISOString().split('T')[0]) : new Date().toISOString().split('T')[0];
                                                         setScheduledFor(`${datePart}T${e.target.value}`);
