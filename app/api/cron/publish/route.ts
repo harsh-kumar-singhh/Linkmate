@@ -5,24 +5,24 @@ import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/prisma";
 import { publishToLinkedIn } from "@/lib/linkedin";
 
-export async function GET(req: Request) {
+export async function POST(req: Request) {
     // Strictly enforce CRON_SECRET for security
     const authHeader = req.headers.get('authorization');
     if (!process.env.CRON_SECRET) {
         console.error("CRON_SECRET is not set in environment variables.");
-        return new Response('Internal Server Error: Security Configuration Missing', { status: 500 });
+        return NextResponse.json({ error: 'Security Configuration Missing' }, { status: 500 });
     }
 
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
         console.warn("Unauthorized cron attempt blocked.");
-        return new Response('Unauthorized', { status: 401 });
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const prisma = getPrisma();
     const now = new Date();
 
     try {
-        // 1. Find all due posts
+        // 1. Find all due posts (status = SCHEDULED and scheduledFor <= now)
         const duePosts = await prisma.post.findMany({
             where: {
                 status: "SCHEDULED",
@@ -41,7 +41,7 @@ export async function GET(req: Request) {
             }
         });
 
-        console.log(`Found ${duePosts.length} posts due for publishing.`);
+        console.log(`[CRON] Found ${duePosts.length} posts due for publishing.`);
 
         const results = [];
 
@@ -54,14 +54,14 @@ export async function GET(req: Request) {
                 });
 
                 if (currentPost?.status !== "SCHEDULED") {
-                    console.info(`Post ${post.id} already processed or cancelled. Skipping.`);
+                    console.info(`[CRON] Post ${post.id} already processed or cancelled. Skipping.`);
                     continue;
                 }
 
                 // Check connection logic
                 const account = post.user.accounts[0];
                 if (!account?.access_token) {
-                    console.warn(`User ${post.userId} is not connected to LinkedIn. Marking post ${post.id} as FAILED.`);
+                    console.warn(`[CRON] User ${post.userId} is not connected to LinkedIn. Marking post ${post.id} as FAILED.`);
                     await prisma.post.update({
                         where: { id: post.id },
                         data: {
@@ -87,7 +87,7 @@ export async function GET(req: Request) {
 
                 results.push({ id: post.id, status: "SUCCESS" });
             } catch (error) {
-                console.error(`Failed to publish post ${post.id}:`, error);
+                console.error(`[CRON] Failed to publish post ${post.id}:`, error);
 
                 // Update post status to FAILED
                 await prisma.post.update({
@@ -107,7 +107,7 @@ export async function GET(req: Request) {
             results
         });
     } catch (error) {
-        console.error("Cron Execution Error:", error);
+        console.error("[CRON] Execution Error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

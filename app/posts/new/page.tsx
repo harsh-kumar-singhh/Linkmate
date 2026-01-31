@@ -314,7 +314,7 @@ function EditorContent() {
                                     </div>
                                     <div className="relative group">
                                         <TextareaAutosize
-                                            minRows={10}
+                                            minRows={12}
                                             placeholder="Start writing or edit the generated content..."
                                             className="w-full resize-none p-5 rounded-2xl bg-card border border-border/80 text-lg leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all shadow-sm group-hover:border-primary/20"
                                             value={content}

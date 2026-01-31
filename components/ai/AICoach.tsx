@@ -72,9 +72,27 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                 const data = await res.json()
                 setResponse(data)
                 setChatHistory(prev => [...prev, { role: "coach", content: data }])
+            } else {
+                const data = await res.json()
+                setChatHistory(prev => [...prev, {
+                    role: "coach",
+                    content: {
+                        message: `Sorry, I'm having trouble connecting: ${data.message || 'Unknown error'}. Please try again later.`,
+                        insights: [],
+                        suggestions: []
+                    }
+                }])
             }
         } catch (err) {
             console.error("Coach fetch error:", err)
+            setChatHistory(prev => [...prev, {
+                role: "coach",
+                content: {
+                    message: "I encountered a technical glitch. I'm ready to try again if you are!",
+                    insights: [],
+                    suggestions: []
+                }
+            }])
         } finally {
             setIsLoading(false)
         }

@@ -6,6 +6,8 @@ import { auth } from "@/lib/auth";
 import { getCoachContext } from "@/lib/coach-context";
 import { getGeminiModel } from "@/lib/gemini";
 
+const MODELS = ["gemini-2.0-flash-lite-preview-02-05", "gemini-2.5-flash-lite", "gemini-2.0-flash-exp"];
+
 export async function POST(req: Request) {
     try {
         const session = await auth();
@@ -15,8 +17,6 @@ export async function POST(req: Request) {
 
         const { page, draftContent, userQuery } = await req.json();
         const context = await getCoachContext(session.user.id);
-
-        const model = getGeminiModel("gemini-2.0-flash-lite-preview-02-05");
 
         let systemPrompt = `You are the LinkMate AI Content Coach, an elite LinkedIn strategist. 
 Your goal is to provide concise, high-value, and personalized advice to help the user grow their LinkedIn presence.
@@ -60,16 +60,33 @@ Response Format (JSON):
             }
         }
 
-        const result = await model.generateContent([systemPrompt, userPrompt]);
-        const response = await result.response;
-        const text = response.text();
+        let lastError: any = null;
+        for (const modelName of MODELS) {
+            try {
+                console.log(`[COACH] Attempting with model: ${modelName}`);
+                const model = getGeminiModel(modelName);
+                const result = await model.generateContent([systemPrompt, userPrompt]);
+                const response = await result.response;
+                const text = response.text();
 
-        // Clean up potential markdown JSON block
-        const cleanedText = text.replace(/```json/g, "").replace(/```/g, "").trim();
+                if (text) {
+                    // Clean up potential markdown JSON block
+                    const cleanedText = text.replace(/```json/g, "").replace(/```/g, "").trim();
+                    return NextResponse.json(JSON.parse(cleanedText));
+                }
+            } catch (error: any) {
+                console.warn(`[COACH] Model ${modelName} failed:`, error.message);
+                lastError = error;
+            }
+        }
 
-        return NextResponse.json(JSON.parse(cleanedText));
+        throw new Error(lastError?.message || "All models failed to respond");
+
     } catch (error) {
         console.error("Coach API Error:", error);
-        return NextResponse.json({ error: "Failed to get coach advice" }, { status: 500 });
+        return NextResponse.json({
+            error: "Failed to get coach advice",
+            message: error instanceof Error ? error.message : "Unknown error"
+        }, { status: 500 });
     }
 }

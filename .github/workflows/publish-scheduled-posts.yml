@@ -1,0 +1,17 @@
+name: Publish Scheduled Posts
+
+on:
+  schedule:
+    - cron: '*/5 * * * *' # Every 5 minutes
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Publishing API
+        run: |
+          curl -X POST "https://linkmate-bp2u.vercel.app/api/cron/publish" \
+          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+          -H "Content-Type: application/json" \
+          -i
