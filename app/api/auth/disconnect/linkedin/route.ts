@@ -21,12 +21,18 @@ export async function POST() {
             return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
-        // Delete the LinkedIn account associated with this user
+        // 1. Delete the LinkedIn account associated with this user
         await prisma.account.deleteMany({
             where: {
                 userId: user.id,
                 provider: "linkedin",
             },
+        });
+
+        // 2. Explicitly update the user flag for synchronization
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { linkedinConnected: false }
         });
 
         return NextResponse.json({ success: true });

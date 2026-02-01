@@ -51,13 +51,15 @@ export async function publishToLinkedIn(userId: string, content: string) {
   } catch { }
 
   if (!response.ok) {
-    console.error("[LinkedIn] Post failed:", {
+    const errorLog = {
       status: response.status,
       statusText: response.statusText,
       error: data,
       message: data.message,
       serviceErrorCode: data.serviceErrorCode,
-    });
+      userId
+    };
+    console.error(`[LinkedIn] Post failed for user ${userId}:`, JSON.stringify(errorLog));
 
     // Provide specific error messages for common issues
     if (response.status === 401) {
@@ -69,7 +71,7 @@ export async function publishToLinkedIn(userId: string, content: string) {
     }
   }
 
-  console.log("[LinkedIn] Post published successfully:", data.id);
+  console.log(`[LinkedIn] Post published successfully by user ${userId}. LinkedIn ID: ${data.id}`);
 
   return {
     success: true,
