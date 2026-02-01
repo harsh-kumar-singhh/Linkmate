@@ -269,28 +269,28 @@ function CoachSuggestionCard() {
       <div className="absolute -inset-0.5 bg-gradient-to-r from-amber-500 to-primary rounded-2xl blur opacity-20 group-hover:opacity-30 transition duration-1000 group-hover:duration-200" />
       <Card className="relative rounded-2xl border-primary/20 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm overflow-hidden">
         <CardContent className="p-6">
-          <div className="flex items-start gap-4">
+          <div className="flex flex-col sm:flex-row items-start gap-4">
             <div className="w-12 h-12 rounded-xl bg-zinc-900 dark:bg-zinc-100 flex items-center justify-center shrink-0 shadow-lg">
               <Sparkles className="w-6 h-6 text-amber-400" />
             </div>
-            <div className="space-y-3 flex-1">
+            <div className="space-y-4 flex-1 w-full">
               <div>
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2 mb-2">
                   <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">AI Strategist Recommendation</span>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest whitespace-normal">AI Strategist Recommendation</span>
                 </div>
-                <h3 className="text-lg font-bold tracking-tight">You haven&apos;t scheduled anything for tomorrow</h3>
+                <h3 className="text-lg md:text-xl font-bold tracking-tight leading-tight mb-2">You haven&apos;t scheduled anything for tomorrow</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   Based on your audience&apos;s active times, a post at <span className="text-foreground font-bold italic underline decoration-amber-500/30">9:30 AM tomorrow</span> could see 25% more engagement.
                 </p>
               </div>
-              <div className="flex items-center gap-3 pt-1">
+              <div className="flex flex-wrap items-center gap-3 pt-1">
                 <Link href="/posts/new">
-                  <Button size="sm" className="rounded-xl h-9 px-4 font-bold bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 shadow-md">
+                  <Button size="sm" className="rounded-xl h-10 px-6 font-bold bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 shadow-md">
                     Get Post Idea
                   </Button>
                 </Link>
-                <Button variant="ghost" size="sm" className="rounded-xl h-9 px-4 font-bold text-muted-foreground hover:text-foreground">
+                <Button variant="ghost" size="sm" className="rounded-xl h-10 px-4 font-bold text-muted-foreground hover:text-foreground">
                   Dismiss
                 </Button>
               </div>

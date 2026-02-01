@@ -261,12 +261,12 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                             {/* Input & Quick Actions */}
                             <div className="p-6 border-t border-zinc-100 dark:border-zinc-900 space-y-4">
                                 {response?.quickActions && !isLoading && (
-                                    <div className="flex flex-wrap gap-2">
+                                    <div className="flex overflow-x-auto scrollbar-hide gap-2 pb-2 -mx-1 px-1">
                                         {response.quickActions.map((action, i) => (
                                             <button
                                                 key={i}
                                                 onClick={() => fetchAdvice(action)}
-                                                className="text-[11px] font-bold px-3 py-1.5 rounded-full bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 transition-colors"
+                                                className="text-[11px] font-bold px-4 py-2 rounded-full bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 transition-colors whitespace-nowrap shadow-sm"
                                             >
                                                 {action}
                                             </button>

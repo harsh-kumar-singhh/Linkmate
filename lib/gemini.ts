@@ -18,9 +18,10 @@ export interface GeneratePostOptions {
     style?: string; // "Professional", "Casual", "Write Like Me", etc.
     userWritingSample?: string; // Content to mimic
     targetLength?: number; // In characters
+    context?: string; // Additional user context
 }
 
-export async function generatePost({ topic, style, userWritingSample, targetLength = 1000 }: GeneratePostOptions) {
+export async function generatePost({ topic, style, userWritingSample, targetLength = 1000, context }: GeneratePostOptions) {
     if (!topic) throw new Error("Topic is required for AI generation.");
 
     let prompt = `Write a LinkedIn post about "${topic}".`;
@@ -29,6 +30,10 @@ export async function generatePost({ topic, style, userWritingSample, targetLeng
         prompt += `\n\nMimic the following writing style:\n"${userWritingSample}"\n`;
     } else if (style) {
         prompt += `\n\nStyle: ${style}`;
+    }
+
+    if (context) {
+        prompt += `\n\nUser Context/Requirements: "${context}"\nEnsure the post incorporates the specific points or requirements mentioned in this context.`;
     }
 
     if (targetLength) {

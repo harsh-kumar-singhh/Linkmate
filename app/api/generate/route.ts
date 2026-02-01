@@ -14,7 +14,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { topic, style, targetLength } = await req.json();
+        const { topic, style, targetLength, context } = await req.json();
 
         let userWritingSample = undefined;
 
@@ -29,7 +29,7 @@ export async function POST(req: Request) {
             }
         }
 
-        const content = await generatePost({ topic, style, userWritingSample, targetLength });
+        const content = await generatePost({ topic, style, userWritingSample, targetLength, context });
         return NextResponse.json({ content });
     } catch (error) {
         console.error("AI Generation Error:", error);
