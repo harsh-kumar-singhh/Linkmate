@@ -46,6 +46,7 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isConnected, setIsConnected] = useState(true)
   const [notifications, setNotifications] = useState<Post[]>([])
+  const [stats, setStats] = useState<any>(null)
 
   // Redirect unauthenticated users
   useEffect(() => {
@@ -59,9 +60,10 @@ export default function DashboardPage() {
     try {
       setIsLoading(true)
 
-      const [postsRes, userRes] = await Promise.all([
+      const [postsRes, userRes, statsRes] = await Promise.all([
         fetch("/api/posts"),
-        fetch("/api/user/me")
+        fetch("/api/user/me"),
+        fetch("/api/stats?days=7")
       ])
 
       if (postsRes.ok) {
@@ -69,8 +71,6 @@ export default function DashboardPage() {
         const fetchedPosts: Post[] = data.posts || []
         setPosts(fetchedPosts)
 
-        // Only show notifications for specifically scheduled posts that just went live
-        // or any newly published post that hasn't been notified yet
         const unnotified = fetchedPosts.filter(
           (p) => p.status === "PUBLISHED" && p.notified === false
         )
@@ -87,6 +87,11 @@ export default function DashboardPage() {
       if (userRes.ok) {
         const data = await userRes.json()
         setIsConnected(data.user.isConnected)
+      }
+
+      if (statsRes.ok) {
+        const data = await statsRes.json()
+        setStats(data)
       }
     } catch (err) {
       console.error("Dashboard fetch error:", err)
@@ -192,13 +197,13 @@ export default function DashboardPage() {
         />
         <StatCard
           label="Total Views"
-          value="0"
+          value={stats?.stats?.totalViews || "0"}
           icon={<Eye className="w-5 h-5" />}
           color="text-blue-500 bg-blue-500/10"
         />
         <StatCard
           label="Engagement"
-          value="0%"
+          value={stats?.stats?.avgEngagement || "0%"}
           icon={<TrendingUp className="w-5 h-5" />}
           color="text-emerald-500 bg-emerald-500/10"
         />
@@ -222,7 +227,7 @@ export default function DashboardPage() {
           <div className="space-y-10">
             {/* AI Suggestion Card - Proactive Coach */}
             {scheduledPosts.length === 0 && (
-              <CoachSuggestionCard />
+              <CoachSuggestionCard postCount={stats?.stats?.postCount || 0} />
             )}
 
             {/* Scheduled Section */}
@@ -263,7 +268,9 @@ export default function DashboardPage() {
   )
 }
 
-function CoachSuggestionCard() {
+function CoachSuggestionCard({ postCount }: { postCount: number }) {
+  const hasHistory = postCount > 0;
+
   return (
     <AnimatedCard animation="fade-in-up" className="relative group">
       <div className="absolute -inset-0.5 bg-gradient-to-r from-amber-500 to-primary rounded-2xl blur opacity-20 group-hover:opacity-30 transition duration-1000 group-hover:duration-200" />
@@ -279,9 +286,15 @@ function CoachSuggestionCard() {
                   <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
                   <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest whitespace-normal">AI Strategist Recommendation</span>
                 </div>
-                <h3 className="text-lg md:text-xl font-bold tracking-tight leading-tight mb-2">You haven&apos;t scheduled anything for tomorrow</h3>
+                <h3 className="text-lg md:text-xl font-bold tracking-tight leading-tight mb-2">
+                  {hasHistory
+                    ? "Consistent Posting is Key"
+                    : "Ready to launch your LinkedIn presence?"}
+                </h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Based on your audience&apos;s active times, a post at <span className="text-foreground font-bold italic underline decoration-amber-500/30">9:30 AM tomorrow</span> could see 25% more engagement.
+                  {hasHistory
+                    ? `You've published ${postCount} posts recently. Based on your activity, posting tomorrow morning could see a significant engagement boost.`
+                    : "You haven't scheduled any posts yet. Let's create your first one using data-driven insights to maximize your reach."}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-3 pt-1">

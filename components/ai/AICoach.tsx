@@ -166,10 +166,10 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                             animate={{ x: 0 }}
                             exit={{ x: "100%" }}
                             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                            className="fixed inset-y-0 right-0 h-full w-full md:w-[500px] bg-white dark:bg-zinc-950 z-[60] shadow-2xl flex flex-col border-l border-zinc-200 dark:border-zinc-800"
+                            className="fixed inset-y-0 right-0 top-0 h-screen w-full md:w-[500px] bg-white dark:bg-zinc-950 z-[60] shadow-2xl flex flex-col border-l border-zinc-200 dark:border-zinc-800"
                         >
                             {/* Header */}
-                            <div className="p-6 border-b border-zinc-100 dark:border-zinc-900 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/50">
+                            <div className="p-5 border-b border-zinc-100 dark:border-zinc-900 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/50">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-xl bg-zinc-900 dark:bg-zinc-100 flex items-center justify-center">
                                         <Sparkles className="w-5 h-5 text-amber-400" />
