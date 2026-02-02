@@ -53,7 +53,7 @@ function Switch({ checked, onChange, disabled }: { checked: boolean; onChange: (
 export function SettingsForm({ user }: SettingsFormProps) {
     const [name, setName] = useState(user?.name || "");
     const [writingStyle, setWritingStyle] = useState(user?.writingStyle || "");
-    const [tone, setTone] = useState("Professional");
+    const [tone, setTone] = useState(user?.defaultTone || "Professional");
     const [autoHashtags, setAutoHashtags] = useState(true);
     const [smartScheduling, setSmartScheduling] = useState(true);
     const [notifications, setNotifications] = useState({
@@ -74,6 +74,7 @@ export function SettingsForm({ user }: SettingsFormProps) {
             if (field === 'writingStyle') body.writingStyle = writingStyle;
             if (field === 'account') body.name = name;
             if (field === 'theme') body.theme = value;
+            if (field === 'tone') body.defaultTone = value; // Handle tone save
 
             const response = await fetch("/api/user/settings", {
                 method: "PUT",
@@ -97,6 +98,11 @@ export function SettingsForm({ user }: SettingsFormProps) {
         setTheme(newTheme);
         handleSave('theme', newTheme);
     };
+
+    const updateTone = (newTone: string) => {
+        setTone(newTone);
+        handleSave('tone', newTone);
+    }
 
     return (
         <div className="space-y-8 pb-20">
@@ -198,13 +204,14 @@ export function SettingsForm({ user }: SettingsFormProps) {
                             </div>
                             <select
                                 value={tone}
-                                onChange={(e) => setTone(e.target.value)}
+                                onChange={(e) => updateTone(e.target.value)}
                                 className="h-10 px-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none min-w-[140px]"
                             >
                                 <option>Professional</option>
                                 <option>Casual</option>
-                                <option>Creative</option>
-                                <option>Academic</option>
+                                <option>Enthusiastic</option>
+                                <option>Storytelling</option>
+                                <option>Write Like Me</option>
                             </select>
                         </div>
 

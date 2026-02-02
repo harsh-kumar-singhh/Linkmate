@@ -26,7 +26,7 @@ export function ThemeSync() {
             };
             fetchTheme();
         }
-    }, [status, session, setTheme, theme]);
+    }, [status, session, setTheme]);
 
     return null;
 }

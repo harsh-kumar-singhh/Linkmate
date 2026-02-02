@@ -13,12 +13,13 @@ export async function PUT(req: Request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { writingStyle, name, theme } = await req.json();
+        const { writingStyle, name, theme, defaultTone } = await req.json();
 
         const data: any = {};
         if (writingStyle !== undefined) data.writingStyle = writingStyle;
         if (name !== undefined) data.name = name;
         if (theme !== undefined) data.theme = theme;
+        if (defaultTone !== undefined) data.defaultTone = defaultTone;
 
         const user = await prisma.user.update({
             where: { id: session.user.id },

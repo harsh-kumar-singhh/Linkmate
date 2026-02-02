@@ -17,7 +17,8 @@ model User {
   name          String?
   emailVerified DateTime?
   image         String?
-  writingStyle  String?
+  writingStyle  String?   // Stores the "Write Like Me" sample text
+  defaultTone   String    @default("Professional") // Stores preferred tone (Professional, Casual, etc.)
   linkedinConnected Boolean @default(false)
   theme         String?   @default("system")
   createdAt     DateTime  @default(now())

@@ -28,6 +28,7 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { LinkedInPreview } from "@/components/posts/LinkedInPreview"
 import { AICoach } from "@/components/ai/AICoach"
+import { StyleSelector } from "@/components/posts/style-selector"
 
 function EditorContent() {
     const { status, data: session } = useSession()
@@ -38,6 +39,7 @@ function EditorContent() {
     const [mode, setMode] = useState<"ai" | "manual">("ai")
     const [content, setContent] = useState("")
     const [isGenerating, setIsGenerating] = useState(false)
+    const [loadingPhase, setLoadingPhase] = useState("Generating...")
     const [scheduledFor, setScheduledFor] = useState<string>("")
     const [isInitialLoading, setIsInitialLoading] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
@@ -60,6 +62,29 @@ function EditorContent() {
             router.push("/login")
         }
     }, [status, router])
+
+    // Load Default Tone
+    useEffect(() => {
+        const fetchSettings = async () => {
+            if (status === 'authenticated') {
+                try {
+                    const res = await fetch("/api/user/me");
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.user?.defaultTone) {
+                            setStyle(data.user.defaultTone);
+                        }
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch user settings", e);
+                }
+            }
+        }
+        // Only fetch if no postId (new post)
+        if (!postId) {
+            fetchSettings();
+        }
+    }, [status, postId]);
 
     // Fetch existing post
     useEffect(() => {
@@ -105,6 +130,15 @@ function EditorContent() {
         if (status !== "authenticated" || !topic) return
 
         setIsGenerating(true)
+        setLoadingPhase("Brainstorming ideas...")
+
+        const phases = ["Brainstorming ideas...", "Drafting content...", "Polishing tone...", "Finalizing..."];
+        let phaseIndex = 0;
+        const phaseInterval = setInterval(() => {
+            phaseIndex = (phaseIndex + 1) % phases.length;
+            setLoadingPhase(phases[phaseIndex]);
+        }, 1500);
+
         try {
             const response = await fetch("/api/generate", {
                 method: "POST",
@@ -126,6 +160,7 @@ function EditorContent() {
             console.error("Generation failed", error)
             alert(error instanceof Error ? error.message : "Failed to generate post.")
         } finally {
+            clearInterval(phaseInterval);
             setIsGenerating(false)
         }
     }
@@ -312,16 +347,11 @@ function EditorContent() {
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                                        <div className="space-y-2">
-                                            <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Tone</label>
-                                            <select
-                                                value={style}
-                                                onChange={(e) => setStyle(e.target.value)}
-                                                className="w-full h-12 px-3 rounded-xl border border-border/80 bg-background text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all appearance-none cursor-pointer"
-                                            >
-                                                {styles.map(s => <option key={s} value={s}>{s}</option>)}
-                                            </select>
-                                        </div>
+                                        <StyleSelector
+                                            value={style}
+                                            onChange={setStyle}
+                                            styles={styles}
+                                        />
 
                                         <div className="space-y-2">
                                             <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest flex justify-between">
@@ -348,7 +378,7 @@ function EditorContent() {
                                         disabled={!topic || isGenerating}
                                     >
                                         {isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-                                        Generate Post
+                                        {isGenerating ? loadingPhase : "Generate Post"}
                                     </Button>
                                 </AnimatedCard>
                             ) : (

@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { AnimatedCard } from "@/components/animated/AnimatedCard"
-import { LayoutDashboard, PenSquare, Calendar, Settings, LogOut } from "lucide-react"
+import { LayoutDashboard, PenSquare, Calendar, Settings, LogOut, BarChart3 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export function Sidebar() {
@@ -12,6 +12,7 @@ export function Sidebar() {
     const links = [
         { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
         { href: "/posts/new", label: "Create Post", icon: PenSquare },
+        { href: "/stats", label: "Analytics", icon: BarChart3 },
         { href: "/calendar", label: "Calendar", icon: Calendar },
         { href: "/settings", label: "Settings", icon: Settings },
     ]

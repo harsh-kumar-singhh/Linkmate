@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-export const MODELS = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-flash-latest"];
+export const MODELS = ["gemini-1.5-flash"];
 
 export function getGeminiModel(modelName: string) {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -24,55 +24,58 @@ export interface GeneratePostOptions {
 export async function generatePost({ topic, style, userWritingSample, targetLength = 1000, context }: GeneratePostOptions) {
     if (!topic) throw new Error("Topic is required for AI generation.");
 
-    let prompt = `Write a LinkedIn post about "${topic}".`;
+    let prompt = `You are a professional ghostwriter for LinkedIn. Write a high-quality, viral-style LinkedIn post about "${topic}".
+
+STRICT FORMATTING RULES:
+1. Return ONLY the raw post text.
+2. DO NOT include ANY specific labels like "Hook:", "Body:", "CTA:", "Headline:", etc.
+3. DO NOT wrap the content in quotes.
+4. The output must be ready-to-post immediately.
+
+Content Rules:
+- Hook: Start with a punchy, attention-grabbing first line.
+- Structure: Use short paragraphs and whitespace for readability.
+- Emoji: Use appropriate emojis but keep it professional (maximum 3-5).
+- Length: Approximately ${targetLength} characters.
+- Ending: End with a clear, engaging question or call to action.`;
 
     if (style === "Write Like Me" && userWritingSample) {
-        prompt += `\n\nMimic the following writing style:\n"${userWritingSample}"\n`;
+        prompt += `\n\nSTYLE INSTRUCTION: Mimic the following user writing style strictly:\n"${userWritingSample}"\n`;
     } else if (style) {
-        prompt += `\n\nStyle: ${style}`;
+        prompt += `\n\nSTYLE INSTRUCTION: Write in a ${style} tone.`;
     }
 
     if (context) {
-        prompt += `\n\nUser Context/Requirements: "${context}"\nEnsure the post incorporates the specific points or requirements mentioned in this context.`;
+        prompt += `\n\nADDITIONAL CONTEXT: "${context}"\n(Incorporate these specific points naturally.)`;
     }
 
-    if (targetLength) {
-        prompt += `\n\nTarget Length: Approximately ${targetLength} characters.`;
-    }
+    try {
+        console.log(`Starting fast AI generation with gemini-1.5-flash`);
+        const model = getGeminiModel("gemini-1.5-flash");
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
 
-    prompt += `\n\nEnsure it has a good hook, engaging body, and a clear call to action. Use appropriate emojis but don't overdo it. Keep it strictly under 3000 characters.`;
-
-    let lastError: any = null;
-
-    for (const modelName of MODELS) {
-        try {
-            console.log(`Attempting AI generation with model: ${modelName}`);
-            const model = getGeminiModel(modelName);
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            const text = response.text();
-
-            if (text) {
-                console.log(`AI generation successful with model: ${modelName}`);
-                return text;
-            }
-            throw new Error(`Empty response from model: ${modelName}`);
-        } catch (error: any) {
-            console.warn(`Model ${modelName} failed:`, error.message);
-            lastError = error;
-            // Continue to next model
+        if (!text) {
+            throw new Error("Empty response from AI");
         }
+
+        // Cleanup any accidental labels if the AI hallucinated them
+        const cleanText = text
+            .replace(/^(Hook|Headline|Body|CTA|Conclusion):\s*/gmi, "")
+            .replace(/\*\*(Hook|Headline|Body|CTA|Conclusion)\*\*:\s*/gmi, "")
+            .trim();
+
+        return cleanText;
+
+    } catch (error: any) {
+        console.error("AI Generation Failed:", error);
+
+        const isNotFoundError = error?.message?.includes("404") || error?.status === 404;
+        const userMessage = isNotFoundError
+            ? "AI service is currently updating. Please try again in a moment."
+            : "AI Generation is temporarily unavailable. Please try again.";
+
+        throw new Error(userMessage);
     }
-
-    console.error("ALL MODELS FAILED. Last error:", {
-        message: lastError?.message,
-        status: lastError?.status,
-    });
-
-    const isNotFoundError = lastError?.message?.includes("404") || lastError?.status === 404;
-    const userMessage = isNotFoundError
-        ? "AI service is currently updating. Please try again in a moment."
-        : "AI Generation is temporarily unavailable. Please try again.";
-
-    throw new Error(userMessage);
 }

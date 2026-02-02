@@ -26,6 +26,8 @@ export async function GET() {
         name: true,
         writingStyle: true,
         theme: true,
+        // @ts-ignore - Prisma client sync lag
+        defaultTone: true,
         linkedinConnected: true,
       }
     })
@@ -43,6 +45,8 @@ export async function GET() {
         name: user.name,
         writingStyle: user.writingStyle,
         theme: user.theme,
+        // @ts-ignore - Prisma client sync lag
+        defaultTone: user.defaultTone,
         isConnected,
       },
     }, {
