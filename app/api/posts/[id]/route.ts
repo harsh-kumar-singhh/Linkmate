@@ -43,7 +43,7 @@ export async function PUT(
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { content, status, scheduledFor } = await req.json();
+        const { content, status, scheduledFor, imageUrl } = await req.json();
 
         // If status is being updated to PUBLISHED, try to publish to LinkedIn
         let finalLinkedinPostId = undefined;
@@ -57,7 +57,7 @@ export async function PUT(
             }
 
             try {
-                const result = await publishToLinkedIn(user.id, content);
+                const result = await publishToLinkedIn(user.id, content, imageUrl);
                 finalLinkedinPostId = result.linkedinPostId;
             } catch (error) {
                 console.error("LinkedIn publishing failed:", error);
@@ -76,6 +76,7 @@ export async function PUT(
                 scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
                 publishedAt: status === "PUBLISHED" ? new Date() : null,
                 linkedinPostId: finalLinkedinPostId,
+                imageUrl: imageUrl !== undefined ? imageUrl : undefined,
             },
         });
 

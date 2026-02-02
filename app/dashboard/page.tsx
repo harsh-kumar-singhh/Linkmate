@@ -285,11 +285,16 @@ function CoachSuggestionCard() {
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-3 pt-1">
-                <Link href="/posts/new">
-                  <Button size="sm" className="rounded-xl h-10 px-6 font-bold bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 shadow-md">
-                    Get Post Idea
-                  </Button>
-                </Link>
+                <Button
+                  size="sm"
+                  className="rounded-xl h-10 px-6 font-bold bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 shadow-md"
+                  onClick={() => {
+                    const event = new CustomEvent('open-ai-coach');
+                    window.dispatchEvent(event);
+                  }}
+                >
+                  Get Post Idea
+                </Button>
                 <Button variant="ghost" size="sm" className="rounded-xl h-10 px-4 font-bold text-muted-foreground hover:text-foreground">
                   Dismiss
                 </Button>

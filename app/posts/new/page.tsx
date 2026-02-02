@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useSession } from "next-auth/react"
-import { useEffect, useState, Suspense } from "react"
+import { useEffect, useState, useRef, Suspense } from "react"
 import { AnimatedCard } from "@/components/animated/AnimatedCard"
 import TextareaAutosize from "react-textarea-autosize"
 import { Button } from "@/components/ui/button"
@@ -41,6 +41,9 @@ function EditorContent() {
     const [scheduledFor, setScheduledFor] = useState<string>("")
     const [isInitialLoading, setIsInitialLoading] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
+    const [imageUrl, setImageUrl] = useState<string | null>(null)
+    const [isUploading, setIsUploading] = useState(false)
+    const fileInputRef = useRef<HTMLInputElement>(null)
 
     // AI State
     const [topic, setTopic] = useState("")
@@ -69,6 +72,7 @@ function EditorContent() {
                     const data = await response.json()
                     setContent(data.content)
                     setMode("manual")
+                    setImageUrl(data.imageUrl || null)
 
                     if (data.scheduledFor) {
                         const date = new Date(data.scheduledFor);
@@ -126,6 +130,46 @@ function EditorContent() {
         }
     }
 
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+
+        if (file.size > 5 * 1024 * 1024) {
+            alert("Image size should be less than 5MB")
+            return
+        }
+
+        setIsUploading(true)
+        try {
+            const formData = new FormData()
+            formData.append("file", file)
+
+            const response = await fetch("/api/upload", {
+                method: "POST",
+                body: formData,
+            })
+
+            if (response.ok) {
+                const data = await response.json()
+                setImageUrl(data.imageUrl)
+            } else {
+                alert("Upload failed")
+            }
+        } catch (error) {
+            console.error("Upload error:", error)
+            alert("Upload failed")
+        } finally {
+            setIsUploading(false)
+        }
+    }
+
+    const handleRemoveImage = () => {
+        setImageUrl(null)
+        if (fileInputRef.current) {
+            fileInputRef.current.value = ""
+        }
+    }
+
     const handleSavePost = async (statusArg: "DRAFT" | "SCHEDULED" | "PUBLISHED") => {
         if (!content.trim() || status !== "authenticated") return
 
@@ -146,7 +190,8 @@ function EditorContent() {
                     content,
                     status: statusArg,
                     scheduledFor: statusArg === "SCHEDULED" ? new Date(scheduledFor).toISOString() : undefined,
-                    postId: statusArg === "SCHEDULED" ? postId : undefined
+                    postId: statusArg === "SCHEDULED" ? postId : undefined,
+                    imageUrl: imageUrl || undefined
                 }),
             })
 
@@ -322,6 +367,58 @@ function EditorContent() {
                                             autoFocus
                                         />
                                     </div>
+
+                                    {/* Image Attachment Section */}
+                                    <div className="pt-2">
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            ref={fileInputRef}
+                                            onChange={handleImageUpload}
+                                        />
+
+                                        {!imageUrl ? (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="rounded-xl gap-2 border-dashed border-2 hover:border-primary/50 hover:bg-primary/5"
+                                                onClick={() => fileInputRef.current?.click()}
+                                                disabled={isUploading}
+                                            >
+                                                {isUploading ? (
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                ) : (
+                                                    <ImageIcon className="w-4 h-4" />
+                                                )}
+                                                Add Image (Optional)
+                                            </Button>
+                                        ) : (
+                                            <div className="relative w-full max-w-sm rounded-2xl overflow-hidden border border-border shadow-sm group">
+                                                <img src={imageUrl} alt="Attachment" className="w-full h-auto object-cover max-h-64" />
+                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                                                    <Button
+                                                        variant="secondary"
+                                                        size="sm"
+                                                        className="rounded-lg gap-2"
+                                                        onClick={() => fileInputRef.current?.click()}
+                                                    >
+                                                        <ImageIcon className="w-4 h-4" />
+                                                        Replace
+                                                    </Button>
+                                                    <Button
+                                                        variant="destructive"
+                                                        size="sm"
+                                                        className="rounded-lg gap-2"
+                                                        onClick={handleRemoveImage}
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                        Remove
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </AnimatedCard>
                             )}
 
@@ -392,7 +489,7 @@ function EditorContent() {
                                 <Globe className="w-5 h-5 text-primary" />
                                 <h3 className="font-bold text-lg">Post Preview</h3>
                             </div>
-                            <LinkedInPreview content={content} />
+                            <LinkedInPreview content={content} imageUrl={imageUrl} />
                         </div>
 
                         {/* Action Buttons */}

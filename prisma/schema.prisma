@@ -78,6 +78,7 @@ model Post {
   scheduledFor   DateTime?
   publishedAt    DateTime?
   linkedinPostId String?    // LinkedIn's post ID after publishing
+  imageUrl       String?    // URL of attached image
   failureReason  String?
   retryCount     Int        @default(0)
   notified       Boolean    @default(false)

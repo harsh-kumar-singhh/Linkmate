@@ -50,10 +50,12 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
     const [inputValue, setInputValue] = useState("")
     const pathname = usePathname()
     const scrollRef = useRef<HTMLDivElement>(null)
+    const isUserMessageRef = useRef(false)
 
     const fetchAdvice = useCallback(async (query?: string) => {
         setIsLoading(true)
         if (query) {
+            isUserMessageRef.current = true
             setChatHistory(prev => [...prev, { role: "user", content: query }])
         }
 
@@ -98,6 +100,12 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
         }
     }, [pathname, draftContent])
 
+    useEffect(() => {
+        const handleOpen = () => setIsOpen(true);
+        window.addEventListener('open-ai-coach', handleOpen);
+        return () => window.removeEventListener('open-ai-coach', handleOpen);
+    }, []);
+
     // Initial fetch when opened
     useEffect(() => {
         if (isOpen && chatHistory.length === 0) {
@@ -107,8 +115,9 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
 
     // Scroll to bottom
     useEffect(() => {
-        if (scrollRef.current) {
+        if (scrollRef.current && isUserMessageRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+            isUserMessageRef.current = false
         }
     }, [chatHistory])
 
@@ -157,7 +166,7 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                             animate={{ x: 0 }}
                             exit={{ x: "100%" }}
                             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                            className="fixed top-0 right-0 h-full w-full md:w-[450px] bg-white dark:bg-zinc-950 z-[60] shadow-2xl flex flex-col border-l border-zinc-200 dark:border-zinc-800"
+                            className="fixed inset-y-0 right-0 h-full w-full md:w-[500px] bg-white dark:bg-zinc-950 z-[60] shadow-2xl flex flex-col border-l border-zinc-200 dark:border-zinc-800"
                         >
                             {/* Header */}
                             <div className="p-6 border-b border-zinc-100 dark:border-zinc-900 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/50">

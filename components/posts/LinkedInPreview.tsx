@@ -7,10 +7,11 @@ import Image from "next/image"
 
 interface LinkedInPreviewProps {
     content: string
+    imageUrl?: string | null
     className?: string
 }
 
-export function LinkedInPreview({ content, className }: LinkedInPreviewProps) {
+export function LinkedInPreview({ content, imageUrl, className }: LinkedInPreviewProps) {
     const { data: session } = useSession()
 
     return (
@@ -63,13 +64,23 @@ export function LinkedInPreview({ content, className }: LinkedInPreviewProps) {
                 </p>
             </div>
 
-            {/* Attachment Placeholder */}
-            <div className="bg-[#F8F9FA] dark:bg-[#121619] border-y border-zinc-100 dark:border-zinc-800 flex flex-col items-center justify-center p-12 mt-2 group cursor-pointer transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800/50">
-                <div className="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center mb-3">
-                    <Globe className="w-5 h-5 text-zinc-400 dark:text-zinc-500" />
+            {/* Attachment Preview */}
+            {imageUrl ? (
+                <div className="mt-2 border-y border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-950">
+                    <img
+                        src={imageUrl}
+                        alt="Post attachment"
+                        className="w-full h-auto object-contain max-h-[450px]"
+                    />
                 </div>
-                <p className="text-[12px] text-zinc-500 dark:text-zinc-400 font-medium tracking-tight">Image preview will be shown here</p>
-            </div>
+            ) : (
+                <div className="bg-[#F8F9FA] dark:bg-[#121619] border-y border-zinc-100 dark:border-zinc-800 flex flex-col items-center justify-center p-12 mt-2 group cursor-pointer transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800/50">
+                    <div className="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center mb-3">
+                        <Globe className="w-5 h-5 text-zinc-400 dark:text-zinc-500" />
+                    </div>
+                    <p className="text-[12px] text-zinc-500 dark:text-zinc-400 font-medium tracking-tight">Image preview will be shown here</p>
+                </div>
+            )}
 
             {/* Stats Area */}
             <div className="px-3 py-2 flex items-center justify-between border-b border-zinc-100/80 dark:border-zinc-800/80 mx-1">

@@ -1,6 +1,6 @@
 import { getPrisma } from "./prisma";
 
-export async function publishToLinkedIn(userId: string, content: string) {
+export async function publishToLinkedIn(userId: string, content: string, imageUrl?: string | null) {
   const prisma = getPrisma();
 
   const account = await prisma.account.findFirst({
@@ -33,7 +33,19 @@ export async function publishToLinkedIn(userId: string, content: string) {
             shareCommentary: {
               text: content,
             },
-            shareMediaCategory: "NONE",
+            shareMediaCategory: imageUrl ? "IMAGE" : "NONE",
+            media: imageUrl ? [
+              {
+                status: "READY",
+                description: {
+                  text: "Attached Image"
+                },
+                media: imageUrl,
+                title: {
+                  text: "Image"
+                }
+              }
+            ] : undefined,
           },
         },
         visibility: {
