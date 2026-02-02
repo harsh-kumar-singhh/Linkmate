@@ -71,11 +71,7 @@ Content Rules:
     } catch (error: any) {
         console.error("AI Generation Failed:", error);
 
-        const isNotFoundError = error?.message?.includes("404") || error?.status === 404;
-        const userMessage = isNotFoundError
-            ? "AI service is currently updating. Please try again in a moment."
-            : "AI Generation is temporarily unavailable. Please try again.";
-
-        throw new Error(userMessage);
+        // Return clear error message to user
+        throw new Error(error.message || "AI Generation failed. Please try again.");
     }
 }

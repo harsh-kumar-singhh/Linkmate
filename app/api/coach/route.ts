@@ -60,32 +60,24 @@ Response Format (JSON):
             }
         }
 
-        let lastError: any = null;
-        for (const modelName of MODELS) {
-            try {
-                console.log(`[COACH] Attempting with model: ${modelName}`);
-                const model = getGeminiModel(modelName);
-                const result = await model.generateContent([systemPrompt, userPrompt]);
-                const response = await result.response;
-                const text = response.text();
+        try {
+            console.log(`[COACH] Generating advice with gemini-1.5-flash`);
+            const model = getGeminiModel("gemini-1.5-flash");
+            const result = await model.generateContent([systemPrompt, userPrompt]);
+            const response = await result.response;
+            const text = response.text();
 
-                if (text) {
-                    // Clean up potential markdown JSON block
-                    const cleanedText = text.replace(/```json/g, "").replace(/```/g, "").trim();
-                    return NextResponse.json(JSON.parse(cleanedText));
-                }
-            } catch (error: any) {
-                console.warn(`[COACH] Model ${modelName} failed:`, error.message);
-                lastError = error;
+            if (text) {
+                // Clean up potential markdown JSON block
+                const cleanedText = text.replace(/```json/g, "").replace(/```/g, "").trim();
+                return NextResponse.json(JSON.parse(cleanedText));
             }
+        } catch (error: any) {
+            console.error(`[COACH] Generation failed:`, error);
+            throw new Error(error.message || "AI Coach Failed");
         }
 
-        const isNotFoundError = lastError?.message?.includes("404") || lastError?.status === 404;
-        const userFriendlyMessage = isNotFoundError
-            ? "The AI service is currently unavailable. We are switching to a backup model."
-            : "The Content Coach is having trouble thinking. Please try again in 30 seconds.";
-
-        throw new Error(userFriendlyMessage);
+        throw new Error("Empty response from AI Coach");
 
     } catch (error) {
         console.error("Coach API Error:", error);

@@ -25,6 +25,8 @@ export async function GET() {
         email: true,
         name: true,
         writingStyle: true,
+        // @ts-ignore - Prisma client sync lag
+        customStyles: true,
         theme: true,
         // @ts-ignore - Prisma client sync lag
         defaultTone: true,
@@ -44,6 +46,8 @@ export async function GET() {
         email: user.email,
         name: user.name,
         writingStyle: user.writingStyle,
+        // @ts-ignore - Prisma client sync lag
+        customStyles: user.customStyles,
         theme: user.theme,
         // @ts-ignore - Prisma client sync lag
         defaultTone: user.defaultTone,

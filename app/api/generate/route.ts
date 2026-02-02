@@ -16,16 +16,31 @@ export async function POST(req: Request) {
 
         const { topic, style, targetLength, context } = await req.json();
 
+        // Fetch User Data for Styles
         let userWritingSample = undefined;
 
-        // If style is "Write Like Me", fetch user's stored style
-        if (style === "Write Like Me") {
+        if (style === "Write Like Me" || style?.startsWith("Custom Style")) {
             const user = await prisma.user.findUnique({
                 where: { id: session.user.id },
-                select: { writingStyle: true }
+                select: {
+                    writingStyle: true,
+                    // @ts-ignore - Prisma client sync lag
+                    customStyles: true
+                }
             });
-            if (user?.writingStyle) {
-                userWritingSample = user.writingStyle;
+
+            if (user) {
+                if (style === "Write Like Me") {
+                    userWritingSample = user.writingStyle || undefined;
+                } else if (style?.startsWith("Custom Style")) {
+                    // Extract index: "Custom Style 1" -> 0
+                    const index = parseInt(style.split(" ")[2]) - 1;
+                    // @ts-ignore - Prisma client sync lag
+                    if (user.customStyles && user.customStyles[index]) {
+                        // @ts-ignore - Prisma client sync lag
+                        userWritingSample = user.customStyles[index];
+                    }
+                }
             }
         }
 
