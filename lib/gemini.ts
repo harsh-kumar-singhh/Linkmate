@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-export const MODELS = ["gemini-1.5-flash"];
+export const MODELS = ["gemini-pro"];
 
 export function getGeminiModel(modelName: string) {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -50,8 +50,8 @@ Content Rules:
     }
 
     try {
-        console.log(`Starting fast AI generation with gemini-1.5-flash`);
-        const model = getGeminiModel("gemini-1.5-flash");
+        console.log(`Starting AI generation with gemini-pro`);
+        const model = getGeminiModel("gemini-pro");
         const result = await model.generateContent(prompt);
         const response = await result.response;
         const text = response.text();
