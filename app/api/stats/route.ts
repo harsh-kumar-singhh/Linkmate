@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getPrisma } from "@/lib/prisma";
 import { subDays } from "date-fns";
-import { syncLinkedInPosts } from "@/lib/linkedin";
 
 export async function GET(req: Request) {
     try {
@@ -18,8 +17,8 @@ export async function GET(req: Request) {
 
         const prisma = getPrisma();
 
-        // 1. Fetch local published posts
-        const localPosts = await prisma.post.findMany({
+        // 1. Fetch only local published posts
+        const posts = await prisma.post.findMany({
             where: {
                 userId: session.user.id,
                 status: "PUBLISHED",
@@ -32,24 +31,12 @@ export async function GET(req: Request) {
             },
         }) as any[];
 
-        // 2. Fetch external LinkedIn posts
-        const externalPosts = await syncLinkedInPosts(session.user.id);
-        const filteredExternal = externalPosts.filter((p: any) => new Date(p.publishedAt) >= startDate);
-
-        // 3. Merge and deduplicate (LinkMate posts will have linkedinPostId matching external post ID)
-        const localLinkedinIds = new Set(localPosts.map((p: any) => p.linkedinPostId).filter(Boolean));
-        const uniqueExternal = filteredExternal.filter((p: any) => !localLinkedinIds.has(p.id));
-
-        const allPosts = [...localPosts, ...uniqueExternal].sort((a, b) =>
-            new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
-        );
-
-        if (allPosts.length === 0) {
+        if (posts.length === 0) {
             return NextResponse.json({
                 stats: {
-                    totalViews: 0,
-                    totalLikes: 0,
-                    totalComments: 0,
+                    totalViews: "0",
+                    totalLikes: "0",
+                    totalComments: "0",
                     avgEngagement: "0%",
                     postCount: 0
                 },
@@ -59,9 +46,9 @@ export async function GET(req: Request) {
             });
         }
 
-        const totalViews = allPosts.reduce((sum, p) => sum + (p.views || 0), 0);
-        const totalLikes = allPosts.reduce((sum, p) => sum + (p.likes || 0), 0);
-        const totalComments = allPosts.reduce((sum, p) => sum + (p.comments || 0), 0);
+        const totalViews = posts.reduce((sum, p) => sum + (p.views || 0), 0);
+        const totalLikes = posts.reduce((sum, p) => sum + (p.likes || 0), 0);
+        const totalComments = posts.reduce((sum, p) => sum + (p.comments || 0), 0);
         const totalEngagement = totalLikes + totalComments;
 
         const avgEngagement = totalViews > 0
@@ -69,7 +56,7 @@ export async function GET(req: Request) {
             : "0%";
 
         // Identification logic for Best/Worst
-        const postsWithRate = allPosts.map(p => ({
+        const postsWithRate = posts.map(p => ({
             ...p,
             engagementRate: (p.views || 0) > 0 ? ((p.likes || 0) + (p.comments || 0)) / p.views : 0
         }));
@@ -83,7 +70,7 @@ export async function GET(req: Request) {
         );
 
         // Simple chart data (recent 15 posts)
-        const chartData = allPosts.slice(0, 15).reverse().map(p => ({
+        const chartData = posts.slice(0, 15).reverse().map(p => ({
             date: p.publishedAt,
             views: p.views || 0,
             engagement: (p.likes || 0) + (p.comments || 0)
@@ -95,7 +82,7 @@ export async function GET(req: Request) {
                 totalLikes: totalLikes.toLocaleString(),
                 totalComments: totalComments.toLocaleString(),
                 avgEngagement,
-                postCount: allPosts.length
+                postCount: posts.length
             },
             bestPost: {
                 content: bestPost.content,
