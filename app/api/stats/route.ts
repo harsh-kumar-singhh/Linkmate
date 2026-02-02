@@ -1,83 +1,108 @@
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getPrisma } from "@/lib/prisma";
+import { subDays } from "date-fns";
 
-export async function GET() {
-    const prisma = getPrisma();
+export async function GET(req: Request) {
     try {
         const session = await auth();
         if (!session || !session.user?.id) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        // Fetch all published posts for this user
+        const { searchParams } = new URL(req.url);
+        const days = parseInt(searchParams.get("days") || "30");
+        const startDate = subDays(new Date(), days);
+
+        const prisma = getPrisma();
+
+        // Fetch all published posts within the range
         const posts = await prisma.post.findMany({
             where: {
                 userId: session.user.id,
                 status: "PUBLISHED",
+                publishedAt: {
+                    gte: startDate,
+                },
             },
             orderBy: {
                 publishedAt: "desc",
             },
-        });
+        }) as any[];
 
-        // In a real app with LinkedIn API, we would sync engagement metrics here.
-        // For now, we'll calculate base stats from our DB and simulate engagement
-        // based on post content length and age to provide a realistic production feel
-        // as per the requirement "Ensure stats reflect real post performance".
+        if (posts.length === 0) {
+            return NextResponse.json({
+                stats: {
+                    totalViews: 0,
+                    totalLikes: 0,
+                    totalComments: 0,
+                    avgEngagement: "0%",
+                    postCount: 0
+                },
+                bestPost: null,
+                worstPost: null,
+                chartData: []
+            });
+        }
 
-        const totalPosts = posts.length;
-        let totalViews = 0;
-        let totalLikes = 0;
-        let totalComments = 0;
-
-        const processedPosts = posts.map(post => {
-            // Deterministic "random" stats based on post ID and age
-            const seed = post.id.charCodeAt(0) + post.id.charCodeAt(post.id.length - 1);
-            const ageInDays = Math.max(1, (Date.now() - new Date(post.publishedAt || post.createdAt).getTime()) / (1000 * 60 * 60 * 24));
-
-            const views = Math.floor((seed * 10) * Math.log10(ageInDays + 1));
-            const likes = Math.floor(views * (0.05 + (seed % 10) / 100));
-            const comments = Math.floor(likes * (0.1 + (seed % 5) / 100));
-
-            totalViews += views;
-            totalLikes += likes;
-            totalComments += comments;
-
-            return {
-                id: post.id,
-                content: post.content,
-                publishedAt: post.publishedAt || post.createdAt,
-                views,
-                likes,
-                comments,
-                engagement: views > 0 ? (((likes + comments) / views) * 100).toFixed(1) : "0.0"
-            };
-        });
+        const totalViews = posts.reduce((sum, p) => sum + p.views, 0);
+        const totalLikes = posts.reduce((sum, p) => sum + p.likes, 0);
+        const totalComments = posts.reduce((sum, p) => sum + p.comments, 0);
+        const totalEngagement = totalLikes + totalComments;
 
         const avgEngagement = totalViews > 0
-            ? (((totalLikes + totalComments) / totalViews) * 100).toFixed(1)
-            : "0.0";
+            ? ((totalEngagement / totalViews) * 100).toFixed(1) + "%"
+            : "0%";
 
-        // Generate chart data (last 15 days or posts)
-        const chartData = processedPosts.slice(0, 15).reverse().map(p => parseFloat(p.engagement));
+        // Identification logic for Best/Worst
+        // Engagement Rate = (Likes + Comments) / Views
+        const postsWithRate = posts.map(p => ({
+            ...p,
+            engagementRate: p.views > 0 ? (p.likes + p.comments) / p.views : 0
+        }));
+
+        const bestPost = postsWithRate.reduce((prev, current) =>
+            (prev.engagementRate > current.engagementRate) ? prev : current
+        );
+
+        const worstPost = postsWithRate.reduce((prev, current) =>
+            (prev.engagementRate < current.engagementRate) ? prev : current
+        );
+
+        // Simple chart data (recent 15 posts or days)
+        const chartData = posts.slice(0, 15).reverse().map(p => ({
+            date: p.publishedAt,
+            views: p.views,
+            engagement: p.likes + p.comments
+        }));
 
         return NextResponse.json({
-            stats: [
-                { title: "Total Views", value: totalViews.toLocaleString(), label: "From all your posts" },
-                { title: "Total Likes", value: totalLikes.toLocaleString(), label: "Total engagement" },
-                { title: "Comments", value: totalComments.toLocaleString(), label: "Total interactions" },
-                { title: "Avg Engagement", value: `${avgEngagement}%`, label: "Engagement rate" }
-            ],
-            topPosts: processedPosts.slice(0, 3),
-            chartData: chartData.length > 0 ? chartData : [0, 0, 0, 0, 0],
-            totalPosts
+            stats: {
+                totalViews: totalViews.toLocaleString(),
+                totalLikes: totalLikes.toLocaleString(),
+                totalComments: totalComments.toLocaleString(),
+                avgEngagement,
+                postCount: posts.length
+            },
+            bestPost: {
+                content: bestPost.content,
+                views: bestPost.views,
+                likes: bestPost.likes,
+                comments: bestPost.comments,
+                engagementRate: (bestPost.engagementRate * 100).toFixed(1) + "%"
+            },
+            worstPost: {
+                content: worstPost.content,
+                views: worstPost.views,
+                likes: worstPost.likes,
+                comments: worstPost.comments,
+                engagementRate: (worstPost.engagementRate * 100).toFixed(1) + "%"
+            },
+            chartData
         });
+
     } catch (error) {
         console.error("Stats API Error:", error);
-        return NextResponse.json({ error: "Failed to fetch statistics" }, { status: 500 });
+        return NextResponse.json({ error: "Failed to fetch stats" }, { status: 500 });
     }
 }

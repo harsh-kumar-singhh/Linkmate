@@ -29,11 +29,13 @@ ${draftContent ? `- Current Draft Content: "${draftContent}"` : ""}
 
 Guidelines:
 1. Be concise. Use bullet points for readability.
-2. Provide specific insights, not generic advice.
-3. If analyzing a draft, focus on the "Hook" (first 2 lines), tone, and clarity.
-4. If on the Dashboard, suggest what to post next or highlight a trend.
-5. If on Stats, explain "why" numbers might be moving.
-6. Always sound encouraging but professional.
+2. Provide specific insights based ONLY on the provided real performance data.
+3. If analysis data for a post is missing (0 views/likes), do not invent performance.
+4. If no data is available at all, explicitly state: "I don't have enough performance data yet to give specific insights."
+5. Reference real numbers (views, likes, engagement rates) when explaining "why" a post worked.
+6. Avoid generic advice like "be consistent" unless it is directly supported by a visible pattern in the user's data.
+7. If analyzing a draft, focus on the "Hook" (first 2 lines), tone, and clarity.
+8. Always sound encouraging but professional and data-driven.
 
 Response Format (JSON):
 {

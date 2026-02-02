@@ -21,21 +21,16 @@ export async function getCoachContext(userId: string) {
     // Calculate some basic stats if not already provided by an external API
     const publishedPosts = posts.filter(p => p.status === "PUBLISHED");
 
-    // We'll simulate some engagement data for the AI to analyze hooks/trends
+    // Use real engagement data from the database
     const postsWithStats = publishedPosts.map((post: any) => {
-        const seed = post.id.charCodeAt(0) + post.id.charCodeAt(post.id.length - 1);
-        const ageInDays = Math.max(1, (Date.now() - new Date(post.publishedAt || post.createdAt).getTime()) / (1000 * 60 * 60 * 24));
-
-        const views = Math.floor((seed * 10) * Math.log10(ageInDays + 1));
-        const likes = Math.floor(views * (0.05 + (seed % 10) / 100));
-        const comments = Math.floor(likes * (0.1 + (seed % 5) / 100));
-
         return {
-            content: post.content.substring(0, 200) + "...",
-            views,
-            likes,
-            comments,
-            publishedAt: post.publishedAt
+            id: post.id,
+            content: post.content.substring(0, 250) + "...",
+            views: post.views,
+            likes: post.likes,
+            comments: post.comments,
+            publishedAt: post.publishedAt,
+            engagementRate: post.views > 0 ? ((post.likes + post.comments) / post.views * 100).toFixed(1) + "%" : "0%"
         };
     });
 

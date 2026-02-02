@@ -293,7 +293,7 @@ function CoachSuggestionCard() {
                     window.dispatchEvent(event);
                   }}
                 >
-                  Get Post Idea (NEW ✨)
+                  Get Post Idea
                 </Button>
                 <Button variant="ghost" size="sm" className="rounded-xl h-10 px-4 font-bold text-muted-foreground hover:text-foreground">
                   Dismiss
