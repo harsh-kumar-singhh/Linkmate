@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const MODELS = ["gemini-2.0-flash-lite-preview-02-05", "gemini-2.5-flash-lite", "gemini-2.0-flash-exp"];
+export const MODELS = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
 
 export function getGeminiModel(modelName: string) {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -66,8 +66,13 @@ export async function generatePost({ topic, style, userWritingSample, targetLeng
 
     console.error("ALL MODELS FAILED. Last error:", {
         message: lastError?.message,
-        stack: lastError?.stack,
+        status: lastError?.status,
     });
 
-    throw new Error(`AI Generation Failure: ${lastError?.message || "All models failed"}`);
+    const isNotFoundError = lastError?.message?.includes("404") || lastError?.status === 404;
+    const userMessage = isNotFoundError
+        ? "AI service is currently updating. Please try again in a moment."
+        : "AI Generation is temporarily unavailable. Please try again.";
+
+    throw new Error(userMessage);
 }

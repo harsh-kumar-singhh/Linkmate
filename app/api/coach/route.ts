@@ -4,9 +4,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getCoachContext } from "@/lib/coach-context";
-import { getGeminiModel } from "@/lib/gemini";
-
-const MODELS = ["gemini-2.0-flash-lite-preview-02-05", "gemini-2.5-flash-lite", "gemini-2.0-flash-exp"];
+import { getGeminiModel, MODELS } from "@/lib/gemini";
 
 export async function POST(req: Request) {
     try {
@@ -82,7 +80,12 @@ Response Format (JSON):
             }
         }
 
-        throw new Error(lastError?.message || "All models failed to respond");
+        const isNotFoundError = lastError?.message?.includes("404") || lastError?.status === 404;
+        const userFriendlyMessage = isNotFoundError
+            ? "The AI service is currently unavailable. We are switching to a backup model."
+            : "The Content Coach is having trouble thinking. Please try again in 30 seconds.";
+
+        throw new Error(userFriendlyMessage);
 
     } catch (error) {
         console.error("Coach API Error:", error);
