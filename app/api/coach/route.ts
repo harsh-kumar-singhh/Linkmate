@@ -61,8 +61,8 @@ Response Format (JSON):
         }
 
         try {
-            console.log(`[COACH] Generating advice with gemini-pro`);
-            const model = getGeminiModel("gemini-pro");
+            console.log(`[COACH] Generating advice with gemini-2.5-flash`);
+            const model = getGeminiModel("gemini-2.5-flash");
             const result = await model.generateContent([systemPrompt, userPrompt]);
             const response = await result.response;
             const text = response.text();
