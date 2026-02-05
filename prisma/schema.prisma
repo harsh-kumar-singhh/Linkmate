@@ -23,6 +23,11 @@ model User {
   theme         String?   @default("system")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+
+  // Legacy fields - kept to prevent data loss during migration
+  // To be removed after data migration is verified
+  writingStyle  String?
+  customStyles  String[]  @default([])
   
   accounts      Account[]
   sessions      Session[]

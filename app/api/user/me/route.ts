@@ -43,8 +43,8 @@ export async function GET() {
         email: user.email,
         name: user.name,
         writingStyles: (user as any).writingStyles || [],
-        theme: user.theme,
-        defaultTone: (user as any).defaultTone,
+        theme: user.theme || "system",
+        defaultTone: (user as any).defaultTone || "Professional",
         isConnected,
       },
     }, {
