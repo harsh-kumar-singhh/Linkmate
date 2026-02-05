@@ -8,17 +8,29 @@ import { publishToLinkedIn } from "@/lib/linkedin";
 export async function POST(req: Request) {
     const now = new Date();
     const nowUTC = now.toISOString();
-    console.log(`[CRON] Execution started at (UTC): ${nowUTC}`);
+
+    // 1. Diagnostic Logging
+    const authHeader = req.headers.get('authorization');
+    const xCronSecret = req.headers.get('x-cron-secret');
+    const method = req.method;
+
+    console.log(`[CRON] ${method} request received at ${nowUTC}`);
+    console.log(`[CRON] Auth Header: ${authHeader ? 'Present' : 'Missing'}, X-Cron-Secret: ${xCronSecret ? 'Present' : 'Missing'}`);
 
     try {
-        // 1. Security Check: Graceful exit if secret is missing or invalid
-        const authHeader = req.headers.get('authorization');
+        // 2. Security Check: Support both header types
         const cronSecret = process.env.CRON_SECRET;
 
+        const isAuthValid = authHeader === `Bearer ${cronSecret}`;
+        const isXSecretValid = xCronSecret === cronSecret;
+
         if (!cronSecret) {
-            console.error("[CRON] CRON_SECRET is not set in environment variables. Skipping security check (WARNING).");
-        } else if (authHeader !== `Bearer ${cronSecret}`) {
-            console.warn("[CRON] Unauthorized attempt blocked.");
+            console.error("[CRON] CRON_SECRET is not set in environment variables.");
+            return NextResponse.json({ error: 'System Configuration Error' }, { status: 500 });
+        }
+
+        if (!isAuthValid && !isXSecretValid) {
+            console.warn("[CRON] Unauthorized attempt blocked. Invalid or missing secret.");
             return NextResponse.json({ error: 'Unauthorized', timestamp: nowUTC }, { status: 401 });
         }
 
