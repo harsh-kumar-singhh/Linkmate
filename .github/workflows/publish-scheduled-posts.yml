@@ -1,12 +1,10 @@
 name: Publish Scheduled Posts
 
 on:
-  schedule:
-    # Runs every minute to check for due posts
-    # Posts are normalized to minute boundaries (seconds set to :00)
-    # This ensures posts publish at the exact scheduled minute
-    - cron: '*/1 * * * *' # Every 1 minute
-  workflow_dispatch: # Allow manual triggering
+  workflow_dispatch: # Manual trigger only
+  # Scheduling is handled by an external cron service
+  # GitHub Actions cron is intentionally disabled to avoid
+  # minute-level precision warnings on free runners
 
 jobs:
   publish:
@@ -15,16 +13,18 @@ jobs:
       - name: Trigger Publishing API
         run: |
           echo "Triggering API at $(date -u)"
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://linkmate-bp2u.vercel.app/api/cron/publish" \
-          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-          -H "Content-Type: application/json")
-          
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://linkmate-bp2u.vercel.app/api/cron/publish" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+
           HTTP_STATUS=$(echo "$RESPONSE" | tail -n 1)
           BODY=$(echo "$RESPONSE" | head -n -1)
-          
+
           echo "Response Body: $BODY"
           echo "HTTP Status: $HTTP_STATUS"
-          
+
           if [ "$HTTP_STATUS" -ne 200 ]; then
             echo "API call failed with status $HTTP_STATUS"
             exit 1
