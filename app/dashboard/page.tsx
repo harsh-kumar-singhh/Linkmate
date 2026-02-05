@@ -100,26 +100,10 @@ export default function DashboardPage() {
     }
   }, [])
 
-  // Fetch data + heartbeat
+  // Fetch data on mount
   useEffect(() => {
     if (status !== "authenticated") return
-
     fetchData()
-
-    const heartbeat = setInterval(async () => {
-      try {
-        const res = await fetch("/api/scheduler/run", { method: "POST" })
-        const data = await res.json()
-
-        if (data.processed > 0) {
-          await fetchData()
-        }
-      } catch (err) {
-        console.error("Heartbeat error:", err)
-      }
-    }, 60000)
-
-    return () => clearInterval(heartbeat)
   }, [status, fetchData])
 
   const dismissNotification = async (postId: string) => {

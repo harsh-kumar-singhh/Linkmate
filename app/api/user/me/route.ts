@@ -25,6 +25,8 @@ export async function GET() {
         email: true,
         name: true,
         writingStyles: true,
+        writingStyle: true,
+        customStyles: true,
         theme: true,
         defaultTone: true,
         linkedinConnected: true,
@@ -37,12 +39,25 @@ export async function GET() {
 
     const isConnected = (user as any).linkedinConnected === true
 
+    // Data Bridge: Extract legacy styles if the new writingStyles is empty
+    let finalWritingStyles = (user as any).writingStyles || [];
+    if (finalWritingStyles.length === 0) {
+      if ((user as any).writingStyle) {
+        finalWritingStyles.push({ name: "Legacy (Main)", sample: (user as any).writingStyle });
+      }
+      if ((user as any).customStyles && Array.isArray((user as any).customStyles)) {
+        (user as any).customStyles.forEach((s: string, i: number) => {
+          if (s) finalWritingStyles.push({ name: `Legacy (Extra ${i + 1})`, sample: s });
+        });
+      }
+    }
+
     return NextResponse.json({
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
-        writingStyles: (user as any).writingStyles || [],
+        writingStyles: finalWritingStyles,
         theme: user.theme || "system",
         defaultTone: (user as any).defaultTone || "Professional",
         isConnected,

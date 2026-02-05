@@ -22,17 +22,30 @@ export async function POST(req: Request) {
         if (style && style.includes("Write Like Me")) {
             const user = await prisma.user.findUnique({
                 where: { id: session.user.id },
-                select: { writingStyles: true }
+                select: {
+                    writingStyles: true,
+                    writingStyle: true,
+                    customStyles: true
+                }
             } as any);
 
-            if (user && (user as any).writingStyles && Array.isArray((user as any).writingStyles)) {
-                // Extract name from "Write Like Me — Personal" or "Write Like Me - Personal"
-                // Using a more robust split that handles various dash types
-                const parts = style.split(/[\u2014\u2013-]/);
-                const styleName = parts.length > 1 ? parts[1].trim() : "";
+            if (user) {
+                // Bridge logic: combine legacy and new styles
+                let styles = (user as any).writingStyles || [];
+                if (styles.length === 0) {
+                    if ((user as any).writingStyle) styles.push({ name: "Legacy (Main)", sample: (user as any).writingStyle });
+                    if ((user as any).customStyles) {
+                        (user as any).customStyles.forEach((s: string, i: number) => {
+                            if (s) styles.push({ name: `Legacy (Extra ${i + 1})`, sample: s });
+                        });
+                    }
+                }
 
-                const matchedStyle = ((user as any).writingStyles as any[]).find(
-                    (s: any) => s.name?.trim().toLowerCase() === styleName.toLowerCase()
+                const parts = style.split(/[\u2014\u2013-]/);
+                const styleName = parts.length > 1 ? parts[parts.length - 1].trim().toLowerCase() : "";
+
+                const matchedStyle = (styles as any[]).find(
+                    (s: any) => s.name?.trim().toLowerCase() === styleName
                 );
 
                 if (matchedStyle?.sample) {

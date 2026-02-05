@@ -81,7 +81,7 @@ export async function POST(req: Request) {
                 }
 
                 // Attempt publishing
-                console.log(`[CRON] Post ${post.id}: Publishing...`);
+                console.log(`[CRON] Post ${post.id}: Publishing... (Scheduled: ${post.scheduledFor?.toISOString()} vs Now: ${nowUTC})`);
                 const publishResult = await publishToLinkedIn(post.userId, post.content);
 
                 // Success
@@ -91,7 +91,8 @@ export async function POST(req: Request) {
                         status: "PUBLISHED",
                         publishedAt: new Date(),
                         linkedinPostId: publishResult.linkedinPostId,
-                        failureReason: null // Clear any previous failure reason
+                        notified: false, // Trigger UI toast for user
+                        failureReason: null
                     }
                 });
 

@@ -83,9 +83,7 @@ function EditorContent() {
                                 .filter((s: any) => s.name && s.name.trim() && s.sample && s.sample.trim())
                                 .map((s: any) => `Write Like Me \u2014 ${s.name.trim()}`);
 
-                            if (namedStyles.length > 0) {
-                                setAvailableStyles(["Professional", "Casual", "Enthusiastic", "Storytelling", ...namedStyles]);
-                            }
+                            setAvailableStyles(["Professional", "Casual", "Enthusiastic", "Storytelling", ...namedStyles]);
                         }
                     }
                 } catch (e) {
