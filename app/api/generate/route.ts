@@ -16,30 +16,28 @@ export async function POST(req: Request) {
 
         const { topic, style, targetLength, context } = await req.json();
 
-        // Fetch User Data for Styles
+        // Fetch User Data for Write Like Me styles
         let userWritingSample = undefined;
 
-        if (style === "Write Like Me" || style?.startsWith("Custom Style")) {
+        if (style && style.includes("Write Like Me")) {
             const user = await prisma.user.findUnique({
                 where: { id: session.user.id },
-                select: {
-                    writingStyle: true,
-                    // @ts-ignore - Prisma client sync lag
-                    customStyles: true
-                }
-            });
+                select: { writingStyles: true }
+            } as any);
 
-            if (user) {
-                if (style === "Write Like Me") {
-                    userWritingSample = user.writingStyle || undefined;
-                } else if (style?.startsWith("Custom Style")) {
-                    // Extract index: "Custom Style 1" -> 0
-                    const index = parseInt(style.split(" ")[2]) - 1;
-                    // @ts-ignore - Prisma client sync lag
-                    if (user.customStyles && user.customStyles[index]) {
-                        // @ts-ignore - Prisma client sync lag
-                        userWritingSample = user.customStyles[index];
-                    }
+            if (user && (user as any).writingStyles && Array.isArray((user as any).writingStyles)) {
+                // Extract name from "Write Like Me — Personal" or "Write Like Me - Personal"
+                // Using a more robust split that handles various dash types
+                const parts = style.split(/[\u2014\u2013-]/);
+                const styleName = parts.length > 1 ? parts[1].trim() : "";
+
+                const matchedStyle = ((user as any).writingStyles as any[]).find(
+                    (s: any) => s.name?.trim().toLowerCase() === styleName.toLowerCase()
+                );
+
+                if (matchedStyle?.sample) {
+                    userWritingSample = matchedStyle.sample;
+                    console.log(`[GENERATE] Using writing style: ${matchedStyle.name}`);
                 }
             }
         }

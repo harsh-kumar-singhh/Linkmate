@@ -19,8 +19,11 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Content and scheduled time are required" }, { status: 400 });
         }
 
+        // Normalize to minute boundary (set seconds and milliseconds to 0)
         const scheduleDate = new Date(scheduledFor);
-        console.log(`[SCHEDULE_POST] Incoming: ${scheduledFor}, Parsed UTC: ${scheduleDate.toISOString()}`);
+        scheduleDate.setSeconds(0, 0);
+
+        console.log(`[SCHEDULE_POST] Incoming: ${scheduledFor}, Normalized UTC: ${scheduleDate.toISOString()}`);
 
         if (scheduleDate <= new Date()) {
             return NextResponse.json({ error: "Scheduled time must be in the future" }, { status: 400 });

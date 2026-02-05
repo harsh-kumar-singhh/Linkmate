@@ -2,6 +2,9 @@ name: Publish Scheduled Posts
 
 on:
   schedule:
+    # Runs every minute to check for due posts
+    # Posts are normalized to minute boundaries (seconds set to :00)
+    # This ensures posts publish at the exact scheduled minute
     - cron: '*/1 * * * *' # Every 1 minute
   workflow_dispatch: # Allow manual triggering
 

@@ -17,8 +17,7 @@ model User {
   name          String?
   emailVerified DateTime?
   image         String?
-  writingStyle  String?   // Stores the "Write Like Me" sample text
-  customStyles  String[]  @default([]) // Stores up to 5 custom writing styles
+  writingStyles Json?     @default("[]") // Array of {name: string, sample: string}
   defaultTone   String    @default("Professional") // Stores preferred tone (Professional, Casual, etc.)
   linkedinConnected Boolean @default(false)
   theme         String?   @default("system")

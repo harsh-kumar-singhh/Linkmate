@@ -13,19 +13,18 @@ export async function PUT(req: Request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { writingStyle, name, theme, defaultTone, customStyles } = await req.json();
+        const { writingStyles, name, theme, defaultTone } = await req.json();
 
         const data: any = {};
-        if (writingStyle !== undefined) data.writingStyle = writingStyle;
+        if (writingStyles !== undefined) data.writingStyles = writingStyles;
         if (name !== undefined) data.name = name;
         if (theme !== undefined) data.theme = theme;
         if (defaultTone !== undefined) data.defaultTone = defaultTone;
-        if (customStyles !== undefined) data.customStyles = customStyles;
 
         const user = await prisma.user.update({
             where: { id: session.user.id },
             data,
-        });
+        } as any);
 
         return NextResponse.json({ success: true, user });
     } catch (error) {

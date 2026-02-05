@@ -45,7 +45,7 @@ export function StyleSelector({ value, onChange, styles }: StyleSelectorProps) {
                     <span className="font-semibold text-sm transition-all duration-300 transform">
                         {value}
                     </span>
-                    {value === "Write Like Me" && (
+                    {value.startsWith("Write Like Me") && (
                         <SparklesIcon className="w-3 h-3 text-primary absolute top-2 right-2" />
                     )}
                 </div>

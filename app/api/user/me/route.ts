@@ -24,33 +24,27 @@ export async function GET() {
         id: true,
         email: true,
         name: true,
-        writingStyle: true,
-        // @ts-ignore - Prisma client sync lag
-        customStyles: true,
+        writingStyles: true,
         theme: true,
-        // @ts-ignore - Prisma client sync lag
         defaultTone: true,
         linkedinConnected: true,
-      }
+      } as any
     })
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
-    const isConnected = user.linkedinConnected === true
+    const isConnected = (user as any).linkedinConnected === true
 
     return NextResponse.json({
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
-        writingStyle: user.writingStyle,
-        // @ts-ignore - Prisma client sync lag
-        customStyles: user.customStyles,
+        writingStyles: (user as any).writingStyles || [],
         theme: user.theme,
-        // @ts-ignore - Prisma client sync lag
-        defaultTone: user.defaultTone,
+        defaultTone: (user as any).defaultTone,
         isConnected,
       },
     }, {

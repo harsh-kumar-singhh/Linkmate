@@ -53,15 +53,27 @@ function Switch({ checked, onChange, disabled }: { checked: boolean; onChange: (
 
 export function SettingsForm({ user }: SettingsFormProps) {
     const [name, setName] = useState(user?.name || "");
-    const [writingStyle, setWritingStyle] = useState(user?.writingStyle || "");
 
-    // Initialize custom styles with 5 slots
-    const initialCustomStyles = user?.customStyles && user.customStyles.length > 0
-        ? user.customStyles
-        : ["", "", "", "", ""];
-    while (initialCustomStyles.length < 5) initialCustomStyles.push("");
+    // Initialize writingStyles with 5 named slots
+    const initialWritingStyles = user?.writingStyles && Array.isArray(user.writingStyles) && user.writingStyles.length > 0
+        ? user.writingStyles
+        : [
+            { name: "", sample: "" },
+            { name: "", sample: "" },
+            { name: "", sample: "" },
+            { name: "", sample: "" },
+            { name: "", sample: "" }
+        ];
 
-    const [customStyles, setCustomStyles] = useState<string[]>(initialCustomStyles);
+    // Ensure we always have exactly 5 slots
+    while (initialWritingStyles.length < 5) {
+        initialWritingStyles.push({ name: "", sample: "" });
+    }
+    if (initialWritingStyles.length > 5) {
+        initialWritingStyles.length = 5;
+    }
+
+    const [writingStyles, setWritingStyles] = useState<Array<{ name: string; sample: string }>>(initialWritingStyles);
     const [currentStyleIndex, setCurrentStyleIndex] = useState(0);
 
     const [tone, setTone] = useState(user?.defaultTone || "Professional");
@@ -82,11 +94,10 @@ export function SettingsForm({ user }: SettingsFormProps) {
         setIsSaving(true);
         try {
             const body: any = {};
-            if (field === 'writingStyle') body.writingStyle = writingStyle;
+            if (field === 'writingStyles') body.writingStyles = writingStyles;
             if (field === 'account') body.name = name;
             if (field === 'theme') body.theme = value;
             if (field === 'tone') body.defaultTone = value;
-            if (field === 'customStyles') body.customStyles = customStyles;
 
             const response = await fetch("/api/user/settings", {
                 method: "PUT",
@@ -106,10 +117,10 @@ export function SettingsForm({ user }: SettingsFormProps) {
         }
     };
 
-    const updateCustomStyle = (index: number, value: string) => {
-        const newStyles = [...customStyles];
-        newStyles[index] = value;
-        setCustomStyles(newStyles);
+    const updateWritingStyle = (index: number, field: 'name' | 'sample', value: string) => {
+        const newStyles = [...writingStyles];
+        newStyles[index] = { ...newStyles[index], [field]: value };
+        setWritingStyles(newStyles);
     };
 
     const updateTheme = (newTheme: string) => {
@@ -166,53 +177,13 @@ export function SettingsForm({ user }: SettingsFormProps) {
                 </div>
             </div>
 
-            {/* Writing Style Card */}
-            <div className="bg-card border border-border/60 rounded-[24px] shadow-sm overflow-hidden">
-                <div className="p-6 md:p-8 space-y-6">
-                    <div className="flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-primary" />
-                        <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Write Like Me</h3>
-                    </div>
-
-                    <div className="space-y-4">
-                        <p className="text-sm text-muted-foreground">
-                            Paste a sample of your writing so AI can mimic your unique voice and style.
-                        </p>
-
-                        <div className="relative group">
-                            <TextareaAutosize
-                                minRows={6}
-                                value={writingStyle}
-                                onChange={(e) => setWritingStyle(e.target.value)}
-                                placeholder="Paste your writing sample here..."
-                                className="w-full resize-none text-base p-6 rounded-2xl bg-secondary/20 border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all text-foreground"
-                            />
-                            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Sparkles className="w-4 h-4 text-primary/40" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="pt-2">
-                        <Button
-                            onClick={() => handleSave('writingStyle')}
-                            disabled={isSaving}
-                            className="h-12 px-6 rounded-xl font-bold gap-2"
-                        >
-                            {isSaved ? <Check className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
-                            Save Writing Style
-                        </Button>
-                    </div>
-                </div>
-            </div>
-
-            {/* Custom Writing Styles Card (5 Slots) */}
+            {/* Write Like Me (5 Named Slots) */}
             <div className="bg-card border border-border/60 rounded-[24px] shadow-sm overflow-hidden">
                 <div className="p-6 md:p-8 space-y-6">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <Type className="w-4 h-4 text-primary" />
-                            <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Custom Writing Styles</h3>
+                            <Sparkles className="w-4 h-4 text-primary" />
+                            <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Write Like Me</h3>
                         </div>
                         <div className="flex items-center gap-2 bg-secondary/30 rounded-lg p-1">
                             <Button
@@ -240,34 +211,49 @@ export function SettingsForm({ user }: SettingsFormProps) {
                     </div>
 
                     <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                            <p className="text-sm text-muted-foreground">
-                                Define up to 5 unique writing personas. AI will mimic the active slot.
-                            </p>
-                            <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-0.5 rounded">
-                                {customStyles[currentStyleIndex]?.length || 0} chars
-                            </span>
-                        </div>
+                        <p className="text-sm text-muted-foreground">
+                            Save up to 5 different writing styles. Give each a name and paste a sample of that style.
+                        </p>
 
-                        <div className="relative group">
-                            <TextareaAutosize
-                                minRows={8}
-                                value={customStyles[currentStyleIndex]}
-                                onChange={(e) => updateCustomStyle(currentStyleIndex, e.target.value)}
-                                placeholder={`Paste sample text for Custom Style #${currentStyleIndex + 1}...\n(e.g., "I use short sentences. I am optimistic. I use emojis like 🚀")`}
-                                className="w-full resize-none text-base p-6 rounded-2xl bg-secondary/20 border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all text-foreground"
-                            />
-                            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Sparkles className="w-4 h-4 text-primary/40" />
+                        <div className="space-y-3">
+                            <div className="space-y-2">
+                                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Style Name</label>
+                                <Input
+                                    value={writingStyles[currentStyleIndex].name}
+                                    onChange={(e) => updateWritingStyle(currentStyleIndex, 'name', e.target.value)}
+                                    placeholder={`e.g., "Personal", "Bold", "Thoughtful"`}
+                                    className="h-12 rounded-xl border-border/80"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Writing Sample</label>
+                                    <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-0.5 rounded">
+                                        {writingStyles[currentStyleIndex].sample?.length || 0} chars
+                                    </span>
+                                </div>
+                                <div className="relative group">
+                                    <TextareaAutosize
+                                        minRows={8}
+                                        value={writingStyles[currentStyleIndex].sample}
+                                        onChange={(e) => updateWritingStyle(currentStyleIndex, 'sample', e.target.value)}
+                                        placeholder={`Paste a sample of your writing for this style...`}
+                                        className="w-full resize-none text-base p-6 rounded-2xl bg-secondary/20 border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all text-foreground"
+                                    />
+                                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Sparkles className="w-4 h-4 text-primary/40" />
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
 
                     <div className="pt-2">
                         <Button
-                            onClick={() => handleSave('customStyles')}
+                            onClick={() => handleSave('writingStyles')}
                             disabled={isSaving}
-                            className="h-12 px-6 rounded-xl font-bold gap-2 bg-primary"
+                            className="h-12 px-6 rounded-xl font-bold gap-2"
                         >
                             {isSaved ? <Check className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
                             Save All Styles

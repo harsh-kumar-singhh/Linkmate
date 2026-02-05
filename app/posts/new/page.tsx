@@ -52,8 +52,7 @@ function EditorContent() {
     const [style, setStyle] = useState("Professional")
     const [targetLength, setTargetLength] = useState(700)
     const [context, setContext] = useState("")
-    const [availableStyles, setAvailableStyles] = useState(["Professional", "Casual", "Enthusiastic", "Storytelling", "Write Like Me"]);
-    const [userWritingSample, setUserWritingSample] = useState(""); // For "Write Like Me"
+    const [availableStyles, setAvailableStyles] = useState(["Professional", "Casual", "Enthusiastic", "Storytelling"]);
 
     const postId = searchParams.get("id")
 
@@ -64,7 +63,7 @@ function EditorContent() {
         }
     }, [status, router])
 
-    // Load User Settings (Tone & Custom Styles)
+    // Load User Settings (Tone & Write Like Me Styles)
     useEffect(() => {
         const fetchSettings = async () => {
             if (status === 'authenticated') {
@@ -78,21 +77,14 @@ function EditorContent() {
                             setStyle(data.user.defaultTone);
                         }
 
-                        // 2. Set "Write Like Me" sample
-                        if (data.user?.writingStyle) {
-                            setUserWritingSample(data.user.writingStyle);
-                        }
+                        // 2. Populate Write Like Me Styles
+                        if (data.user?.writingStyles && Array.isArray(data.user.writingStyles)) {
+                            const namedStyles = data.user.writingStyles
+                                .filter((s: any) => s.name && s.name.trim() && s.sample && s.sample.trim())
+                                .map((s: any) => `Write Like Me \u2014 ${s.name.trim()}`);
 
-                        // 3. Populate Custom Styles
-                        if (data.user?.customStyles && Array.isArray(data.user.customStyles)) {
-                            // Dynamic style names: "Custom 1", "Custom 2", etc. or just append them?
-                            // The user wants 5 slots. Let's append filled slots.
-                            const stylesFromDB = data.user.customStyles
-                                .map((s: string, i: number) => s.trim() ? `Custom Style ${i + 1}` : null)
-                                .filter(Boolean);
-
-                            if (stylesFromDB.length > 0) {
-                                setAvailableStyles(prev => [...prev, ...stylesFromDB]);
+                            if (namedStyles.length > 0) {
+                                setAvailableStyles(["Professional", "Casual", "Enthusiastic", "Storytelling", ...namedStyles]);
                             }
                         }
                     }
