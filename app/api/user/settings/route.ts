@@ -2,14 +2,14 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { resolveUser } from "@/lib/auth/user";
 import { getPrisma } from "@/lib/prisma";
 
 export async function PUT(req: Request) {
     const prisma = getPrisma();
     try {
-        const session = await auth();
-        if (!session || !session.user?.id) {
+        const userRecord = await resolveUser();
+        if (!userRecord) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
@@ -21,12 +21,13 @@ export async function PUT(req: Request) {
         if (theme !== undefined) data.theme = theme;
         if (defaultTone !== undefined) data.defaultTone = defaultTone;
 
-        const user = await prisma.user.update({
-            where: { id: session.user.id },
+        const updatedUser = await prisma.user.update({
+            where: { id: userRecord.id },
             data,
         } as any);
 
-        return NextResponse.json({ success: true, user });
+        return NextResponse.json({ success: true, user: updatedUser });
+
     } catch (error) {
         console.error("Settings Update Error:", error);
         return NextResponse.json({ error: "Failed to update settings" }, { status: 500 });

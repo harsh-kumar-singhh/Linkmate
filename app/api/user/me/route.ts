@@ -5,7 +5,7 @@ export const revalidate = 0
 
 import { NextResponse } from "next/server"
 import { headers } from "next/headers"
-import { auth } from "@/lib/auth"
+import { resolveUser } from "@/lib/auth/user"
 import { getPrisma } from "@/lib/prisma"
 
 export async function GET() {
@@ -13,29 +13,11 @@ export async function GET() {
   headers() // Force dynamic rendering at request time
 
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
+    const user = await resolveUser()
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        writingStyles: true,
-        writingStyle: true,
-        customStyles: true,
-        theme: true,
-        defaultTone: true,
-        linkedinConnected: true,
-      } as any
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 })
-    }
 
     const isConnected = (user as any).linkedinConnected === true
 

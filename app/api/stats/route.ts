@@ -1,13 +1,13 @@
 export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { resolveUser } from "@/lib/auth/user";
 import { getPrisma } from "@/lib/prisma";
 import { subDays } from "date-fns";
 
 export async function GET(req: Request) {
     try {
-        const session = await auth();
-        if (!session || !session.user?.id) {
+        const user = await resolveUser();
+        if (!user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
@@ -20,7 +20,7 @@ export async function GET(req: Request) {
         // 1. Fetch only local published posts
         const posts = await prisma.post.findMany({
             where: {
-                userId: session.user.id,
+                userId: user.id,
                 status: "PUBLISHED",
                 publishedAt: {
                     gte: startDate,

@@ -1,24 +1,17 @@
 import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
-import { auth } from "@/lib/auth";
+import { resolveUser } from "@/lib/auth/user";
 import { getPrisma } from "@/lib/prisma";
 import { publishToLinkedIn } from "@/lib/linkedin";
 
 export async function GET() {
   const prisma = getPrisma();
   try {
-    const session = await auth();
-    if (!session || !session.user?.id) {
+    const user = await resolveUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
 
     const posts = await prisma.post.findMany({
       where: { userId: user.id },
@@ -35,24 +28,14 @@ export async function GET() {
 export async function POST(req: Request) {
   const prisma = getPrisma();
   try {
-    const session = await auth();
-    if (!session || !session.user?.id) {
+    const user = await resolveUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
     const { content, status, scheduledFor, linkedinPostId, imageUrl } = await req.json();
 
     if (!content) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 });
-    }
-
-    // Find user by id
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     // If status is PUBLISHED, try to publish to LinkedIn first
