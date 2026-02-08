@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { resolveUser } from "@/lib/auth/user";
 import { getPrisma } from "@/lib/prisma";
 import { generateWithFallback, getPublicErrorMessage } from "@/lib/openrouter";
 import { checkAndIncrementAIQuota } from "@/lib/usage";
@@ -20,26 +21,20 @@ export async function POST(req: Request) {
             );
         }
 
-        const userId = session.user.id;
+        const user = await resolveUser(session);
+        if (!user) {
+            return NextResponse.json(
+                { error: "Your session has expired. Please refresh the page or sign in again." },
+                { status: 401 }
+            );
+        }
+
+        const userId = user.id;
 
         const { topic, style, targetLength = 1000, context } = await req.json();
 
         if (!topic) {
             return NextResponse.json({ error: "Topic is required" }, { status: 400 });
-        }
-
-        // --- VERIFY USER EXISTS IN DATABASE ---
-        const userExists = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { id: true }
-        });
-
-        if (!userExists) {
-            console.warn(`[GENERATE] User ${userId} not found in database`);
-            return NextResponse.json(
-                { error: "Your session has expired. Please refresh the page or sign in again." },
-                { status: 401 }
-            );
         }
 
         // --- ENFORCE DAILY QUOTA ---

@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { resolveUser } from "@/lib/auth/user";
 import { getCoachContext } from "@/lib/coach-context";
 import { generateWithFallback, getPublicErrorMessage } from "@/lib/openrouter";
 import { checkAndIncrementAIQuota } from "@/lib/usage";
@@ -20,23 +21,17 @@ export async function POST(req: Request) {
             );
         }
 
-        const userId = session.user.id;
-        const { page, draftContent, userQuery } = await req.json();
-
-        // --- VERIFY USER EXISTS IN DATABASE ---
-        const prisma = getPrisma();
-        const userExists = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { id: true }
-        });
-
-        if (!userExists) {
-            console.warn(`[COACH] User ${userId} not found in database`);
+        const user = await resolveUser(session);
+        if (!user) {
             return NextResponse.json(
                 { error: "Your session has expired. Please refresh the page or sign in again." },
                 { status: 401 }
             );
         }
+
+        const userId = user.id;
+
+        const { page, draftContent, userQuery } = await req.json();
 
         // --- ENFORCE DAILY QUOTA ---
         const quota = await checkAndIncrementAIQuota(userId);

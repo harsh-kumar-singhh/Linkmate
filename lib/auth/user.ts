@@ -1,42 +1,50 @@
 import { auth } from "@/lib/auth"
 import { getPrisma } from "@/lib/prisma"
+import { Session } from "next-auth"
 
 /**
  * Resolves the authenticated user from the database.
- * Priority: 1. Session user email, 2. Session user ID.
- * If the user does not exist in the database, it creates a new record.
+ * Priority: 1. Session user ID, 2. Session user email.
+ * If the user does not exist in the database, it recreates the record silently (Auto-Healing).
  */
-export async function resolveUser() {
-    const session = await auth()
-    if (!session?.user?.email) {
+export async function resolveUser(providedSession?: Session | null) {
+    const session = providedSession || await auth()
+
+    if (!session?.user?.id) {
         return null
     }
 
     const prisma = getPrisma()
 
-    // 1. Try resolving by email (stable identifier)
+    // 1. Primary lookup by ID (as it's the stable identifier in the session)
     let user = await prisma.user.findUnique({
-        where: { email: session.user.email },
+        where: { id: session.user.id },
     })
 
-    // 2. Fallback: Try resolving by session ID (if provided)
-    if (!user && session.user.id) {
+    // 2. Secondary lookup by email if ID lookup failed
+    if (!user && session.user.email) {
         user = await prisma.user.findUnique({
-            where: { id: session.user.id },
+            where: { email: session.user.email },
         })
     }
 
-    // 3. Last Resort: Create user if it doesn't exist
-    // This handles cases where session exists but DB record was lost/deleted
-    if (!user && session.user.email) {
-        console.log(`[AUTH] Creating missing user record for: ${session.user.email}`)
-        user = await prisma.user.create({
-            data: {
-                email: session.user.email,
-                name: session.user.name,
-                image: session.user.image,
-            },
-        })
+    // 3. Auto-Healing: Create user if it doesn't exist but session is valid
+    if (!user) {
+        console.warn(`[AUTH] Auto-healing missing user record for: ${session.user.id} (${session.user.email || 'no-email'})`)
+
+        try {
+            user = await prisma.user.create({
+                data: {
+                    id: session.user.id, // Preserving ID from session
+                    email: session.user.email,
+                    name: session.user.name,
+                    image: session.user.image,
+                },
+            })
+        } catch (error) {
+            console.error(`[AUTH] Failed to auto-heal user: ${error}`)
+            return null
+        }
     }
 
     return user
