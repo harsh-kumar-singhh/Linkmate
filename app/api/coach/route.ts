@@ -8,6 +8,7 @@ import { getCoachContext } from "@/lib/coach-context";
 import { generateWithFallback, getPublicErrorMessage } from "@/lib/openrouter";
 import { checkAndIncrementAIQuota } from "@/lib/usage";
 import { getPrisma } from "@/lib/prisma";
+import { AIUsageType } from "@prisma/client";
 
 export async function POST(req: Request) {
     try {
@@ -16,7 +17,7 @@ export async function POST(req: Request) {
         if (!session?.user?.id) {
             console.warn("[COACH] No authenticated session found");
             return NextResponse.json(
-                { error: "Your session has expired. Please refresh the page or sign in again." },
+                { error: "We couldn’t verify your session. Please refresh the page once." },
                 { status: 401 }
             );
         }
@@ -24,7 +25,7 @@ export async function POST(req: Request) {
         const user = await resolveUser(session);
         if (!user) {
             return NextResponse.json(
-                { error: "Your session has expired. Please refresh the page or sign in again." },
+                { error: "We couldn’t verify your session. Please refresh the page once." },
                 { status: 401 }
             );
         }
@@ -33,19 +34,19 @@ export async function POST(req: Request) {
 
         const { page, draftContent, userQuery } = await req.json();
 
-        // --- ENFORCE DAILY QUOTA ---
-        const quota = await checkAndIncrementAIQuota(userId);
+        // --- ENFORCE DAILY QUOTA (COACH) ---
+        const quota = await checkAndIncrementAIQuota(userId, AIUsageType.AI_CONTENT_COACH);
         if (!quota.allowed) {
             return NextResponse.json(
                 {
-                    error: "You’ve reached today’s AI limit (2 posts per day). You can try again tomorrow or continue writing manually.",
-                    code: "AI_DAILY_QUOTA_EXCEEDED"
+                    error: "You’ve reached today’s AI Coach limit (2 messages). You can continue tomorrow.",
+                    code: "AI_COACH_QUOTA_EXCEEDED"
                 },
                 { status: 429 }
             );
         }
 
-        const context = await getCoachContext(session.user.id);
+        const context = await getCoachContext(userId);
 
         let systemPrompt = `You are the LinkMate AI Content Coach, an elite LinkedIn strategist. 
 Your goal is to provide concise, high-value, and personalized advice to help the user grow their LinkedIn presence.
@@ -111,8 +112,7 @@ Response Format (JSON):
         } catch (aiError: any) {
             console.error(`[COACH] AI Fallback failed:`, aiError);
             return NextResponse.json({
-                error: getPublicErrorMessage(aiError),
-                message: aiError.message
+                error: getPublicErrorMessage(aiError)
             }, { status: 500 });
         }
 
@@ -121,8 +121,7 @@ Response Format (JSON):
     } catch (error) {
         console.error("Coach API Error:", error);
         return NextResponse.json({
-            error: "We ran into an issue while generating your advice. Please try again in a moment.",
-            message: error instanceof Error ? error.message : "Unknown error"
+            error: "Something went wrong on our end. Please try again shortly."
         }, { status: 500 });
     }
 }

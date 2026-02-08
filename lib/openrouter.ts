@@ -76,7 +76,7 @@ export async function generateWithFallback(
 
     try {
       console.log(`[AI] Attempt ${attempt} with model: ${model.id}`);
-      
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 60000); // 1 minute timeout
 
@@ -124,7 +124,7 @@ export async function generateWithFallback(
     } catch (error: any) {
       const errorType = error instanceof AIError ? error.type : (error.name === 'AbortError' ? 'TIMEOUT' : 'UNKNOWN_ERROR');
       const errorMessage = error.message || "Unknown error occurred";
-      
+
       lastError = new AIError(errorMessage, errorType, model.id);
 
       await logAIEvent({
@@ -138,7 +138,7 @@ export async function generateWithFallback(
 
       // If it's a logic error (e.g. bad prompt/config), don't bother falling back
       if (errorType === 'LOGIC_ERROR') throw lastError;
-      
+
       // Continue to next model
       console.warn(`[AI] Model ${model.id} failed (${errorType}). Trying next model...`);
     }
@@ -148,13 +148,20 @@ export async function generateWithFallback(
 }
 
 export const USER_MESSAGES = {
-  quota_exhausted: "AI generation is temporarily unavailable due to usage limits. Please try again later.",
-  system_error: "We ran into an issue while generating your post. Please try again in a moment."
+  unauthorized: "We couldn’t verify your session. Please refresh the page once.",
+  quota_exhausted: "You’ve reached today’s AI limit. Please try again tomorrow.",
+  model_failure: "Our AI is under heavy load right now. Please try again in a moment.",
+  unknown: "Something went wrong on our end. Please try again shortly."
 };
 
 export function getPublicErrorMessage(error: any): string {
-  if (error instanceof AIError && error.type === 'QUOTA_EXHAUSTED') {
-    return USER_MESSAGES.quota_exhausted;
+  if (error instanceof AIError) {
+    if (error.type === 'QUOTA_EXHAUSTED') {
+      return USER_MESSAGES.quota_exhausted;
+    }
+    if (error.type === 'PROVIDER_ERROR' || error.type === 'RATE_LIMIT' || error.type === 'TIMEOUT') {
+      return USER_MESSAGES.model_failure;
+    }
   }
-  return USER_MESSAGES.system_error;
+  return USER_MESSAGES.unknown;
 }

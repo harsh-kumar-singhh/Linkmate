@@ -126,14 +126,20 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+enum AIUsageType {
+  AI_POST_GENERATION
+  AI_CONTENT_COACH
+}
+
 model AIUsage {
-  id     String   @id @default(cuid())
+  id     String       @id @default(cuid())
   userId String
-  date   DateTime // Normalized to UTC start-of-day
-  count  Int      @default(0)
+  date   DateTime     // Normalized to UTC start-of-day
+  type   AIUsageType  @default(AI_POST_GENERATION)
+  count  Int          @default(0)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, date])
-  @@index([userId, date])
+  @@unique([userId, date, type])
+  @@index([userId, date, type])
 }

@@ -7,6 +7,14 @@ import { resolveUser } from "@/lib/auth/user";
 import { getPrisma } from "@/lib/prisma";
 import { generateWithFallback, getPublicErrorMessage } from "@/lib/openrouter";
 import { checkAndIncrementAIQuota } from "@/lib/usage";
+import { AIUsageType } from "@prisma/client";
+
+const TONE_GUIDELINES = {
+    professional: "Tone: Professional. Structure: Formal, structured, neutral, and concise. Avoid slang or overly emotional language.",
+    enthusiastic: "Tone: Enthusiastic. Structure: High-energy, optimistic, and motivating. Use vibrant language and encourage the reader.",
+    storytelling: "Tone: Storytelling. Structure: Narrative-driven, emotional, and flowing. Use a clear arc (hook, conflict/insight, resolution).",
+    casual: "Tone: Casual. Structure: Relaxed, conversational, and friendly. Use a relatable voice as if talking to a colleague."
+};
 
 export async function POST(req: Request) {
     const prisma = getPrisma();
@@ -16,7 +24,7 @@ export async function POST(req: Request) {
         if (!session?.user?.id) {
             console.warn("[GENERATE] No authenticated session found");
             return NextResponse.json(
-                { error: "Your session has expired. Please refresh the page or sign in again." },
+                { error: "We couldn’t verify your session. Please refresh the page once." },
                 { status: 401 }
             );
         }
@@ -24,7 +32,7 @@ export async function POST(req: Request) {
         const user = await resolveUser(session);
         if (!user) {
             return NextResponse.json(
-                { error: "Your session has expired. Please refresh the page or sign in again." },
+                { error: "We couldn’t verify your session. Please refresh the page once." },
                 { status: 401 }
             );
         }
@@ -37,12 +45,12 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Topic is required" }, { status: 400 });
         }
 
-        // --- ENFORCE DAILY QUOTA ---
-        const quota = await checkAndIncrementAIQuota(userId);
+        // --- ENFORCE DAILY QUOTA (POST GENERATION) ---
+        const quota = await checkAndIncrementAIQuota(userId, AIUsageType.AI_POST_GENERATION);
         if (!quota.allowed) {
             return NextResponse.json(
                 {
-                    error: "You’ve reached today’s AI limit (2 posts per day). You can try again tomorrow or continue writing manually.",
+                    error: "You’ve reached today’s AI post generation limit (2 posts). You can try again tomorrow or continue writing manually.",
                     code: "AI_DAILY_QUOTA_EXCEEDED"
                 },
                 { status: 429 }
@@ -52,9 +60,18 @@ export async function POST(req: Request) {
         // Fetch User Data for Write Like Me styles
         let userWritingSample = undefined;
 
+        // Determine Tone
+        let activeTone = "professional";
+        if (style) {
+            const lowerStyle = style.toLowerCase();
+            if (lowerStyle.includes("enthusiastic")) activeTone = "enthusiastic";
+            else if (lowerStyle.includes("storytelling")) activeTone = "storytelling";
+            else if (lowerStyle.includes("casual")) activeTone = "casual";
+        }
+
         if (style && style.includes("Write Like Me")) {
-            const user = await prisma.user.findUnique({
-                where: { id: session.user.id },
+            const userData = await prisma.user.findUnique({
+                where: { id: userId },
                 select: {
                     writingStyles: true,
                     writingStyle: true,
@@ -62,13 +79,13 @@ export async function POST(req: Request) {
                 }
             } as any);
 
-            if (user) {
-                // Bridge logic: combine legacy and new styles
-                let styles = (user as any).writingStyles || [];
+            if (userData) {
+                let styles = (userData as any).writingStyles || [];
+                // Bridge logic: combine legacy and new styles if needed
                 if (styles.length === 0) {
-                    if ((user as any).writingStyle) styles.push({ name: "Legacy (Main)", sample: (user as any).writingStyle });
-                    if ((user as any).customStyles) {
-                        (user as any).customStyles.forEach((s: string, i: number) => {
+                    if ((userData as any).writingStyle) styles.push({ name: "Legacy (Main)", sample: (userData as any).writingStyle });
+                    if ((userData as any).customStyles) {
+                        (userData as any).customStyles.forEach((s: string, i: number) => {
                             if (s) styles.push({ name: `Legacy (Extra ${i + 1})`, sample: s });
                         });
                     }
@@ -88,21 +105,27 @@ export async function POST(req: Request) {
             }
         }
 
+        // Strict Word Limit Logic: Aim for midpoint
+        const wordMidpoint = Math.floor(targetLength / 6); // Approximation: 6 chars per word
+
         // Construct canonical prompt
         let prompt = `Role: Elite LinkedIn Ghostwriter
 Action: Write a high-engagement LinkedIn post about "${topic}".
-Format:
+Goal: Aim for approximately ${wordMidpoint} words (~${targetLength} characters).
+
+Tone Enforcement:
+${TONE_GUIDELINES[activeTone as keyof typeof TONE_GUIDELINES]}
+
+Constraint Rules:
 - Start with a compelling hook.
 - Use structured points/short paragraphs with whitespace.
-- Emojis: 3-5 professional ones.
-- Length: Target ~${targetLength} characters.
+- Emojis: Strictly 3-5 professional ones.
+- Length: DO NOT exceed ${targetLength} characters.
 - End with a strong CTA or question.
-- No labels (e.g., "Hook:").`;
+- No labels (e.g., "Hook:", "Tone:").`;
 
-        if (style?.includes("Write Like Me") && userWritingSample) {
-            prompt += `\n\nStyle Reference: Mimic this voice/structure precisely:\n"${userWritingSample}"`;
-        } else if (style) {
-            prompt += `\n\nTone: ${style}`;
+        if (userWritingSample) {
+            prompt += `\n\nStyle Reference (Write Like Me): Mimic the sentence length, paragraph spacing, formatting patterns, and cadence of this sample precisely, but apply it to the new topic and selected tone:\n"${userWritingSample}"`;
         }
 
         if (context) {
@@ -116,8 +139,8 @@ Format:
         try {
             const content = await generateWithFallback(messages);
             const cleanedContent = content
-                .replace(/^(Hook|Headline|Body|CTA|Conclusion|Post|Draft):\s*/gmi, "")
-                .replace(/\*\*(Hook|Headline|Body|CTA|Conclusion|Post|Draft)\*\*:\s*/gmi, "")
+                .replace(/^(Hook|Headline|Body|CTA|Conclusion|Post|Draft|Tone|Style):\s*/gmi, "")
+                .replace(/\*\*(Hook|Headline|Body|CTA|Conclusion|Post|Draft|Tone|Style)\*\*:\s*/gmi, "")
                 .trim();
 
             return NextResponse.json({ content: cleanedContent });
@@ -132,7 +155,7 @@ Format:
     } catch (error) {
         console.error("API Error in Generate route:", error);
         return NextResponse.json(
-            { error: "We ran into an issue while generating your post. Please try again in a moment." },
+            { error: "Something went wrong on our end. Please try again shortly." },
             { status: 500 }
         );
     }
