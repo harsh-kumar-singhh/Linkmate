@@ -1,3 +1,6 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getPrisma } from "@/lib/prisma";
@@ -8,9 +11,16 @@ export async function POST(req: Request) {
     const prisma = getPrisma();
     try {
         const session = await auth();
-        if (!session || !session.user?.id) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+        if (!session?.user?.id) {
+            console.warn("[GENERATE] No authenticated session found");
+            return NextResponse.json(
+                { error: "Your session has expired. Please refresh the page or sign in again." },
+                { status: 401 }
+            );
         }
+
+        const userId = session.user.id;
 
         const { topic, style, targetLength = 1000, context } = await req.json();
 
@@ -18,13 +28,14 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Topic is required" }, { status: 400 });
         }
 
-        // --- VERIFY USER EXISTS ---
+        // --- VERIFY USER EXISTS IN DATABASE ---
         const userExists = await prisma.user.findUnique({
-            where: { id: session.user.id },
+            where: { id: userId },
             select: { id: true }
         });
 
         if (!userExists) {
+            console.warn(`[GENERATE] User ${userId} not found in database`);
             return NextResponse.json(
                 { error: "Your session has expired. Please refresh the page or sign in again." },
                 { status: 401 }
@@ -32,7 +43,7 @@ export async function POST(req: Request) {
         }
 
         // --- ENFORCE DAILY QUOTA ---
-        const quota = await checkAndIncrementAIQuota(session.user.id);
+        const quota = await checkAndIncrementAIQuota(userId);
         if (!quota.allowed) {
             return NextResponse.json(
                 {

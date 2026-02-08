@@ -64,6 +64,7 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
             const res = await fetch("/api/coach", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
+                credentials: 'include',
                 body: JSON.stringify({
                     page: pathname,
                     draftContent,

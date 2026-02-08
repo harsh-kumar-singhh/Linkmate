@@ -6,24 +6,32 @@ import { auth } from "@/lib/auth";
 import { getCoachContext } from "@/lib/coach-context";
 import { generateWithFallback, getPublicErrorMessage } from "@/lib/openrouter";
 import { checkAndIncrementAIQuota } from "@/lib/usage";
+import { getPrisma } from "@/lib/prisma";
 
 export async function POST(req: Request) {
     try {
         const session = await auth();
-        if (!session || !session.user?.id) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+        if (!session?.user?.id) {
+            console.warn("[COACH] No authenticated session found");
+            return NextResponse.json(
+                { error: "Your session has expired. Please refresh the page or sign in again." },
+                { status: 401 }
+            );
         }
 
+        const userId = session.user.id;
         const { page, draftContent, userQuery } = await req.json();
 
-        // --- VERIFY USER EXISTS ---
-        const prisma = (await import("@/lib/prisma")).getPrisma();
+        // --- VERIFY USER EXISTS IN DATABASE ---
+        const prisma = getPrisma();
         const userExists = await prisma.user.findUnique({
-            where: { id: session.user.id },
+            where: { id: userId },
             select: { id: true }
         });
 
         if (!userExists) {
+            console.warn(`[COACH] User ${userId} not found in database`);
             return NextResponse.json(
                 { error: "Your session has expired. Please refresh the page or sign in again." },
                 { status: 401 }
@@ -31,7 +39,7 @@ export async function POST(req: Request) {
         }
 
         // --- ENFORCE DAILY QUOTA ---
-        const quota = await checkAndIncrementAIQuota(session.user.id);
+        const quota = await checkAndIncrementAIQuota(userId);
         if (!quota.allowed) {
             return NextResponse.json(
                 {
