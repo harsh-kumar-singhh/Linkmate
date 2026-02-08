@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getCoachContext } from "@/lib/coach-context";
-import { getGeminiModel, MODELS } from "@/lib/gemini";
+import { generateWithFallback, getPublicErrorMessage } from "@/lib/openrouter";
 
 export async function POST(req: Request) {
     try {
@@ -60,21 +60,29 @@ Response Format (JSON):
             }
         }
 
+        const messages = [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+        ];
+
         try {
-            console.log(`[COACH] Generating advice with gemini-2.5-flash`);
-            const model = getGeminiModel("gemini-2.5-flash");
-            const result = await model.generateContent([systemPrompt, userPrompt]);
-            const response = await result.response;
-            const text = response.text();
+            console.log(`[COACH] Generating advice with OpenRouter fallback system`);
+            const text = await generateWithFallback(messages, {
+                temperature: 0.7,
+                response_format: { type: 'json_object' }
+            });
 
             if (text) {
                 // Clean up potential markdown JSON block
                 const cleanedText = text.replace(/```json/g, "").replace(/```/g, "").trim();
                 return NextResponse.json(JSON.parse(cleanedText));
             }
-        } catch (error: any) {
-            console.error(`[COACH] Generation failed:`, error);
-            throw new Error(error.message || "AI Coach Failed");
+        } catch (aiError: any) {
+            console.error(`[COACH] AI Fallback failed:`, aiError);
+            return NextResponse.json({
+                error: getPublicErrorMessage(aiError),
+                message: aiError.message
+            }, { status: 500 });
         }
 
         throw new Error("Empty response from AI Coach");
@@ -82,7 +90,7 @@ Response Format (JSON):
     } catch (error) {
         console.error("Coach API Error:", error);
         return NextResponse.json({
-            error: "Failed to get coach advice",
+            error: "We ran into an issue while generating your advice. Please try again in a moment.",
             message: error instanceof Error ? error.message : "Unknown error"
         }, { status: 500 });
     }

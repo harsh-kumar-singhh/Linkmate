@@ -1,10 +1,7 @@
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 import { NextResponse } from "next/server";
-import { generatePost } from "@/lib/gemini";
 import { auth } from "@/lib/auth";
 import { getPrisma } from "@/lib/prisma";
+import { generateWithFallback, getPublicErrorMessage } from "@/lib/openrouter";
 
 export async function POST(req: Request) {
     const prisma = getPrisma();
@@ -14,7 +11,11 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { topic, style, targetLength, context } = await req.json();
+        const { topic, style, targetLength = 1000, context } = await req.json();
+
+        if (!topic) {
+            return NextResponse.json({ error: "Topic is required" }, { status: 400 });
+        }
 
         // Fetch User Data for Write Like Me styles
         let userWritingSample = undefined;
@@ -55,11 +56,52 @@ export async function POST(req: Request) {
             }
         }
 
-        const content = await generatePost({ topic, style, userWritingSample, targetLength, context });
-        return NextResponse.json({ content });
+        // Construct canonical prompt
+        let prompt = `Role: Elite LinkedIn Ghostwriter
+Action: Write a high-engagement LinkedIn post about "${topic}".
+Format:
+- Start with a compelling hook.
+- Use structured points/short paragraphs with whitespace.
+- Emojis: 3-5 professional ones.
+- Length: Target ~${targetLength} characters.
+- End with a strong CTA or question.
+- No labels (e.g., "Hook:").`;
+
+        if (style?.includes("Write Like Me") && userWritingSample) {
+            prompt += `\n\nStyle Reference: Mimic this voice/structure precisely:\n"${userWritingSample}"`;
+        } else if (style) {
+            prompt += `\n\nTone: ${style}`;
+        }
+
+        if (context) {
+            prompt += `\n\nSpecific Context to include:\n"${context}"`;
+        }
+
+        const messages = [
+            { role: "user", content: prompt }
+        ];
+
+        try {
+            const content = await generateWithFallback(messages);
+            const cleanedContent = content
+                .replace(/^(Hook|Headline|Body|CTA|Conclusion|Post|Draft):\s*/gmi, "")
+                .replace(/\*\*(Hook|Headline|Body|CTA|Conclusion|Post|Draft)\*\*:\s*/gmi, "")
+                .trim();
+
+            return NextResponse.json({ content: cleanedContent });
+        } catch (aiError: any) {
+            console.error("[GENERATE] AI Fallback failed:", aiError);
+            return NextResponse.json(
+                { error: getPublicErrorMessage(aiError) },
+                { status: 500 }
+            );
+        }
+
     } catch (error) {
-        console.error("AI Generation Error:", error);
-        const errorMessage = error instanceof Error ? error.message : "Failed to generate post";
-        return NextResponse.json({ error: errorMessage }, { status: 500 });
+        console.error("API Error in Generate route:", error);
+        return NextResponse.json(
+            { error: "We ran into an issue while generating your post. Please try again in a moment." },
+            { status: 500 }
+        );
     }
 }
