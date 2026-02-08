@@ -32,6 +32,7 @@ model User {
   accounts      Account[]
   sessions      Session[]
   posts         Post[]
+  aiUsage       AIUsage[]
   schedule      Schedule?
 }
 
@@ -123,4 +124,16 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model AIUsage {
+  id     String   @id @default(cuid())
+  userId String
+  date   DateTime // Normalized to UTC start-of-day
+  count  Int      @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
 }

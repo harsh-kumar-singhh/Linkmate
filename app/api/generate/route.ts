@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getPrisma } from "@/lib/prisma";
 import { generateWithFallback, getPublicErrorMessage } from "@/lib/openrouter";
+import { checkAndIncrementAIQuota } from "@/lib/usage";
 
 export async function POST(req: Request) {
     const prisma = getPrisma();
@@ -15,6 +16,18 @@ export async function POST(req: Request) {
 
         if (!topic) {
             return NextResponse.json({ error: "Topic is required" }, { status: 400 });
+        }
+
+        // --- ENFORCE DAILY QUOTA ---
+        const quota = await checkAndIncrementAIQuota(session.user.id);
+        if (!quota.allowed) {
+            return NextResponse.json(
+                {
+                    error: "You’ve reached today’s AI limit (2 posts per day). You can try again tomorrow or continue writing manually.",
+                    code: "AI_DAILY_QUOTA_EXCEEDED"
+                },
+                { status: 429 }
+            );
         }
 
         // Fetch User Data for Write Like Me styles

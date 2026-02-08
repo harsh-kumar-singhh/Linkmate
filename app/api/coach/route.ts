@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getCoachContext } from "@/lib/coach-context";
 import { generateWithFallback, getPublicErrorMessage } from "@/lib/openrouter";
+import { checkAndIncrementAIQuota } from "@/lib/usage";
 
 export async function POST(req: Request) {
     try {
@@ -14,6 +15,19 @@ export async function POST(req: Request) {
         }
 
         const { page, draftContent, userQuery } = await req.json();
+
+        // --- ENFORCE DAILY QUOTA ---
+        const quota = await checkAndIncrementAIQuota(session.user.id);
+        if (!quota.allowed) {
+            return NextResponse.json(
+                {
+                    error: "You’ve reached today’s AI limit (2 posts per day). You can try again tomorrow or continue writing manually.",
+                    code: "AI_DAILY_QUOTA_EXCEEDED"
+                },
+                { status: 429 }
+            );
+        }
+
         const context = await getCoachContext(session.user.id);
 
         let systemPrompt = `You are the LinkMate AI Content Coach, an elite LinkedIn strategist. 
