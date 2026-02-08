@@ -16,6 +16,20 @@ export async function POST(req: Request) {
 
         const { page, draftContent, userQuery } = await req.json();
 
+        // --- VERIFY USER EXISTS ---
+        const prisma = (await import("@/lib/prisma")).getPrisma();
+        const userExists = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { id: true }
+        });
+
+        if (!userExists) {
+            return NextResponse.json(
+                { error: "Your session has expired. Please refresh the page or sign in again." },
+                { status: 401 }
+            );
+        }
+
         // --- ENFORCE DAILY QUOTA ---
         const quota = await checkAndIncrementAIQuota(session.user.id);
         if (!quota.allowed) {

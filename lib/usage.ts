@@ -29,6 +29,17 @@ export async function checkAndIncrementAIQuota(userId: string): Promise<{
   const today = getUTCStartOfDay();
 
   try {
+    // --- ROBUSTNESS: Verify user exists before touching AIUsage ---
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true }
+    });
+
+    if (!user) {
+      console.warn(`[QUOTA] Attempted to check quota for non-existent user: ${userId}`);
+      return { allowed: false, currentCount: -1, limit: DAILY_QUOTA };
+    }
+
     // We use a transaction to ensure atomic increment for correctness
     const result = await prisma.$transaction(async (tx) => {
       // Find or create the usage record for today
