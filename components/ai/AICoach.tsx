@@ -37,10 +37,22 @@ interface Suggestion {
 }
 
 interface CoachResponse {
-    message: string
+    reply: string
     insights?: Insight[]
     suggestions?: Suggestion[]
     quickActions?: string[]
+}
+
+interface CoachEnvelope {
+    success: boolean
+    reply?: string
+    data?: {
+        insights: Insight[]
+        suggestions: Suggestion[]
+        quickActions: string[]
+    }
+    errorCode?: string
+    message?: string
 }
 
 export function AICoach({ draftContent }: { draftContent?: string }) {
@@ -73,15 +85,40 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
             })
 
             if (res.ok) {
-                const data = await res.json()
-                setResponse(data)
-                setChatHistory(prev => [...prev, { role: "coach", content: data }])
+                const envelope: CoachEnvelope = await res.json()
+
+                if (envelope.success && envelope.reply) {
+                    const mappedResponse: CoachResponse = {
+                        reply: envelope.reply,
+                        insights: envelope.data?.insights || [],
+                        suggestions: envelope.data?.suggestions || [],
+                        quickActions: envelope.data?.quickActions || []
+                    }
+                    setResponse(mappedResponse)
+                    setChatHistory(prev => [...prev, { role: "coach", content: mappedResponse }])
+                } else {
+                    // Business logic error (e.g. quota, auth)
+                    const errorMsg = envelope.message || "We had trouble generating a response. Please try again."
+                    setChatHistory(prev => [...prev, {
+                        role: "coach",
+                        content: {
+                            reply: errorMsg,
+                            insights: [],
+                            suggestions: []
+                        }
+                    }])
+                }
             } else {
-                const data = await res.json()
+                // HTTP error or malformed response
+                const envelope: CoachEnvelope = await res.json().catch(() => ({
+                    success: false,
+                    message: "The AI Coach is temporarily unavailable. Please try again in a moment."
+                }))
+
                 setChatHistory(prev => [...prev, {
                     role: "coach",
                     content: {
-                        message: `Sorry, I'm having trouble connecting: ${data.message || 'Unknown error'}. Please try again later.`,
+                        reply: envelope.message || "The AI Coach is temporarily unavailable. Please try again in a moment.",
                         insights: [],
                         suggestions: []
                     }
@@ -92,7 +129,7 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
             setChatHistory(prev => [...prev, {
                 role: "coach",
                 content: {
-                    message: "I encountered a technical glitch. I'm ready to try again if you are!",
+                    reply: "I encountered a technical glitch. I'm ready to try again if you are!",
                     insights: [],
                     suggestions: []
                 }
@@ -186,7 +223,7 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                                     ) : (
                                         <div className="space-y-4 max-w-[95%]">
                                             <div className="bg-zinc-100 dark:bg-zinc-900 p-4 rounded-2xl rounded-tl-sm text-sm leading-relaxed text-foreground/90 border border-zinc-200/50 dark:border-zinc-800/50">
-                                                {(item.content as CoachResponse).message}
+                                                {(item.content as CoachResponse).reply}
                                             </div>
 
                                             {/* Insights */}
