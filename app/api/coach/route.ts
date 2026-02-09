@@ -15,7 +15,7 @@ export async function POST(req: Request) {
         const session = await auth();
 
         if (!session?.user?.id) {
-            console.warn("[COACH] No authenticated session found");
+            console.warn("[AI_COACH] No authenticated session found");
             return NextResponse.json(
                 { error: "We couldn’t verify your session. Please refresh the page once." },
                 { status: 401 }
@@ -104,7 +104,7 @@ Response Format (JSON):
         ];
 
         try {
-            console.log(`[COACH] Generating advice with OpenRouter fallback system`);
+            console.log(`[AI_COACH] Generating advice with OpenRouter fallback system`);
             const text = await generateWithFallback(messages, {
                 temperature: 0.7,
                 response_format: { type: 'json_object' }
@@ -116,7 +116,7 @@ Response Format (JSON):
                 return NextResponse.json(JSON.parse(cleanedText));
             }
         } catch (aiError: any) {
-            console.error(`[COACH] AI Fallback failed:`, aiError);
+            console.error(`[AI_COACH] AI Fallback failed:`, aiError);
             const { error, code } = getCoachErrorResponse(aiError);
             let status = 503;
             if (code === AI_CORE_CONFIG.ERROR_CATEGORIES.AUTH_MISSING) status = 401;
@@ -129,7 +129,17 @@ Response Format (JSON):
         throw new AIError("Empty response from AI Coach", "MODEL_FAILURE");
 
     } catch (error: any) {
-        console.error("Coach API Error:", error);
+        console.error("[AI_COACH] API Error:", error);
+
+        // --- SPECIFIC DATABASE ERROR HANDLING ---
+        // Catch Prisma P2025 (Record not found) or other DB errors that might leak from context fetching
+        if (error.code?.startsWith('P') || error.message?.includes('Prisma')) {
+            return NextResponse.json({
+                error: "The assistant is temporarily unavailable. Please try again in a moment.",
+                code: AI_CORE_CONFIG.ERROR_CATEGORIES.MODEL_FAILURE
+            }, { status: 503 });
+        }
+
         if (error instanceof AIError) {
             const { error: msg, code } = getCoachErrorResponse(error);
             return NextResponse.json({ error: msg, code }, { status: 500 });

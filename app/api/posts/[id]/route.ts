@@ -43,6 +43,12 @@ export async function PUT(
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
+        const postId = params.id;
+        if (!postId || postId === 'undefined' || postId === 'null') {
+            console.warn("[POST_UPDATE] Skipping: Invalid or missing postId");
+            return NextResponse.json({ error: "Invalid post ID" }, { status: 400 });
+        }
+
         const { content, status, scheduledFor, imageUrl } = await req.json();
 
         // If status is being updated to PUBLISHED, try to publish to LinkedIn
@@ -69,7 +75,7 @@ export async function PUT(
         }
 
         const post = await prisma.post.update({
-            where: { id: params.id },
+            where: { id: postId },
             data: {
                 content,
                 status,
@@ -81,7 +87,11 @@ export async function PUT(
         });
 
         return NextResponse.json(post);
-    } catch (error) {
+    } catch (error: any) {
+        if (error.code === 'P2025') {
+            console.warn(`[POST_UPDATE] Skip: Post ${params.id} not found`);
+            return NextResponse.json({ error: "Post not found" }, { status: 404 });
+        }
         console.error("Error updating post:", error);
         return NextResponse.json({ error: "Failed to update post" }, { status: 500 });
     }
@@ -98,12 +108,22 @@ export async function DELETE(
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
+        const postId = params.id;
+        if (!postId || postId === 'undefined' || postId === 'null') {
+            console.warn("[POST_DELETE] Skipping: Invalid or missing postId");
+            return NextResponse.json({ error: "Invalid post ID" }, { status: 400 });
+        }
+
         await prisma.post.delete({
-            where: { id: params.id },
+            where: { id: postId },
         });
 
         return NextResponse.json({ message: "Post deleted successfully" });
-    } catch (error) {
+    } catch (error: any) {
+        if (error.code === 'P2025') {
+            console.warn(`[POST_DELETE] Skip: Post ${params.id} already deleted or not found`);
+            return NextResponse.json({ message: "Post already deleted" });
+        }
         console.error("Error deleting post:", error);
         return NextResponse.json({ error: "Failed to delete post" }, { status: 500 });
     }

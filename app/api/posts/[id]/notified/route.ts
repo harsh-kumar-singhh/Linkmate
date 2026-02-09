@@ -15,18 +15,29 @@ export async function PATCH(
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
+        const postId = params.id;
+        if (!postId || postId === 'undefined' || postId === 'null') {
+            console.warn("[POST_NOTIFIED] Skipping update: Invalid or missing postId");
+            return NextResponse.json({ success: true, message: "Update skipped: invalid postId" });
+        }
+
         const prisma = getPrisma();
         const post = await prisma.post.update({
             where: {
-                id: params.id,
+                id: postId,
                 userId: session.user.id
             },
             data: { notified: true }
         });
 
         return NextResponse.json({ success: true, post });
-    } catch (error) {
-        console.error("[NOTIFIED_PATCH] Error:", error);
+    } catch (error: any) {
+        // Catch Prisma P2025 specifically
+        if (error.code === 'P2025') {
+            console.warn(`[POST_NOTIFIED] Skip: Post ${params.id} not found in DB`);
+            return NextResponse.json({ success: true, message: "Post not found, skipped" });
+        }
+        console.error("[POST_NOTIFIED] Error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
