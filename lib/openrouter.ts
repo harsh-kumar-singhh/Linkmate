@@ -1,3 +1,4 @@
+import { AI_CORE_CONFIG } from "./ai/config";
 
 export type AIErrorType = 'QUOTA_EXHAUSTED' | 'RATE_LIMIT' | 'TIMEOUT' | 'PROVIDER_ERROR' | 'LOGIC_ERROR' | 'UNKNOWN_ERROR';
 
@@ -148,9 +149,9 @@ export async function generateWithFallback(
 }
 
 export const USER_MESSAGES = {
-  unauthorized: "We couldn’t verify your session. Please refresh the page once.",
-  quota_exhausted: "You’ve reached today’s AI limit. Please try again tomorrow.",
-  model_failure: "Our AI is under heavy load right now. Please try again in a moment.",
+  unauthorized: AI_CORE_CONFIG.ERROR_MESSAGES.session_issue,
+  quota_exhausted: AI_CORE_CONFIG.ERROR_MESSAGES.quota_exceeded_post,
+  model_failure: AI_CORE_CONFIG.ERROR_MESSAGES.service_busy,
   unknown: "Something went wrong on our end. Please try again shortly."
 };
 

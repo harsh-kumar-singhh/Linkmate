@@ -9,6 +9,7 @@ import { generateWithFallback, getPublicErrorMessage } from "@/lib/openrouter";
 import { checkAndIncrementAIQuota } from "@/lib/usage";
 import { getPrisma } from "@/lib/prisma";
 import { AIUsageType } from "@prisma/client";
+import { AI_CORE_CONFIG } from "@/lib/ai/config";
 
 export async function POST(req: Request) {
     try {
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
         if (!quota.allowed) {
             return NextResponse.json(
                 {
-                    error: "You’ve reached today’s AI Coach limit (2 messages). You can continue tomorrow.",
+                    error: AI_CORE_CONFIG.ERROR_MESSAGES.quota_exceeded_coach,
                     code: "AI_COACH_QUOTA_EXCEEDED"
                 },
                 { status: 429 }
@@ -48,8 +49,15 @@ export async function POST(req: Request) {
 
         const context = await getCoachContext(userId);
 
-        let systemPrompt = `You are the LinkMate AI Content Coach, an elite LinkedIn strategist. 
-Your goal is to provide concise, high-value, and personalized advice to help the user grow their LinkedIn presence.
+        let systemPrompt = `Role: LinkMate AI Content Coach (Elite LinkedIn Strategist)
+Purpose: ${AI_CORE_CONFIG.AI_COACH.purpose}
+
+GLOBAL RULES:
+${AI_CORE_CONFIG.GLOBAL_RULES.hard_constraints.map(c => `- ${c}`).join('\n')}
+${AI_CORE_CONFIG.GLOBAL_RULES.prohibited_behavior.map(b => `- ${b}`).join('\n')}
+
+Response Style:
+${AI_CORE_CONFIG.AI_COACH.response_style.map(s => `- ${s}`).join('\n')}
 
 User Context:
 - Recent Posts & Performance: ${JSON.stringify(context.recentPerformance)}
@@ -57,15 +65,13 @@ User Context:
 - Current Page: ${page}
 ${draftContent ? `- Current Draft Content: "${draftContent}"` : ""}
 
-Guidelines:
-1. Be concise. Use bullet points for readability.
-2. Provide specific insights based ONLY on the provided real performance data.
-3. If analysis data for a post is missing (0 views/likes), do not invent performance.
-4. If no data is available at all, explicitly state: "I don't have enough performance data yet to give specific insights."
-5. Reference real numbers (views, likes, engagement rates) when explaining "why" a post worked.
-6. Avoid generic advice like "be consistent" unless it is directly supported by a visible pattern in the user's data.
-7. If analyzing a draft, focus on the "Hook" (first 2 lines), tone, and clarity.
-8. Always sound encouraging but professional and data-driven.
+Coach Guidelines:
+1. Provide specific insights based ONLY on the provided real performance data.
+2. If analysis data for a post is missing (0 views/likes), do not invent performance.
+3. If no data is available at all, explicitly state: "I don't have enough performance data yet to give specific insights."
+4. Reference real numbers (views, likes, engagement rates) when explaining "why" a post worked.
+5. Avoid generic advice like "be consistent" unless it is directly supported by a visible pattern in the user's data.
+6. If analyzing a draft, focus on the "Hook" (first 2 lines), tone, and clarity.
 
 Response Format (JSON):
 {

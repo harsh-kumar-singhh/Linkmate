@@ -8,13 +8,9 @@ import { getPrisma } from "@/lib/prisma";
 import { generateWithFallback, getPublicErrorMessage } from "@/lib/openrouter";
 import { checkAndIncrementAIQuota } from "@/lib/usage";
 import { AIUsageType } from "@prisma/client";
+import { AI_CORE_CONFIG } from "@/lib/ai/config";
 
-const TONE_GUIDELINES = {
-    professional: "Tone: Professional. Structure: Formal, structured, neutral, and concise. Avoid slang or overly emotional language.",
-    enthusiastic: "Tone: Enthusiastic. Structure: High-energy, optimistic, and motivating. Use vibrant language and encourage the reader.",
-    storytelling: "Tone: Storytelling. Structure: Narrative-driven, emotional, and flowing. Use a clear arc (hook, conflict/insight, resolution).",
-    casual: "Tone: Casual. Structure: Relaxed, conversational, and friendly. Use a relatable voice as if talking to a colleague."
-};
+const TONE_GUIDELINES = AI_CORE_CONFIG.TONE_MAPPING;
 
 export async function POST(req: Request) {
     const prisma = getPrisma();
@@ -50,7 +46,7 @@ export async function POST(req: Request) {
         if (!quota.allowed) {
             return NextResponse.json(
                 {
-                    error: "You’ve reached today’s AI post generation limit (2 posts). You can try again tomorrow or continue writing manually.",
+                    error: AI_CORE_CONFIG.ERROR_MESSAGES.quota_exceeded_post,
                     code: "AI_DAILY_QUOTA_EXCEEDED"
                 },
                 { status: 429 }
@@ -61,12 +57,13 @@ export async function POST(req: Request) {
         let userWritingSample = undefined;
 
         // Determine Tone
-        let activeTone = "professional";
+        let activeTone: keyof typeof TONE_GUIDELINES = "professional";
         if (style) {
             const lowerStyle = style.toLowerCase();
             if (lowerStyle.includes("enthusiastic")) activeTone = "enthusiastic";
             else if (lowerStyle.includes("storytelling")) activeTone = "storytelling";
             else if (lowerStyle.includes("casual")) activeTone = "casual";
+            else if (lowerStyle.includes("bold")) activeTone = "bold";
         }
 
         if (style && style.includes("Write Like Me")) {
@@ -108,13 +105,17 @@ export async function POST(req: Request) {
         // Strict Word Limit Logic: Aim for midpoint
         const wordMidpoint = Math.floor(targetLength / 6); // Approximation: 6 chars per word
 
-        // Construct canonical prompt
+        // Construct canonical prompt using AI Core rules
         let prompt = `Role: Elite LinkedIn Ghostwriter
 Action: Write a high-engagement LinkedIn post about "${topic}".
-Goal: Aim for approximately ${wordMidpoint} words (~${targetLength} characters).
+Goal: Aim for a length of ${targetLength} characters.
 
-Tone Enforcement:
-${TONE_GUIDELINES[activeTone as keyof typeof TONE_GUIDELINES]}
+GLOBAL RULES:
+${AI_CORE_CONFIG.GLOBAL_RULES.hard_constraints.map(c => `- ${c}`).join('\n')}
+${AI_CORE_CONFIG.GLOBAL_RULES.prohibited_behavior.map(b => `- ${b}`).join('\n')}
+
+Tone Enforcement (${activeTone}):
+${TONE_GUIDELINES[activeTone]}
 
 Constraint Rules:
 - Start with a compelling hook.
@@ -125,7 +126,7 @@ Constraint Rules:
 - No labels (e.g., "Hook:", "Tone:").`;
 
         if (userWritingSample) {
-            prompt += `\n\nStyle Reference (Write Like Me): Mimic the sentence length, paragraph spacing, formatting patterns, and cadence of this sample precisely, but apply it to the new topic and selected tone:\n"${userWritingSample}"`;
+            prompt += `\n\nStyle Reference (Write Like Me):\n${AI_CORE_CONFIG.WRITE_LIKE_ME.instruction}\n${AI_CORE_CONFIG.WRITE_LIKE_ME.rules.map(r => `- ${r}`).join('\n')}\n\nSample:\n"${userWritingSample}"`;
         }
 
         if (context) {
