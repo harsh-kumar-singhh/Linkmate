@@ -45,9 +45,18 @@ export const AI_CORE_CONFIG = {
 
     ERROR_MESSAGES: {
         quota_exceeded_post: "You’ve reached today’s AI post limit. You can write manually or try again tomorrow.",
-        quota_exceeded_coach: "You’ve reached today’s AI Coach limit. Please try again tomorrow.",
-        service_busy: "The AI is currently under heavy load. Please try again in a moment.",
-        session_issue: "Your session needs a quick refresh. Please reload once and try again."
+        quota_exceeded_coach: "You’ve reached today’s AI Coach limit. You can continue manually or come back tomorrow.",
+        service_busy: "The AI Coach is temporarily unavailable. Please try again in a moment.",
+        session_issue: "Your session expired. Please refresh the page.",
+        unknown_internal: "Something went wrong. Please try again shortly."
+    },
+
+    ERROR_CATEGORIES: {
+        QUOTA_EXCEEDED: "QUOTA_EXCEEDED",
+        MODEL_FAILURE: "MODEL_FAILURE",
+        TIMEOUT: "TIMEOUT",
+        AUTH_MISSING: "AUTH_MISSING",
+        UNKNOWN_INTERNAL: "UNKNOWN_INTERNAL"
     },
 
     FALLBACK_MODELS: [

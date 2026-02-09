@@ -1,6 +1,6 @@
 import { AI_CORE_CONFIG } from "./ai/config";
 
-export type AIErrorType = 'QUOTA_EXHAUSTED' | 'RATE_LIMIT' | 'TIMEOUT' | 'PROVIDER_ERROR' | 'LOGIC_ERROR' | 'UNKNOWN_ERROR';
+export type AIErrorType = 'QUOTA_EXCEEDED' | 'RATE_LIMIT' | 'TIMEOUT' | 'MODEL_FAILURE' | 'LOGIC_ERROR' | 'AUTH_MISSING' | 'UNKNOWN_INTERNAL';
 
 export class AIError extends Error {
   type: AIErrorType;
@@ -50,14 +50,15 @@ async function logAIEvent(event: {
 function classifyError(status: number, message: string): AIErrorType {
   if (status === 429) {
     if (message.toLowerCase().includes('quota') || message.toLowerCase().includes('credit')) {
-      return 'QUOTA_EXHAUSTED';
+      return 'QUOTA_EXCEEDED';
     }
     return 'RATE_LIMIT';
   }
   if (status === 408 || status === 504) return 'TIMEOUT';
-  if (status >= 500) return 'PROVIDER_ERROR';
+  if (status >= 500) return 'MODEL_FAILURE';
+  if (status === 401) return 'AUTH_MISSING';
   if (status === 400) return 'LOGIC_ERROR';
-  return 'UNKNOWN_ERROR';
+  return 'UNKNOWN_INTERNAL';
 }
 
 export async function generateWithFallback(
@@ -110,7 +111,7 @@ export async function generateWithFallback(
 
       const content = data.choices?.[0]?.message?.content;
       if (!content) {
-        throw new AIError("Empty response from AI", "PROVIDER_ERROR", model.id);
+        throw new AIError("Empty response from AI", "MODEL_FAILURE", model.id);
       }
 
       await logAIEvent({
@@ -123,7 +124,7 @@ export async function generateWithFallback(
       return content;
 
     } catch (error: any) {
-      const errorType = error instanceof AIError ? error.type : (error.name === 'AbortError' ? 'TIMEOUT' : 'UNKNOWN_ERROR');
+      const errorType = error instanceof AIError ? error.type : (error.name === 'AbortError' ? 'TIMEOUT' : 'UNKNOWN_INTERNAL');
       const errorMessage = error.message || "Unknown error occurred";
 
       lastError = new AIError(errorMessage, errorType, model.id);
@@ -145,24 +146,44 @@ export async function generateWithFallback(
     }
   }
 
-  throw lastError || new AIError("All AI models failed", "UNKNOWN_ERROR");
+  throw lastError || new AIError("All AI models failed", "UNKNOWN_INTERNAL");
 }
 
 export const USER_MESSAGES = {
   unauthorized: AI_CORE_CONFIG.ERROR_MESSAGES.session_issue,
   quota_exhausted: AI_CORE_CONFIG.ERROR_MESSAGES.quota_exceeded_post,
   model_failure: AI_CORE_CONFIG.ERROR_MESSAGES.service_busy,
-  unknown: "Something went wrong on our end. Please try again shortly."
+  unknown: AI_CORE_CONFIG.ERROR_MESSAGES.unknown_internal
 };
 
 export function getPublicErrorMessage(error: any): string {
   if (error instanceof AIError) {
-    if (error.type === 'QUOTA_EXHAUSTED') {
+    if (error.type === 'QUOTA_EXCEEDED') {
       return USER_MESSAGES.quota_exhausted;
     }
-    if (error.type === 'PROVIDER_ERROR' || error.type === 'RATE_LIMIT' || error.type === 'TIMEOUT') {
+    if (error.type === 'MODEL_FAILURE' || error.type === 'RATE_LIMIT' || error.type === 'TIMEOUT') {
       return USER_MESSAGES.model_failure;
+    }
+    if (error.type === 'AUTH_MISSING') {
+      return USER_MESSAGES.unauthorized;
     }
   }
   return USER_MESSAGES.unknown;
+}
+
+/**
+ * Returns a structured error response for the AI Coach
+ */
+export function getCoachErrorResponse(error: any) {
+  const message = getPublicErrorMessage(error);
+  let code = AI_CORE_CONFIG.ERROR_CATEGORIES.UNKNOWN_INTERNAL;
+
+  if (error instanceof AIError) {
+    if (error.type === 'QUOTA_EXCEEDED') code = AI_CORE_CONFIG.ERROR_CATEGORIES.QUOTA_EXCEEDED;
+    else if (error.type === 'AUTH_MISSING') code = AI_CORE_CONFIG.ERROR_CATEGORIES.AUTH_MISSING;
+    else if (error.type === 'TIMEOUT') code = AI_CORE_CONFIG.ERROR_CATEGORIES.TIMEOUT;
+    else if (error.type === 'MODEL_FAILURE' || error.type === 'RATE_LIMIT') code = AI_CORE_CONFIG.ERROR_CATEGORIES.MODEL_FAILURE;
+  }
+
+  return { error: message, code };
 }

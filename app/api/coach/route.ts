@@ -5,11 +5,10 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { resolveUser } from "@/lib/auth/user";
 import { getCoachContext } from "@/lib/coach-context";
-import { generateWithFallback, getPublicErrorMessage } from "@/lib/openrouter";
-import { checkAndIncrementAIQuota } from "@/lib/usage";
-import { getPrisma } from "@/lib/prisma";
-import { AIUsageType } from "@prisma/client";
 import { AI_CORE_CONFIG } from "@/lib/ai/config";
+import { generateWithFallback, getCoachErrorResponse, AIError } from "@/lib/openrouter";
+import { checkAndIncrementAIQuota } from "@/lib/usage";
+import { AIUsageType } from "@prisma/client";
 
 export async function POST(req: Request) {
     try {
@@ -36,12 +35,13 @@ export async function POST(req: Request) {
         const { page, draftContent, userQuery } = await req.json();
 
         // --- ENFORCE DAILY QUOTA (COACH) ---
+        // Short-circuit: Check quota BEFORE calling AI or doing heavy DB work
         const quota = await checkAndIncrementAIQuota(userId, AIUsageType.AI_CONTENT_COACH);
         if (!quota.allowed) {
             return NextResponse.json(
                 {
                     error: AI_CORE_CONFIG.ERROR_MESSAGES.quota_exceeded_coach,
-                    code: "AI_COACH_QUOTA_EXCEEDED"
+                    code: AI_CORE_CONFIG.ERROR_CATEGORIES.QUOTA_EXCEEDED
                 },
                 { status: 429 }
             );
@@ -117,17 +117,26 @@ Response Format (JSON):
             }
         } catch (aiError: any) {
             console.error(`[COACH] AI Fallback failed:`, aiError);
-            return NextResponse.json({
-                error: getPublicErrorMessage(aiError)
-            }, { status: 500 });
+            const { error, code } = getCoachErrorResponse(aiError);
+            let status = 503;
+            if (code === AI_CORE_CONFIG.ERROR_CATEGORIES.AUTH_MISSING) status = 401;
+            else if (code === AI_CORE_CONFIG.ERROR_CATEGORIES.QUOTA_EXCEEDED) status = 429;
+            else if (code === AI_CORE_CONFIG.ERROR_CATEGORIES.UNKNOWN_INTERNAL) status = 500;
+
+            return NextResponse.json({ error, code }, { status });
         }
 
-        throw new Error("Empty response from AI Coach");
+        throw new AIError("Empty response from AI Coach", "MODEL_FAILURE");
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Coach API Error:", error);
+        if (error instanceof AIError) {
+            const { error: msg, code } = getCoachErrorResponse(error);
+            return NextResponse.json({ error: msg, code }, { status: 500 });
+        }
         return NextResponse.json({
-            error: "Something went wrong on our end. Please try again shortly."
+            error: AI_CORE_CONFIG.ERROR_MESSAGES.unknown_internal,
+            code: AI_CORE_CONFIG.ERROR_CATEGORIES.UNKNOWN_INTERNAL
         }, { status: 500 });
     }
 }
