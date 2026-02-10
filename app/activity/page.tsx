@@ -58,11 +58,11 @@ export default function ActivityPage() {
             label: "Drafts and coaching sessions"
         },
         {
-            title: "AI vs Manual Posts",
-            value: statsData ? `AI: ${statsData.stats.aiPosts} • Manual: ${statsData.stats.manualPosts}` : "...",
+            title: "Consistency Score",
+            value: statsData ? `${statsData.stats.consistencyScore}%` : "0%",
             icon: PenTool,
             color: "text-primary",
-            label: "Out of total published posts"
+            label: `You posted on ${statsData?.stats?.activeDaysLast15 || 0} of the last 15 days`
         }
     ]
 

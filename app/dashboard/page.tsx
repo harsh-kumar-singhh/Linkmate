@@ -63,7 +63,7 @@ export default function DashboardPage() {
       const [postsRes, userRes, statsRes] = await Promise.all([
         fetch("/api/posts"),
         fetch("/api/user/me"),
-        fetch("/api/stats?days=7")
+        fetch("/api/activity")
       ])
 
       if (postsRes.ok) {
@@ -175,7 +175,7 @@ export default function DashboardPage() {
       <AnimatedCard animation="stagger-container" className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard
           label="Posting Streak"
-          value={stats?.stats?.postingStreak || 0}
+          value={stats?.stats?.postingStreak ? `${stats.stats.postingStreak} ${stats.stats.postingStreak === 1 ? 'day' : 'days'}` : "0 days"}
           icon={<Zap className="w-5 h-5" />}
           color="text-amber-500 bg-amber-500/10"
         />
@@ -186,9 +186,9 @@ export default function DashboardPage() {
           color="text-emerald-500 bg-emerald-500/10"
         />
         <StatCard
-          label="Posts Queued"
-          value={stats?.stats?.postsQueued || 0}
-          icon={<Calendar className="w-5 h-5" />}
+          label="Consistency Score"
+          value={stats?.stats?.consistencyScore ? `${stats.stats.consistencyScore}%` : "0%"}
+          icon={<TrendingUp className="w-5 h-5" />}
           color="text-primary bg-primary/10"
         />
       </AnimatedCard>
