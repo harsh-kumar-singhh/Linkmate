@@ -12,7 +12,7 @@ export function Sidebar() {
     const links = [
         { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
         { href: "/posts/new", label: "Create Post", icon: PenSquare },
-        { href: "/stats", label: "Analytics", icon: BarChart3 },
+        { href: "/activity", label: "Activity", icon: BarChart3 },
         { href: "/calendar", label: "Calendar", icon: Calendar },
         { href: "/settings", label: "Settings", icon: Settings },
     ]

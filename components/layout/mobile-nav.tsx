@@ -29,10 +29,10 @@ export function MobileNav() {
             match: (path: string) => path.startsWith("/calendar")
         },
         {
-            href: "/stats",
-            label: "Stats",
+            href: "/activity",
+            label: "Activity",
             icon: BarChart2,
-            match: (path: string) => path === "/stats"
+            match: (path: string) => path === "/activity"
         },
         {
             href: "/settings",

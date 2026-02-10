@@ -21,7 +21,7 @@ export default function ActivityPage() {
     const fetchStats = async () => {
         setIsLoading(true)
         try {
-            const response = await fetch(`/api/stats`)
+            const response = await fetch(`/api/activity`)
             const data = await response.json()
             setStatsData(data)
         } catch (error) {
@@ -58,11 +58,11 @@ export default function ActivityPage() {
             label: "Drafts and coaching sessions"
         },
         {
-            title: "Most Used Writing Style",
-            value: statsData?.stats?.mostUsedWritingStyle || "N/A",
+            title: "AI vs Manual Posts",
+            value: statsData ? `AI: ${statsData.stats.aiPosts} • Manual: ${statsData.stats.manualPosts}` : "...",
             icon: PenTool,
             color: "text-primary",
-            label: "Your favorite content tone"
+            label: "Out of total published posts"
         }
     ]
 
@@ -102,7 +102,7 @@ export default function ActivityPage() {
                             <h3 className="text-xl font-bold tracking-tight">Posts Published (Last 15 Days)</h3>
                             <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 text-[10px] font-bold uppercase tracking-wider">
                                 <Zap className="w-3 h-3" />
-                                {statsData?.stats?.postingStreak} Day Streak
+                                {statsData?.stats?.postingStreak} {statsData?.stats?.postingStreak === 1 ? 'Day' : 'Days'} Streak
                             </div>
                         </div>
 
@@ -110,9 +110,11 @@ export default function ActivityPage() {
                             {statsData?.chartData?.map((d: any, i: number) => {
                                 const maxCount = Math.max(...statsData.chartData.map((x: any) => x.count), 1);
                                 const h = (d.count / maxCount) * 100;
+                                const isEmpty = d.count === 0 && maxCount === 1 && statsData?.chartData?.every((x: any) => x.count === 0);
+
                                 return (
                                     <div key={i} className="flex-1 flex flex-col items-center gap-2 group cursor-default">
-                                        <div className="relative w-full flex flex-col items-center">
+                                        <div className="relative w-full flex flex-col items-center h-full justify-end">
                                             {/* Tooltip */}
                                             <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap pointer-events-none">
                                                 {d.count === 1 ? "1 post" : `${d.count} posts`}

@@ -13,7 +13,7 @@ export async function GET(req: Request) {
 
         const prisma = getPrisma();
 
-        // 1. Fetch all published posts for calculation
+        // 1. Fetch all published posts
         const allPublishedPosts = await prisma.post.findMany({
             where: {
                 userId: user.id,
@@ -24,7 +24,7 @@ export async function GET(req: Request) {
             },
         });
 
-        // 2. Fetch all scheduled posts
+        // 2. Scheduled Posts Count
         const scheduledPostsCount = await prisma.post.count({
             where: {
                 userId: user.id,
@@ -32,7 +32,19 @@ export async function GET(req: Request) {
             },
         });
 
-        // 3. Posting Streak Calculation
+        // 3. AI vs Manual Posts
+        let aiPosts = 0;
+        let manualPosts = 0;
+
+        allPublishedPosts.forEach((post: any) => {
+            if (post.source === 'AI') {
+                aiPosts++;
+            } else {
+                manualPosts++;
+            }
+        });
+
+        // 4. Posting Streak Calculation
         let streak = 0;
         if (allPublishedPosts.length > 0) {
             const daysWithPosts = Array.from(new Set(
@@ -61,7 +73,7 @@ export async function GET(req: Request) {
             }
         }
 
-        // 4. Line Chart Data (Last 15 Days)
+        // 5. Line Chart Data (Last 15 Days)
         const chartData = [];
         for (let i = 14; i >= 0; i--) {
             const date = subDays(startOfDay(new Date()), i);
@@ -76,14 +88,14 @@ export async function GET(req: Request) {
             });
         }
 
-        // 5. Average Posts Per Week (Last 30 Days)
+        // 6. Average Posts Per Week (Last 30 Days)
         const thirtyDaysAgo = subDays(new Date(), 30);
         const postsInLast30Days = allPublishedPosts.filter(p =>
             p.publishedAt && new Date(p.publishedAt) >= thirtyDaysAgo
         ).length;
         const avgPostsPerWeek = (postsInLast30Days / 30 * 7).toFixed(1);
 
-        // 6. AI Usage This Week
+        // 7. AI Usage This Week (Coaching + Generation)
         const startOfWeek = new Date();
         startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // Sunday
         startOfWeek.setHours(0, 0, 0, 0);
@@ -98,32 +110,6 @@ export async function GET(req: Request) {
         });
         const aiUsageThisWeek = aiUsage.reduce((sum, u) => sum + u.count, 0);
 
-        // 7. Most Used Writing Style
-        const styleCounts: Record<string, number> = {};
-        allPublishedPosts.forEach((p: any) => {
-            if (p.writingStyle) {
-                styleCounts[p.writingStyle] = (styleCounts[p.writingStyle] || 0) + 1;
-            }
-        });
-
-        // Include scheduled posts in style count for better reflection of current use
-        const scheduledWithStyles = await (prisma.post as any).findMany({
-            where: {
-                userId: user.id,
-                status: "SCHEDULED",
-                NOT: { writingStyle: null }
-            },
-            select: { writingStyle: true }
-        });
-        scheduledWithStyles.forEach((p: any) => {
-            if (p.writingStyle) {
-                styleCounts[p.writingStyle] = (styleCounts[p.writingStyle] || 0) + 1;
-            }
-        });
-
-        const sortedStyles = Object.entries(styleCounts).sort((a, b) => b[1] - a[1]);
-        const mostUsedStyle = sortedStyles.length > 0 ? sortedStyles[0][0] : "None yet";
-
         return NextResponse.json({
             stats: {
                 postingStreak: streak,
@@ -131,7 +117,8 @@ export async function GET(req: Request) {
                 postsQueued: scheduledPostsCount,
                 avgPostsPerWeek,
                 aiUsageThisWeek,
-                mostUsedWritingStyle: mostUsedStyle
+                aiPosts,
+                manualPosts
             },
             chartData
         });
