@@ -237,7 +237,8 @@ function EditorContent() {
                     status: statusArg,
                     scheduledFor: statusArg === "SCHEDULED" ? new Date(scheduledFor).toISOString() : undefined,
                     postId: statusArg === "SCHEDULED" ? postId : undefined,
-                    imageUrl: imageUrl || undefined
+                    imageUrl: imageUrl || undefined,
+                    writingStyle: style
                 }),
             })
 

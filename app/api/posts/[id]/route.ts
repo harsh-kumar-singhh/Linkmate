@@ -49,7 +49,7 @@ export async function PUT(
             return NextResponse.json({ error: "Invalid post ID" }, { status: 400 });
         }
 
-        const { content, status, scheduledFor, imageUrl } = await req.json();
+        const { content, status, scheduledFor, imageUrl, writingStyle } = await req.json();
 
         // If status is being updated to PUBLISHED, try to publish to LinkedIn
         let finalLinkedinPostId = undefined;
@@ -83,7 +83,8 @@ export async function PUT(
                 publishedAt: status === "PUBLISHED" ? new Date() : null,
                 linkedinPostId: finalLinkedinPostId,
                 imageUrl: imageUrl !== undefined ? imageUrl : undefined,
-            },
+                writingStyle: writingStyle !== undefined ? writingStyle : undefined,
+            } as any,
         });
 
         return NextResponse.json(post);

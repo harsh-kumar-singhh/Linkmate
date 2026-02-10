@@ -13,7 +13,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { content, scheduledFor, postId } = await req.json();
+        const { content, scheduledFor, postId, writingStyle } = await req.json();
 
         if (!content || !scheduledFor) {
             return NextResponse.json({ error: "Content and scheduled time are required" }, { status: 400 });
@@ -36,8 +36,9 @@ export async function POST(req: Request) {
                 data: {
                     content,
                     scheduledFor: scheduleDate,
-                    status: "SCHEDULED"
-                }
+                    status: "SCHEDULED",
+                    writingStyle: writingStyle || undefined
+                } as any
             });
         } else {
             // Create new scheduled post
@@ -46,8 +47,9 @@ export async function POST(req: Request) {
                     userId: user.id,
                     content,
                     scheduledFor: scheduleDate,
-                    status: "SCHEDULED"
-                }
+                    status: "SCHEDULED",
+                    writingStyle: writingStyle || null
+                } as any
             });
         }
 

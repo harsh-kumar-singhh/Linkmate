@@ -89,6 +89,7 @@ model Post {
   views          Int        @default(0)
   likes          Int        @default(0)
   comments       Int        @default(0)
+  writingStyle   String?
   lastSyncedAt   DateTime?
   failureReason  String?
   retryCount     Int        @default(0)

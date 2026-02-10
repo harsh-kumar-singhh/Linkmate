@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const { content, status, scheduledFor, linkedinPostId, imageUrl } = await req.json();
+    const { content, status, scheduledFor, linkedinPostId, imageUrl, writingStyle } = await req.json();
 
     if (!content) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 });
@@ -62,7 +62,8 @@ export async function POST(req: Request) {
         publishedAt: status === "PUBLISHED" ? new Date() : null,
         linkedinPostId: finalLinkedinPostId,
         imageUrl: imageUrl || null,
-      },
+        writingStyle: writingStyle || null,
+      } as any,
     });
 
     return NextResponse.json(post);
