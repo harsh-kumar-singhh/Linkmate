@@ -186,9 +186,9 @@ export default function DashboardPage() {
           color="text-emerald-500 bg-emerald-500/10"
         />
         <StatCard
-          label="Consistency Score"
-          value={stats?.stats?.consistencyScore ? `${stats.stats.consistencyScore}%` : "0%"}
-          icon={<TrendingUp className="w-5 h-5" />}
+          label="Posts Queued"
+          value={stats?.stats?.postsQueued || 0}
+          icon={<Calendar className="w-5 h-5" />}
           color="text-primary bg-primary/10"
         />
       </AnimatedCard>

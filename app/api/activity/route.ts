@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { resolveUser } from "@/lib/auth/user";
 import { getPrisma } from "@/lib/prisma";
-import { subDays, startOfDay, isSameDay, differenceInDays } from "date-fns";
+import { startOfDay, differenceInDays, subDays } from "date-fns";
 
 export async function GET(req: Request) {
     try {
@@ -32,17 +32,30 @@ export async function GET(req: Request) {
             },
         });
 
-        // 3. AI vs Manual Posts
-        let aiPosts = 0;
-        let manualPosts = 0;
+        // 3. Consistency Score (Percentage of days in last 15 days with at least one post)
+        // Normalize to UTC start of day to avoid timezone issues
+        const today = new Date();
+        today.setUTCHours(0, 0, 0, 0);
 
-        allPublishedPosts.forEach((post: any) => {
-            if (post.source === 'AI') {
-                aiPosts++;
-            } else {
-                manualPosts++;
-            }
+        const fifteenDaysAgo = new Date(today);
+        fifteenDaysAgo.setUTCDate(today.getUTCDate() - 14); // Include today (0 to 14 = 15 days)
+
+        const recentPosts = allPublishedPosts.filter(p => {
+            if (!p.publishedAt) return false;
+            const postDate = new Date(p.publishedAt);
+            postDate.setUTCHours(0, 0, 0, 0);
+            return postDate >= fifteenDaysAgo;
         });
+
+        const uniqueDaysWithPosts = new Set(
+            recentPosts.map(p => {
+                const d = new Date(p.publishedAt!);
+                d.setUTCHours(0, 0, 0, 0);
+                return d.getTime();
+            })
+        ).size;
+
+        const consistencyScore = Math.round((uniqueDaysWithPosts / 15) * 100);
 
         // 4. Posting Streak Calculation
         let streak = 0;
@@ -50,21 +63,27 @@ export async function GET(req: Request) {
             const daysWithPosts = Array.from(new Set(
                 allPublishedPosts
                     .filter(p => p.publishedAt)
-                    .map(p => startOfDay(new Date(p.publishedAt!)).getTime())
+                    .map(p => {
+                        const d = new Date(p.publishedAt!);
+                        d.setUTCHours(0, 0, 0, 0);
+                        return d.getTime();
+                    })
             )).sort((a, b) => b - a); // Descending
 
-            const today = startOfDay(new Date());
-            const mostRecentPostDay = new Date(daysWithPosts[0]);
+            const mostRecentPostDay = daysWithPosts[0];
+            const todayTime = today.getTime();
 
             // Check if user has posted today or yesterday to continue streak
-            const diff = differenceInDays(today, mostRecentPostDay);
+            const diffTime = Math.abs(todayTime - mostRecentPostDay);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-            if (diff <= 1) {
+            if (diffDays <= 1) { // 0 (today) or 1 (yesterday)
                 streak = 1;
                 for (let i = 0; i < daysWithPosts.length - 1; i++) {
-                    const current = new Date(daysWithPosts[i]);
-                    const next = new Date(daysWithPosts[i + 1]);
-                    if (differenceInDays(current, next) === 1) {
+                    const current = daysWithPosts[i];
+                    const next = daysWithPosts[i + 1];
+                    const gap = (current - next) / (1000 * 60 * 60 * 24);
+                    if (Math.round(gap) === 1) {
                         streak++;
                     } else {
                         break;
@@ -76,14 +95,19 @@ export async function GET(req: Request) {
         // 5. Line Chart Data (Last 15 Days)
         const chartData = [];
         for (let i = 14; i >= 0; i--) {
-            const date = subDays(startOfDay(new Date()), i);
-            const count = allPublishedPosts.filter(p =>
-                p.publishedAt && isSameDay(new Date(p.publishedAt), date)
-            ).length;
+            const date = new Date(today);
+            date.setUTCDate(today.getUTCDate() - i);
+
+            const count = allPublishedPosts.filter(p => {
+                if (!p.publishedAt) return false;
+                const pDate = new Date(p.publishedAt);
+                pDate.setUTCHours(0, 0, 0, 0);
+                return pDate.getTime() === date.getTime();
+            }).length;
 
             chartData.push({
-                date: date.toISOString(),
-                label: i === 0 ? "Today" : i === 14 ? "15d ago" : "",
+                date: date.toISOString(), // ISO string for frontend parsing
+                label: i === 0 ? "Today" : (i === 14 ? "15d ago" : ""), // Simple labels
                 count: count
             });
         }
@@ -117,8 +141,8 @@ export async function GET(req: Request) {
                 postsQueued: scheduledPostsCount,
                 avgPostsPerWeek,
                 aiUsageThisWeek,
-                aiPosts,
-                manualPosts
+                consistencyScore,
+                activeDaysLast15: uniqueDaysWithPosts
             },
             chartData
         });
