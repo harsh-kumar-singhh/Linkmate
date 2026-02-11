@@ -40,7 +40,7 @@ export function StyleSelector({ value, onChange, styles }: StyleSelectorProps) {
                     <ChevronLeft className="w-5 h-5" />
                 </Button>
 
-                <div className="flex-1 h-14 relative overflow-hidden bg-background border border-border/80 rounded-xl flex items-center justify-center group px-4">
+                <div className="min-w-[200px] w-[200px] md:w-auto md:min-w-[240px] h-14 relative overflow-hidden bg-background border border-border/80 rounded-xl flex items-center justify-center group px-4 shrink-0 transition-all">
                     <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
                     <span className="font-semibold text-sm transition-all duration-300 transform whitespace-nowrap overflow-hidden text-ellipsis w-full text-center leading-tight">
                         {value}

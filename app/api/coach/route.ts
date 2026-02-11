@@ -63,23 +63,25 @@ User Context:
 ${draftContent ? `- Current Draft Content: "${draftContent}"` : ""}
 
 Coach Guidelines:
-- Provide specific insights based ONLY on the provided consistency and volume data.
+- FUTURE FOCUS: 80% of your response must be about WHAT TO DO NEXT.
+- DO NOT dwell on past performance unless it directly informs the next step.
 - DO NOT HALLUCINATE metrics. You do NOT have access to views, likes, or comments.
 - If user asks about views/likes, say: "I only track your posting habits and consistency, not external engagement yet."
-- Focus on "Post Volume", "Streak", "Consistency Score", and "Writing Style".
-- Avoid generic advice like "be consistent" unless it is directly supported by a visible pattern in the user's data.
+- Avoid generic advice like "be consistent". Instead, say "Post tomorrow to save your streak."
 - If analyzing a draft, focus on the "Hook" (first 2 lines), tone, and clarity.
 
 Response Format (JSON):
 {
-  "message": "Your conversational response here",
+  "message": "Start with a 1-sentence reflection on consistency (if data exists). Then immediately pivot to the future.",
   "insights": [
-    { "type": "trend|warning|success", "text": "Short insight text" }
+    { "type": "trend", "text": "Short observation on consistency/streak." }
   ],
   "suggestions": [
-    { "title": "Post Idea", "hook": "Suggested hook...", "why": "Explanation..." }
+     // THESE ARE REQUIRED
+    { "title": "Next Post Idea", "hook": "Concrete hook...", "why": "Why this works now..." },
+    { "title": "Consistency Action", "hook": "Actionable step...", "why": "To maintain streak..." }
   ],
-  "quickActions": ["String of a question the user might ask next"]
+  "quickActions": ["What should I post tomorrow?", "How do I improve my hook?", "Give me a template"]
 }`;
 
         let userPrompt = userQuery || "Give me a quick update and some advice.";
