@@ -63,12 +63,12 @@ User Context:
 ${draftContent ? `- Current Draft Content: "${draftContent}"` : ""}
 
 Coach Guidelines:
-1. Provide specific insights based ONLY on the provided real performance data.
-2. If analysis data for a post is missing (0 views/likes), do not invent performance.
-3. If no data is available at all, explicitly state: "I don't have enough performance data yet to give specific insights."
-4. Reference real numbers (views, likes, engagement rates) when explaining "why" a post worked.
-5. Avoid generic advice like "be consistent" unless it is directly supported by a visible pattern in the user's data.
-6. If analyzing a draft, focus on the "Hook" (first 2 lines), tone, and clarity.
+- Provide specific insights based ONLY on the provided consistency and volume data.
+- DO NOT HALLUCINATE metrics. You do NOT have access to views, likes, or comments.
+- If user asks about views/likes, say: "I only track your posting habits and consistency, not external engagement yet."
+- Focus on "Post Volume", "Streak", "Consistency Score", and "Writing Style".
+- Avoid generic advice like "be consistent" unless it is directly supported by a visible pattern in the user's data.
+- If analyzing a draft, focus on the "Hook" (first 2 lines), tone, and clarity.
 
 Response Format (JSON):
 {

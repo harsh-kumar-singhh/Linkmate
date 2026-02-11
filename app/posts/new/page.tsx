@@ -81,7 +81,7 @@ function EditorContent() {
                         if (data.user?.writingStyles && Array.isArray(data.user.writingStyles)) {
                             const namedStyles = data.user.writingStyles
                                 .filter((s: any) => s.name && s.name.trim() && s.sample && s.sample.trim())
-                                .map((s: any) => `Write Like Me \u2014 ${s.name.trim()}`);
+                                .map((s: any) => `Write Like Me - ${s.name.trim()}`);
 
                             setAvailableStyles(["Professional", "Casual", "Enthusiastic", "Storytelling", ...namedStyles]);
                         }

@@ -35,18 +35,18 @@ export function StyleSelector({ value, onChange, styles }: StyleSelectorProps) {
                     variant="outline"
                     size="icon"
                     onClick={handlePrevious}
-                    className="h-12 w-12 rounded-xl border-border/80 hover:bg-secondary/50 shrink-0"
+                    className="h-14 w-14 rounded-xl border-border/80 hover:bg-secondary/50 shrink-0"
                 >
-                    <ChevronLeft className="w-4 h-4" />
+                    <ChevronLeft className="w-5 h-5" />
                 </Button>
 
-                <div className="flex-1 h-12 relative overflow-hidden bg-background border border-border/80 rounded-xl flex items-center justify-center group px-3">
+                <div className="flex-1 h-14 relative overflow-hidden bg-background border border-border/80 rounded-xl flex items-center justify-center group px-4">
                     <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <span className="font-semibold text-sm transition-all duration-300 transform whitespace-nowrap overflow-hidden text-ellipsis w-full text-center">
+                    <span className="font-semibold text-sm transition-all duration-300 transform whitespace-nowrap overflow-hidden text-ellipsis w-full text-center leading-tight">
                         {value}
                     </span>
                     {value.startsWith("Write Like Me") && (
-                        <SparklesIcon className="w-3 h-3 text-primary absolute top-2 right-2" />
+                        <SparklesIcon className="w-4 h-4 text-primary absolute top-2 right-2" />
                     )}
                 </div>
 
@@ -54,9 +54,9 @@ export function StyleSelector({ value, onChange, styles }: StyleSelectorProps) {
                     variant="outline"
                     size="icon"
                     onClick={handleNext}
-                    className="h-12 w-12 rounded-xl border-border/80 hover:bg-secondary/50 shrink-0"
+                    className="h-14 w-14 rounded-xl border-border/80 hover:bg-secondary/50 shrink-0"
                 >
-                    <ChevronRight className="w-4 h-4" />
+                    <ChevronRight className="w-5 h-5" />
                 </Button>
             </div>
         </div>

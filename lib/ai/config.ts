@@ -36,11 +36,12 @@ export const AI_CORE_CONFIG = {
     },
 
     AI_COACH: {
-        purpose: "Provide concise, actionable guidance related to LinkedIn content strategy.",
+        purpose: "Provide concise, actionable guidance based ONLY on LinkMate metrics: posting consistency, streak, and volume.",
         response_style: [
             "Short, direct answers.",
             "Action-oriented suggestions.",
-            "No generic motivational fluff."
+            "No generic motivational fluff.",
+            "NEVER mention 'views', 'likes', 'comments', or 'shares' (LinkMate does not track these)."
         ]
     },
 

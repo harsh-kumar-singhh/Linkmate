@@ -13,7 +13,7 @@ export function getUTCStartOfDay(date: Date = new Date()): Date {
   ));
 }
 
-const DAILY_QUOTA = 2;
+const DAILY_QUOTA = 3;
 
 /**
  * Checks if a user has exceeded their daily AI usage quota and increments it if they haven't.
