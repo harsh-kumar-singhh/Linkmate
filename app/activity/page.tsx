@@ -106,28 +106,29 @@ export default function ActivityPage() {
                             </div>
                         </div>
 
-                        <div className="h-48 w-full flex items-end justify-between gap-1 md:gap-2 px-1">
+                        <div className="h-64 w-full flex items-end justify-between gap-1 md:gap-2 px-1 mt-4">
                             {statsData?.chartData?.data?.map((count: number, i: number) => {
                                 const maxCount = Math.max(...(statsData.chartData.data || [1]), 1);
-                                const h = (count / maxCount) * 100;
+                                // Ensure a minimum 5% height for visibility if count > 0, else 1% for baseline
+                                const percentage = count === 0 ? 0 : (count / maxCount) * 100;
+                                const barHeight = count > 0 ? Math.max(percentage, 5) : 2;
 
                                 return (
-                                    <div key={i} className="flex-1 flex flex-col items-center gap-2 group cursor-default">
-                                        <div className="relative w-full flex flex-col items-center h-full justify-end">
-                                            {/* Tooltip */}
-                                            <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap pointer-events-none">
-                                                {count === 1 ? "1 post" : `${count} posts`}
-                                                <span className="opacity-50 ml-1">({statsData.chartData.labels[i].slice(5)})</span>
-                                            </div>
-                                            {/* Bar */}
-                                            <div
-                                                className={cn(
-                                                    "w-full transition-all rounded-t-lg",
-                                                    count > 0 ? "bg-primary" : "bg-zinc-100 dark:bg-zinc-800"
-                                                )}
-                                                style={{ height: `${Math.max(h, 4)}%` }}
-                                            />
+                                    <div key={i} className="flex-1 h-full flex flex-col items-center justify-end gap-2 group cursor-pointer relative">
+                                        {/* Tooltip */}
+                                        <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-popover text-popover-foreground text-[10px] font-bold px-2 py-1 rounded shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap pointer-events-none border border-border">
+                                            {count === 1 ? "1 post" : `${count} posts`}
+                                            <span className="opacity-50 ml-1">({statsData.chartData.labels[i].slice(5)})</span>
                                         </div>
+
+                                        {/* Bar */}
+                                        <div
+                                            className={cn(
+                                                "w-full max-w-[24px] rounded-t-sm transition-all duration-500 ease-out",
+                                                count > 0 ? "bg-primary" : "bg-muted/30"
+                                            )}
+                                            style={{ height: `${barHeight}%` }}
+                                        />
                                     </div>
                                 )
                             })}
