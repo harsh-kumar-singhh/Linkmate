@@ -27,7 +27,7 @@ export function StyleSelector({ value, onChange, styles }: StyleSelectorProps) {
         <div className="space-y-2">
             <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest flex justify-between">
                 <span>Tone</span>
-                <span className="text-primary font-mono">{currentIndex + 1} / {styles.length}</span>
+                <span className="text-primary font-mono">{Math.max(0, currentIndex) + 1} / {styles.length}</span>
             </label>
 
             <div className="flex items-center gap-2">
@@ -40,9 +40,9 @@ export function StyleSelector({ value, onChange, styles }: StyleSelectorProps) {
                     <ChevronLeft className="w-4 h-4" />
                 </Button>
 
-                <div className="flex-1 h-12 relative overflow-hidden bg-background border border-border/80 rounded-xl flex items-center justify-center group">
+                <div className="flex-1 h-12 relative overflow-hidden bg-background border border-border/80 rounded-xl flex items-center justify-center group px-3">
                     <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <span className="font-semibold text-sm transition-all duration-300 transform">
+                    <span className="font-semibold text-sm transition-all duration-300 transform whitespace-nowrap overflow-hidden text-ellipsis w-full text-center">
                         {value}
                     </span>
                     {value.startsWith("Write Like Me") && (

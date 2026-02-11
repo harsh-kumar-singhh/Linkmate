@@ -133,12 +133,6 @@ export default function ActivityPage() {
                                 )
                             })}
                         </div>
-
-                        <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">
-                            <span>15 days ago</span>
-                            <span>Yesterday</span>
-                            <span className="text-primary">Today</span>
-                        </div>
                     </AnimatedCard>
 
                     {/* Consistency Tip */}
