@@ -285,7 +285,13 @@ export function SettingsForm({ user }: SettingsFormProps) {
                                 <option>Casual</option>
                                 <option>Enthusiastic</option>
                                 <option>Storytelling</option>
-                                <option>Write Like Me</option>
+                                {writingStyles.map((style, i) => (
+                                    style.name.trim() && (
+                                        <option key={i} value={`Write Like Me - ${style.name.trim()}`}>
+                                            Write Like Me - {style.name.trim()}
+                                        </option>
+                                    )
+                                ))}
                             </select>
                         </div>
 

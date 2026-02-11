@@ -107,23 +107,23 @@ export default function ActivityPage() {
                         </div>
 
                         <div className="h-48 w-full flex items-end justify-between gap-1 md:gap-2 px-1">
-                            {statsData?.chartData?.map((d: any, i: number) => {
-                                const maxCount = Math.max(...statsData.chartData.map((x: any) => x.count), 1);
-                                const h = (d.count / maxCount) * 100;
-                                const isEmpty = d.count === 0 && maxCount === 1 && statsData?.chartData?.every((x: any) => x.count === 0);
+                            {statsData?.chartData?.data?.map((count: number, i: number) => {
+                                const maxCount = Math.max(...(statsData.chartData.data || [1]), 1);
+                                const h = (count / maxCount) * 100;
 
                                 return (
                                     <div key={i} className="flex-1 flex flex-col items-center gap-2 group cursor-default">
                                         <div className="relative w-full flex flex-col items-center h-full justify-end">
                                             {/* Tooltip */}
                                             <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap pointer-events-none">
-                                                {d.count === 1 ? "1 post" : `${d.count} posts`}
+                                                {count === 1 ? "1 post" : `${count} posts`}
+                                                <span className="opacity-50 ml-1">({statsData.chartData.labels[i].slice(5)})</span>
                                             </div>
                                             {/* Bar */}
                                             <div
                                                 className={cn(
                                                     "w-full transition-all rounded-t-lg",
-                                                    d.count > 0 ? "bg-primary" : "bg-zinc-100 dark:bg-zinc-800"
+                                                    count > 0 ? "bg-primary" : "bg-zinc-100 dark:bg-zinc-800"
                                                 )}
                                                 style={{ height: `${Math.max(h, 4)}%` }}
                                             />

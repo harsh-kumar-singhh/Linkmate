@@ -93,11 +93,13 @@ export async function GET(req: Request) {
         }
 
         // 5. Line Chart Data (Last 15 Days)
-        const chartData = [];
+        const labels: string[] = [];
+        const data: number[] = [];
+
         for (let i = 14; i >= 0; i--) {
             const date = new Date(today);
             date.setUTCDate(today.getUTCDate() - i);
-            
+
             // Format as YYYY-MM-DD for consistent frontend parsing
             const dateString = date.toISOString().split('T')[0];
 
@@ -108,12 +110,11 @@ export async function GET(req: Request) {
                 return pDate.toISOString().split('T')[0] === dateString;
             }).length;
 
-            chartData.push({
-                date: dateString,
-                label: i === 0 ? "Today" : (i === 14 ? "15d ago" : ""),
-                count: count
-            });
+            labels.push(dateString);
+            data.push(count);
         }
+
+        const chartData = { labels, data };
 
         // 6. Average Posts Per Week (Last 30 Days)
         const thirtyDaysAgo = subDays(new Date(), 30);
