@@ -121,9 +121,13 @@ Constraint Rules:
 - Start with a compelling hook.
 - Use structured points/short paragraphs with whitespace.
 - Emojis: Strictly 3-5 professional ones.
-- Length: DO NOT exceed ${targetLength} characters.
 - End with a strong CTA or question.
-- No labels (e.g., "Hook:", "Tone:").`;
+- No labels (e.g., "Hook:", "Tone:").
+
+HARD CONSTRAINT - LENGTH:
+- Your response MUST be under ${targetLength} characters.
+- This is a CRITICAL LIMIT. If you exceed it, the response is invalid.
+- Prune unnecessary words to fit.`;
 
         if (userWritingSample) {
             // override global rules for Write Like Me to prevent conflict
