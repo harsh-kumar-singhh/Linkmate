@@ -22,7 +22,8 @@ import {
     PenTool,
     Loader2,
     CheckCircle2,
-    Globe
+    Globe,
+    Check
 } from "lucide-react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -45,6 +46,7 @@ function EditorContent() {
     const [isSaving, setIsSaving] = useState(false)
     const [imageUrl, setImageUrl] = useState<string | null>(null)
     const [isUploading, setIsUploading] = useState(false)
+    const [isCopied, setIsCopied] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     // AI State
@@ -275,6 +277,17 @@ function EditorContent() {
         }
     }
 
+    const handleCopy = async () => {
+        if (!content) return
+        try {
+            await navigator.clipboard.writeText(content)
+            setIsCopied(true)
+            setTimeout(() => setIsCopied(false), 2000)
+        } catch (err) {
+            console.error("Failed to copy:", err)
+        }
+    }
+
     if (status === "loading" || isInitialLoading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
@@ -396,8 +409,34 @@ function EditorContent() {
                                 </AnimatedCard>
                             ) : (
                                 <AnimatedCard animation="fade-in-scale" className="space-y-4">
+
+
+                                    // ... inside return ...
+
                                     <div className="flex items-center justify-between">
-                                        <h3 className="font-bold text-lg">Post Content</h3>
+                                        <div className="flex items-center gap-3">
+                                            <h3 className="font-bold text-lg">Post Content</h3>
+                                            {content && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={handleCopy}
+                                                    className="h-7 px-2 text-xs gap-1.5 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
+                                                >
+                                                    {isCopied ? (
+                                                        <>
+                                                            <Check className="w-3.5 h-3.5" />
+                                                            Copied!
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
+                                                            Copy
+                                                        </>
+                                                    )}
+                                                </Button>
+                                            )}
+                                        </div>
                                         <span className="text-[11px] bg-secondary/50 px-2 py-1 rounded-md text-muted-foreground font-mono">{content.length} characters</span>
                                     </div>
                                     <div className="relative group">
