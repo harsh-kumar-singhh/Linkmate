@@ -126,7 +126,21 @@ Constraint Rules:
 - No labels (e.g., "Hook:", "Tone:").`;
 
         if (userWritingSample) {
-            prompt += `\n\nStyle Reference (Write Like Me):\n${AI_CORE_CONFIG.WRITE_LIKE_ME.instruction}\n${AI_CORE_CONFIG.WRITE_LIKE_ME.rules.map(r => `- ${r}`).join('\n')}\n\nSample:\n"${userWritingSample}"`;
+            // override global rules for Write Like Me to prevent conflict
+            prompt += `\n\nCRITICAL - WRITING STYLE REPLICATION (WRITE LIKE ME):
+${AI_CORE_CONFIG.WRITE_LIKE_ME.instruction}
+${AI_CORE_CONFIG.WRITE_LIKE_ME.rules.map(r => `- ${r}`).join('\n')}
+
+REFERENCE SAMPLE (Everything below is the style truth):
+"""
+${userWritingSample}
+"""
+
+Usage Instructions:
+1. Ignore standard grammar rules if the sample ignores them.
+2. If the sample uses lowercase for line starts, YOU MUST TOO.
+3. If the sample has no emojis, YOU MUST HAVE NONE.
+4. Structure your response directly based on the visual rhythm of the sample.`;
         }
 
         if (context) {

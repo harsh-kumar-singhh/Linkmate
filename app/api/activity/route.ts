@@ -97,17 +97,20 @@ export async function GET(req: Request) {
         for (let i = 14; i >= 0; i--) {
             const date = new Date(today);
             date.setUTCDate(today.getUTCDate() - i);
+            
+            // Format as YYYY-MM-DD for consistent frontend parsing
+            const dateString = date.toISOString().split('T')[0];
 
             const count = allPublishedPosts.filter(p => {
                 if (!p.publishedAt) return false;
                 const pDate = new Date(p.publishedAt);
-                pDate.setUTCHours(0, 0, 0, 0);
-                return pDate.getTime() === date.getTime();
+                // Compare using ISO date strings to avoid timezone mismatch
+                return pDate.toISOString().split('T')[0] === dateString;
             }).length;
 
             chartData.push({
-                date: date.toISOString(), // ISO string for frontend parsing
-                label: i === 0 ? "Today" : (i === 14 ? "15d ago" : ""), // Simple labels
+                date: dateString,
+                label: i === 0 ? "Today" : (i === 14 ? "15d ago" : ""),
                 count: count
             });
         }

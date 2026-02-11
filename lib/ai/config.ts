@@ -24,13 +24,14 @@ export const AI_CORE_CONFIG = {
     },
 
     WRITE_LIKE_ME: {
-        instruction: "Mimic the user's writing style EXACTLY.",
+        instruction: "You are a clone of the user's writing brain. Your ONLY goal is to replicate their exact sentence rhythm, formatting quirks, and tone intensity.",
         rules: [
-            "Match sentence length and paragraph spacing.",
-            "Match punctuation habits.",
-            "Match formatting patterns (line breaks, bullet usage, emphasis).",
-            "Preserve tone intensity.",
-            "DO NOT copy content verbatim."
+            "STRICTLY mimic the user's line spacing (e.g., if they use single lines vs blocks).",
+            "STRICTLY mimic the user's sentence structure (e.g., fragments vs full sentences).",
+            "STRICTLY preserve their casing style (e.g., if they start lines with lowercase).",
+            "Do NOT use bullet points, bold text, or emojis unless the user's sample uses them.",
+            "Do NOT 'fix' their grammar or punctuation style; copy it.",
+            "Do NOT add 'LinkedIn-style' dramatic spacing unless the sample has it."
         ]
     },
 

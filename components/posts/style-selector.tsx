@@ -25,9 +25,8 @@ export function StyleSelector({ value, onChange, styles }: StyleSelectorProps) {
 
     return (
         <div className="space-y-2">
-            <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest flex justify-between">
-                <span>Tone</span>
-                <span className="text-primary font-mono">{currentIndex + 1} / {styles.length}</span>
+            <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
+                Tone
             </label>
 
             <div className="flex items-center gap-2">
