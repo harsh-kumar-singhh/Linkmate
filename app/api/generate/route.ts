@@ -144,7 +144,12 @@ Usage Instructions:
 1. Ignore standard grammar rules if the sample ignores them.
 2. If the sample uses lowercase for line starts, YOU MUST TOO.
 3. If the sample has no emojis, YOU MUST HAVE NONE.
-4. Structure your response directly based on the visual rhythm of the sample.`;
+4. Structure your response directly based on the visual rhythm of the sample.
+
+FORMATTING FIDELITY:
+- Do NOT use markdown bold (**text**) or italics (*text*) unless the Reference Sample EXPLICITLY uses them.
+- Do NOT add stars, bullet points, or visual emphasis symbols unless they appear in the sample.
+- If the sample is plain text, your output MUST be plain text.`;
         }
 
         if (context) {
