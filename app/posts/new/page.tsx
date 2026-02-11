@@ -411,7 +411,7 @@ function EditorContent() {
                                 <AnimatedCard animation="fade-in-scale" className="space-y-4">
 
 
-                                    // ... inside return ...
+
 
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-3">
