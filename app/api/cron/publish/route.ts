@@ -94,7 +94,7 @@ export async function POST(req: Request) {
 
                 // Attempt publishing
                 console.log(`[CRON] Post ${post.id}: Publishing... (Scheduled: ${post.scheduledFor?.toISOString()} vs Now: ${nowUTC})`);
-                const publishResult = await publishToLinkedIn(post.userId, post.content);
+                const publishResult = await publishToLinkedIn(post.userId, post.content, post.imageUrl);
 
                 // Success
                 await prisma.post.update({

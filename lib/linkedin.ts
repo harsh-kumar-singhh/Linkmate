@@ -1,4 +1,6 @@
 import { getPrisma } from "./prisma";
+import fs from "fs";
+import path from "path";
 
 export async function publishToLinkedIn(userId: string, content: string, imageUrl?: string | null) {
   const prisma = getPrisma();
@@ -15,6 +17,96 @@ export async function publishToLinkedIn(userId: string, content: string, imageUr
   }
 
   console.log("[LinkedIn] Attempting to post with author URN:", `urn:li:person:${account.providerAccountId}`);
+
+  let mediaAsset = null;
+
+  if (imageUrl) {
+    try {
+      console.log("[LinkedIn] Detected image, registering upload...");
+
+      // 1. Register Upload
+      const registerResponse = await fetch(
+        "https://api.linkedin.com/v2/assets?action=registerUpload",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${account.access_token}`,
+            "Content-Type": "application/json",
+            "X-Restli-Protocol-Version": "2.0.0",
+          },
+          body: JSON.stringify({
+            registerUploadRequest: {
+              recipes: ["urn:li:digitalmediaRecipe:feedshare-image"],
+              owner: `urn:li:person:${account.providerAccountId}`,
+              serviceRelationships: [
+                {
+                  relationshipType: "OWNER",
+                  identifier: "urn:li:userGeneratedContent",
+                },
+              ],
+            },
+          }),
+        }
+      );
+
+      if (!registerResponse.ok) {
+        const errData = await registerResponse.json();
+        throw new Error(`Failed to register upload: ${JSON.stringify(errData)}`);
+      }
+
+      const registerData = await registerResponse.json();
+      const uploadUrl = registerData.value.uploadMechanism["com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"].uploadUrl;
+      mediaAsset = registerData.value.asset;
+
+      console.log("[LinkedIn] Upload registered. Asset:", mediaAsset);
+
+      // 2. Upload the image binary
+      let imageBuffer: Buffer;
+
+      if (imageUrl.startsWith("http")) {
+        console.log("[LinkedIn] Fetching image from URL:", imageUrl);
+        const imgRes = await fetch(imageUrl);
+        if (!imgRes.ok) throw new Error(`Failed to fetch image from URL: ${imgRes.statusText}`);
+        imageBuffer = Buffer.from(await imgRes.arrayBuffer());
+      } else {
+        // Assume local path
+        const localPath = path.join(process.cwd(), "public", imageUrl.startsWith("/") ? imageUrl : `/${imageUrl}`);
+        console.log("[LinkedIn] Reading local image from:", localPath);
+        if (fs.existsSync(localPath)) {
+          imageBuffer = fs.readFileSync(localPath);
+        } else {
+          // Fallback to checking without 'public' just in case
+          const altPath = path.join(process.cwd(), imageUrl.startsWith("/") ? imageUrl : `/${imageUrl}`);
+          console.log("[LinkedIn] Local image not found in public, trying alt path:", altPath);
+          if (fs.existsSync(altPath)) {
+            imageBuffer = fs.readFileSync(altPath);
+          } else {
+            throw new Error(`Image file not found at ${localPath} or ${altPath}`);
+          }
+        }
+      }
+
+      console.log("[LinkedIn] Uploading binary data to LinkedIn... Size:", imageBuffer.length);
+      const uploadResponse = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${account.access_token}`,
+          "Content-Type": "application/octet-stream",
+        },
+        body: new Uint8Array(imageBuffer),
+      });
+
+      if (!uploadResponse.ok) {
+        const errMsg = await uploadResponse.text();
+        throw new Error(`Failed to upload binary: ${uploadResponse.status} ${errMsg}`);
+      }
+
+      console.log("[LinkedIn] Image upload successful.");
+    } catch (error) {
+      console.error("[LinkedIn] Image processing failed:", error);
+      throw error; // Fail the whole process if image upload fails
+    }
+  }
 
   const response = await fetch(
     "https://api.linkedin.com/v2/ugcPosts",
@@ -33,14 +125,14 @@ export async function publishToLinkedIn(userId: string, content: string, imageUr
             shareCommentary: {
               text: content,
             },
-            shareMediaCategory: imageUrl ? "IMAGE" : "NONE",
-            media: imageUrl ? [
+            shareMediaCategory: mediaAsset ? "IMAGE" : "NONE",
+            media: mediaAsset ? [
               {
                 status: "READY",
                 description: {
-                  text: "Attached Image"
+                  text: "LinkMate Post Image"
                 },
-                media: imageUrl,
+                media: mediaAsset,
                 title: {
                   text: "Image"
                 }
