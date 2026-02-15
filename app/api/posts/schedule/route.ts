@@ -13,7 +13,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { content, scheduledFor, postId, writingStyle } = await req.json();
+        const { content, scheduledFor, postId, writingStyle, imageUrl, imageData } = await req.json();
 
         if (!content || !scheduledFor) {
             return NextResponse.json({ error: "Content and scheduled time are required" }, { status: 400 });
@@ -37,7 +37,9 @@ export async function POST(req: Request) {
                     content,
                     scheduledFor: scheduleDate,
                     status: "SCHEDULED",
-                    writingStyle: writingStyle || undefined
+                    writingStyle: writingStyle || undefined,
+                    imageUrl: imageUrl || undefined,
+                    imageData: imageData || undefined,
                 } as any
             });
         } else {
@@ -48,7 +50,9 @@ export async function POST(req: Request) {
                     content,
                     scheduledFor: scheduleDate,
                     status: "SCHEDULED",
-                    writingStyle: writingStyle || null
+                    writingStyle: writingStyle || null,
+                    imageUrl: imageUrl || null,
+                    imageData: imageData || null,
                 } as any
             });
         }

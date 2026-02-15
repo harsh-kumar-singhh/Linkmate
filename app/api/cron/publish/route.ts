@@ -94,6 +94,7 @@ export async function POST(req: Request) {
 
                 // Attempt publishing
                 console.log(`[CRON] Post ${post.id}: Publishing... (Scheduled: ${post.scheduledFor?.toISOString()} vs Now: ${nowUTC})`);
+                console.log(`[CRON] Post ${post.id}: Image data present: ${!!(post as any).imageData}, Image URL present: ${!!post.imageUrl}`);
                 // @ts-ignore - Ignore type desync for new imageData field
                 const publishResult = await publishToLinkedIn(post.userId, post.content, post.imageUrl, (post as any).imageData);
 
