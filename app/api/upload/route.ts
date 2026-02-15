@@ -20,11 +20,19 @@ export async function POST(req: Request) {
         // Note: Real storage is out of scope for this prompt's request to "avoid overengineering"
         // and use "browser default" behavior.
 
+        // Read file as buffer
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const base64Data = buffer.toString("base64");
+
         // Simulating a successful upload
         const fileName = `${Date.now()}-${file.name.replace(/\s/g, "-")}`;
         const imageUrl = `/uploads/${fileName}`;
 
-        return NextResponse.json({ imageUrl, name: file.name });
+        return NextResponse.json({
+            imageUrl,
+            imageData: base64Data,
+            name: file.name
+        });
     } catch (error) {
         console.error("Upload error:", error);
         return NextResponse.json({ error: "Upload failed" }, { status: 500 });

@@ -45,6 +45,7 @@ function EditorContent() {
     const [isInitialLoading, setIsInitialLoading] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
     const [imageUrl, setImageUrl] = useState<string | null>(null)
+    const [imageData, setImageData] = useState<string | null>(null)
     const [isUploading, setIsUploading] = useState(false)
     const [isCopied, setIsCopied] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -110,6 +111,7 @@ function EditorContent() {
                     setContent(data.content)
                     setMode("manual")
                     setImageUrl(data.imageUrl || null)
+                    setImageData(data.imageData || null)
 
                     if (data.scheduledFor) {
                         const date = new Date(data.scheduledFor);
@@ -200,6 +202,7 @@ function EditorContent() {
             if (response.ok) {
                 const data = await response.json()
                 setImageUrl(data.imageUrl)
+                setImageData(data.imageData)
             } else {
                 alert("Upload failed")
             }
@@ -213,6 +216,7 @@ function EditorContent() {
 
     const handleRemoveImage = () => {
         setImageUrl(null)
+        setImageData(null)
         if (fileInputRef.current) {
             fileInputRef.current.value = ""
         }
@@ -240,6 +244,7 @@ function EditorContent() {
                     scheduledFor: statusArg === "SCHEDULED" ? new Date(scheduledFor).toISOString() : undefined,
                     postId: statusArg === "SCHEDULED" ? postId : undefined,
                     imageUrl: imageUrl || undefined,
+                    imageData: imageData || undefined,
                     writingStyle: style,
                     source: mode === "ai" ? "AI" : "MANUAL"
                 }),

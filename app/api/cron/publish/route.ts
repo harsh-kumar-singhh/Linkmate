@@ -94,7 +94,8 @@ export async function POST(req: Request) {
 
                 // Attempt publishing
                 console.log(`[CRON] Post ${post.id}: Publishing... (Scheduled: ${post.scheduledFor?.toISOString()} vs Now: ${nowUTC})`);
-                const publishResult = await publishToLinkedIn(post.userId, post.content, post.imageUrl);
+                // @ts-ignore - Ignore type desync for new imageData field
+                const publishResult = await publishToLinkedIn(post.userId, post.content, post.imageUrl, (post as any).imageData);
 
                 // Success
                 await prisma.post.update({

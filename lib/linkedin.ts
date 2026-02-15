@@ -1,8 +1,6 @@
 import { getPrisma } from "./prisma";
-import fs from "fs";
-import path from "path";
 
-export async function publishToLinkedIn(userId: string, content: string, imageUrl?: string | null) {
+export async function publishToLinkedIn(userId: string, content: string, imageUrl?: string | null, imageData?: string | null) {
   const prisma = getPrisma();
 
   const account = await prisma.account.findFirst({
@@ -20,7 +18,7 @@ export async function publishToLinkedIn(userId: string, content: string, imageUr
 
   let mediaAsset = null;
 
-  if (imageUrl) {
+  if (imageData || imageUrl) {
     try {
       console.log("[LinkedIn] Detected image, registering upload...");
 
@@ -60,30 +58,19 @@ export async function publishToLinkedIn(userId: string, content: string, imageUr
 
       console.log("[LinkedIn] Upload registered. Asset:", mediaAsset);
 
-      // 2. Upload the image binary
+      // 2. Prepare the image binary
       let imageBuffer: Buffer;
 
-      if (imageUrl.startsWith("http")) {
+      if (imageData) {
+        console.log("[LinkedIn] Using image data from database (base64)");
+        imageBuffer = Buffer.from(imageData, "base64");
+      } else if (imageUrl && imageUrl.startsWith("http")) {
         console.log("[LinkedIn] Fetching image from URL:", imageUrl);
         const imgRes = await fetch(imageUrl);
         if (!imgRes.ok) throw new Error(`Failed to fetch image from URL: ${imgRes.statusText}`);
         imageBuffer = Buffer.from(await imgRes.arrayBuffer());
       } else {
-        // Assume local path
-        const localPath = path.join(process.cwd(), "public", imageUrl.startsWith("/") ? imageUrl : `/${imageUrl}`);
-        console.log("[LinkedIn] Reading local image from:", localPath);
-        if (fs.existsSync(localPath)) {
-          imageBuffer = fs.readFileSync(localPath);
-        } else {
-          // Fallback to checking without 'public' just in case
-          const altPath = path.join(process.cwd(), imageUrl.startsWith("/") ? imageUrl : `/${imageUrl}`);
-          console.log("[LinkedIn] Local image not found in public, trying alt path:", altPath);
-          if (fs.existsSync(altPath)) {
-            imageBuffer = fs.readFileSync(altPath);
-          } else {
-            throw new Error(`Image file not found at ${localPath} or ${altPath}`);
-          }
-        }
+        throw new Error("No valid image data or URL provided for LinkedIn upload.");
       }
 
       console.log("[LinkedIn] Uploading binary data to LinkedIn... Size:", imageBuffer.length);

@@ -86,6 +86,7 @@ model Post {
   publishedAt    DateTime?
   linkedinPostId String?    // LinkedIn's post ID after publishing
   imageUrl       String?    // URL of attached image
+  imageData      String?    @db.Text // Base64 or raw image data for serverless compatibility
   views          Int        @default(0)
   likes          Int        @default(0)
   comments       Int        @default(0)

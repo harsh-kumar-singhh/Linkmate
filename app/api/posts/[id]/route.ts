@@ -49,7 +49,7 @@ export async function PUT(
             return NextResponse.json({ error: "Invalid post ID" }, { status: 400 });
         }
 
-        const { content, status, scheduledFor, imageUrl, writingStyle } = await req.json();
+        const { content, status, scheduledFor, imageUrl, imageData, writingStyle } = await req.json();
 
         // If status is being updated to PUBLISHED, try to publish to LinkedIn
         let finalLinkedinPostId = undefined;
@@ -63,7 +63,8 @@ export async function PUT(
             }
 
             try {
-                const result = await publishToLinkedIn(user.id, content, imageUrl);
+                // @ts-ignore - Ignore type desync for new imageData field
+                const result = await publishToLinkedIn(user.id, content, imageUrl, imageData);
                 finalLinkedinPostId = result.linkedinPostId;
             } catch (error) {
                 console.error("LinkedIn publishing failed:", error);
@@ -83,6 +84,7 @@ export async function PUT(
                 publishedAt: status === "PUBLISHED" ? new Date() : null,
                 linkedinPostId: finalLinkedinPostId,
                 imageUrl: imageUrl !== undefined ? imageUrl : undefined,
+                imageData: imageData !== undefined ? imageData : undefined,
                 writingStyle: writingStyle !== undefined ? writingStyle : undefined,
             } as any,
         });
