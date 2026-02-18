@@ -1,11 +1,20 @@
 import { NextResponse } from "next/server"
+import { auth } from "@/lib/auth"
+import { encryptState } from "@/lib/oauth-state"
 
 export async function GET() {
+  const session = await auth()
+  if (!session?.user?.id) {
+    console.error("[LinkedIn Connect] Unauthorized: No active session")
+    const baseUrl = process.env.NEXTAUTH_URL?.replace(/\/$/, "") || "https://www.linkmateapp.me"
+    return NextResponse.redirect(`${baseUrl}/login`)
+  }
+
   const clientId = process.env.LINKEDIN_CLIENT_ID
   const baseUrl = process.env.NEXTAUTH_URL?.replace(/\/$/, "") || "https://www.linkmateapp.me"
   const redirectUri = `${baseUrl}/api/linkedin/callback`
   const scope = "openid profile email w_member_social"
-  const state = Math.random().toString(36).substring(2, 15)
+  const state = encryptState(session.user.id)
 
   const authUrl = new URL("https://www.linkedin.com/oauth/v2/authorization")
   authUrl.searchParams.append("response_type", "code")

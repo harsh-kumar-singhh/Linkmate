@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { revalidatePath } from "next/cache"
-import { auth } from "@/lib/auth"
 import { getPrisma } from "@/lib/prisma"
+import { decryptState } from "@/lib/oauth-state"
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
@@ -12,20 +12,30 @@ export async function GET(request: Request) {
 
     console.log(`[LinkedIn Callback] Received params:`, { code: code ? "****" : null, state, error, errorDescription })
 
+    const baseUrl = process.env.NEXTAUTH_URL?.replace(/\/$/, "") || "https://www.linkmateapp.me"
+
     if (error || !code) {
         console.error(`[LinkedIn Callback] Error during callback: ${error} - ${errorDescription}`)
-        return NextResponse.redirect(new URL("/settings/linkedin?error=callback_failed", request.url))
+        return NextResponse.redirect(`${baseUrl}/settings/linkedin?error=callback_failed`)
     }
 
-    const session = await auth()
-    if (!session?.user?.id) {
-        console.error("[LinkedIn Callback] No active session found")
-        return NextResponse.redirect(new URL("/login", request.url))
+    if (!state) {
+        console.error("[LinkedIn Callback] No state parameter provided")
+        return NextResponse.redirect(`${baseUrl}/settings/linkedin?error=missing_state`)
+    }
+
+    let userId: string;
+    try {
+        const payload = decryptState(state)
+        userId = payload.userId
+        console.log(`[LinkedIn Callback] Decrypted userId: ${userId}`)
+    } catch (err: any) {
+        console.error("[LinkedIn Callback] State validation failed:", err.message)
+        return NextResponse.redirect(`${baseUrl}/settings/linkedin?error=invalid_state`)
     }
 
     const clientId = process.env.LINKEDIN_CLIENT_ID
     const clientSecret = process.env.LINKEDIN_CLIENT_SECRET
-    const baseUrl = process.env.NEXTAUTH_URL?.replace(/\/$/, "") || "https://www.linkmateapp.me"
     const redirectUri = `${baseUrl}/api/linkedin/callback`
 
     try {
@@ -76,7 +86,7 @@ export async function GET(request: Request) {
 
         // 3. Store in Database
         const prisma = getPrisma()
-        console.log(`[LinkedIn Callback] Updating user ${session.user.id} with LinkedIn connection...`)
+        console.log(`[LinkedIn Callback] Updating user ${userId} with LinkedIn connection...`)
 
         await prisma.$transaction([
             prisma.account.upsert({
@@ -91,9 +101,10 @@ export async function GET(request: Request) {
                     expires_at: expiresAt,
                     scope: tokenData.scope,
                     email: profileData.email,
+                    userId: userId, // Ensure it's linked to the correct user
                 },
                 create: {
-                    userId: session.user.id,
+                    userId: userId,
                     type: "oauth",
                     provider: "linkedin",
                     providerAccountId: linkedinMemberId,
@@ -104,7 +115,7 @@ export async function GET(request: Request) {
                 }
             }),
             prisma.user.update({
-                where: { id: session.user.id },
+                where: { id: userId },
                 data: { linkedinConnected: true }
             })
         ])
@@ -118,10 +129,10 @@ export async function GET(request: Request) {
         revalidatePath("/dashboard")
         revalidatePath("/api/user/me")
 
-        return NextResponse.redirect(new URL("/settings/linkedin?success=true", request.url))
+        return NextResponse.redirect(`${baseUrl}/settings/linkedin?success=true`)
 
     } catch (err: any) {
         console.error("[LinkedIn Callback] Unexpected error:", err)
-        return NextResponse.redirect(new URL(`/settings/linkedin?error=unexpected&message=${encodeURIComponent(err.message)}`, request.url))
+        return NextResponse.redirect(`${baseUrl}/settings/linkedin?error=unexpected&message=${encodeURIComponent(err.message)}`)
     }
 }
