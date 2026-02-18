@@ -25,7 +25,8 @@ export async function GET(request: Request) {
 
     const clientId = process.env.LINKEDIN_CLIENT_ID
     const clientSecret = process.env.LINKEDIN_CLIENT_SECRET
-    const redirectUri = "https://linkmate-bp2u.vercel.app/api/linkedin/callback"
+    const baseUrl = process.env.NEXTAUTH_URL?.replace(/\/$/, "") || "https://www.linkmateapp.me"
+    const redirectUri = `${baseUrl}/api/linkedin/callback`
 
     try {
         // 1. Exchange code for access token

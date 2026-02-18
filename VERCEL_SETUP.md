@@ -23,7 +23,7 @@ To enable authentication providers:
    - `LINKEDIN_CLIENT_ID` – your LinkedIn OAuth client ID.
    - `LINKEDIN_CLIENT_SECRET` – your LinkedIn OAuth client secret.
 2. Ensure these core variables are also set:
-   - `NEXTAUTH_URL` – your production URL (e.g., `https://your-project.vercel.app`).
+   - `NEXTAUTH_URL` – your production URL (e.g., `https://www.linkmateapp.me`).
    - `NEXTAUTH_SECRET` – a random 32-character string.
 3. Redeploy.
 

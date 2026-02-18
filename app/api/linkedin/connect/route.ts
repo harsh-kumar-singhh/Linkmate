@@ -2,7 +2,8 @@ import { NextResponse } from "next/server"
 
 export async function GET() {
   const clientId = process.env.LINKEDIN_CLIENT_ID
-  const redirectUri = "https://linkmate-bp2u.vercel.app/api/linkedin/callback"
+  const baseUrl = process.env.NEXTAUTH_URL?.replace(/\/$/, "") || "https://www.linkmateapp.me"
+  const redirectUri = `${baseUrl}/api/linkedin/callback`
   const scope = "openid profile email w_member_social"
   const state = Math.random().toString(36).substring(2, 15)
 
