@@ -8,6 +8,8 @@ import { motion, AnimatePresence } from "framer-motion"
 import { PLAN_LIMITS } from "@/lib/plan-limits"
 import { cn } from "@/lib/utils"
 
+const MotionDiv = motion.div as any
+
 function FAQItem({ question, answer }: { question: string, answer: string }) {
   const [isOpen, setIsOpen] = useState(false)
   return (
@@ -21,7 +23,7 @@ function FAQItem({ question, answer }: { question: string, answer: string }) {
       </button>
       <AnimatePresence>
         {isOpen && (
-          <motion.div
+          <MotionDiv
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
@@ -31,7 +33,7 @@ function FAQItem({ question, answer }: { question: string, answer: string }) {
             <p className="pb-6 text-muted-foreground leading-relaxed">
               {answer}
             </p>
-          </motion.div>
+          </MotionDiv>
         )}
       </AnimatePresence>
     </div>
@@ -41,7 +43,6 @@ function FAQItem({ question, answer }: { question: string, answer: string }) {
 export default function PricingPage() {
   const { data: session } = useSession()
   const userPlan = session?.user?.plan || "free"
-  const MotionDiv = motion.div as any
 
   const plans = [
     {
