@@ -9,6 +9,7 @@ import { PLAN_LIMITS } from "@/lib/plan-limits"
 export default function PricingPage() {
   const { data: session } = useSession()
   const userPlan = session?.user?.plan || "free"
+  const MotionDiv = motion.div as any
 
   const plans = [
     {
@@ -96,7 +97,7 @@ export default function PricingPage() {
       <script src="https://checkout.razorpay.com/v1/checkout.js" async />
       <div className="max-w-7xl mx-auto px-6 py-24 lg:py-32">
         <div className="text-center mb-20">
-          <motion.div
+          <MotionDiv
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
@@ -107,12 +108,12 @@ export default function PricingPage() {
             <p className="text-lg text-zinc-400 max-w-2xl mx-auto">
               Choose the plan that&apos;s right for you. Start for free and upgrade when you&apos;re ready to scale.
             </p>
-          </motion.div>
+          </MotionDiv>
         </div>
 
         <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
           {plans.map((plan, index) => (
-            <motion.div
+            <MotionDiv
               key={plan.name}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -176,7 +177,7 @@ export default function PricingPage() {
                   <ArrowRight className="w-4 h-4" />
                 </button>
               )}
-            </motion.div>
+            </MotionDiv>
           ))}
         </div>
 
