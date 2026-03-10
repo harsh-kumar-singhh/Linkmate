@@ -16,7 +16,15 @@ export async function PUT(req: Request) {
         const { writingStyles, name, theme, defaultTone } = await req.json();
 
         const data: any = {};
-        if (writingStyles !== undefined) data.writingStyles = writingStyles;
+        if (writingStyles !== undefined) {
+            // Enforce plan limits for writing styles
+            if (userRecord.plan === "free" && Array.isArray(writingStyles)) {
+                // Keep only the first style that has content, or just the first slot
+                data.writingStyles = writingStyles.slice(0, 1);
+            } else {
+                data.writingStyles = writingStyles;
+            }
+        }
         if (name !== undefined) data.name = name;
         if (theme !== undefined) data.theme = theme;
         if (defaultTone !== undefined) data.defaultTone = defaultTone;

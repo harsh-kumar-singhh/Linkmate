@@ -19,13 +19,16 @@ import {
     Shield,
     ChevronLeft,
     ChevronRight,
-    Languages
+    Languages,
+    Lock
 } from "lucide-react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
 
 interface SettingsFormProps {
     user: any;
+    plan?: string;
 }
 
 function Switch({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
@@ -51,7 +54,8 @@ function Switch({ checked, onChange, disabled }: { checked: boolean; onChange: (
     );
 }
 
-export function SettingsForm({ user }: SettingsFormProps) {
+export function SettingsForm({ user, plan = "free" }: SettingsFormProps) {
+    const isPro = plan === "pro";
     const [name, setName] = useState(user?.name || "");
 
     // Initialize writingStyles with 5 named slots
@@ -202,15 +206,41 @@ export function SettingsForm({ user }: SettingsFormProps) {
                                 variant="ghost"
                                 size="sm"
                                 disabled={currentStyleIndex === 4}
-                                onClick={() => setCurrentStyleIndex(prev => Math.min(4, prev + 1))}
+                                onClick={() => {
+                                    if (!isPro && currentStyleIndex === 0) {
+                                        if (confirm("Multiple writing styles are a Pro feature. Upgrade now to save different voices!")) {
+                                            router.push("/pricing");
+                                        }
+                                        return;
+                                    }
+                                    setCurrentStyleIndex(prev => Math.min(4, prev + 1));
+                                }}
                                 className="h-6 w-6 p-0"
                             >
-                                <ChevronRight className="w-4 h-4" />
+                                <ChevronRight className={cn("w-4 h-4", !isPro && currentStyleIndex === 0 && "text-muted-foreground/40")} />
                             </Button>
                         </div>
                     </div>
 
                     <div className="space-y-4">
+                        {!isPro && (
+                            <div className="bg-primary/5 border border-primary/10 rounded-2xl p-4 flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-primary/10 rounded-lg">
+                                        <Lock className="w-4 h-4 text-primary" />
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <div className="text-xs font-bold text-foreground">Pro Feature</div>
+                                        <div className="text-[11px] text-muted-foreground">You are limited to 1 writing style slot on the Free plan.</div>
+                                    </div>
+                                </div>
+                                <Link href="/pricing" className="shrink-0">
+                                    <Button variant="outline" size="sm" className="h-8 text-[10px] font-bold px-3 rounded-lg bg-background">
+                                        Unlock Pro
+                                    </Button>
+                                </Link>
+                            </div>
+                        )}
                         <p className="text-sm text-muted-foreground">
                             Save up to 5 different writing styles. Give each a name and paste a sample of that style.
                         </p>

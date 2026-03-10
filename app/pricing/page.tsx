@@ -1,10 +1,42 @@
 "use client"
 
 import { useSession } from "next-auth/react"
-import { Check, X, ShieldCheck, Zap, ArrowRight, Star } from "lucide-react"
+import { Check, X, ShieldCheck, Zap, ArrowRight, Star, HelpCircle, ChevronDown, Sparkles } from "lucide-react"
+import { useState } from "react"
 import Link from "next/link"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 import { PLAN_LIMITS } from "@/lib/plan-limits"
+import { cn } from "@/lib/utils"
+
+function FAQItem({ question, answer }: { question: string, answer: string }) {
+  const [isOpen, setIsOpen] = useState(false)
+  return (
+    <div className="border-b border-border transition-all">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full py-6 flex items-center justify-between text-left hover:text-primary transition-colors group"
+      >
+        <span className="text-lg font-semibold pr-8">{question}</span>
+        <ChevronDown className={cn("w-5 h-5 text-muted-foreground transition-transform duration-300", isOpen && "rotate-180")} />
+      </button>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="overflow-hidden"
+          >
+            <p className="pb-6 text-muted-foreground leading-relaxed">
+              {answer}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
 
 export default function PricingPage() {
   const { data: session } = useSession()
@@ -44,9 +76,32 @@ export default function PricingPage() {
         { text: "Priority support", included: true },
       ],
       cta: "Upgrade to Pro",
-      href: "/api/payments/razorpay/checkout", // This will be handled by a function later
+      href: "/api/payments/razorpay/checkout",
       featured: true,
     },
+  ]
+
+  const faqs = [
+    {
+      question: "What exactly is Autopilot Mode?",
+      answer: "Autopilot is our premium automation engine. Instead of manually creating posts, you define your strategy once, and our AI weekly generates, optimizes, and prepares your content queue. You just review and approve in one click."
+    },
+    {
+      question: "What happens when I reach my limit on the Free plan?",
+      answer: "When you hit a daily or monthly limit, you'll see a friendly prompt to upgrade. You can still access all your existing posts and data, but you'll need to wait for the limit to reset or upgrade to Pro for unlimited access."
+    },
+    {
+      question: "How do 'Writing Styles' work?",
+      answer: "Writing Styles (Write Like Me) allows you to train the AI on your specific voice. You can paste samples of your previous posts, and the AI will mimic your tone, structure, and vocabulary perfectly. Free users get 1 style, while Pro users can save unlimited custom personas."
+    },
+    {
+      question: "Can I cancel my subscription at any time?",
+      answer: "Yes, absolutely. There are no long-term contracts. You can cancel your subscription from your settings at any time, and you'll retain Pro access until the end of your current billing period."
+    },
+    {
+      question: "Is my LinkedIn account safe with Linkmate?",
+      answer: "Linkmate uses official LinkedIn API integrations. We never store your password, and we follow LinkedIn's rate limits and best practices to ensure your account remains in good standing."
+    }
   ]
 
   const handleUpgrade = async () => {
@@ -70,8 +125,6 @@ export default function PricingPage() {
         description: "Monthly subscription for Linkmate Pro",
         order_id: data.orderId,
         handler: async function (response: any) {
-          // In a real app, you'd verify the payment on the server here
-          // But our webhook will also handle it asynchronously
           alert("Payment successful! Your account will be upgraded shortly.")
           window.location.href = "/dashboard"
         },
@@ -93,39 +146,42 @@ export default function PricingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white selection:bg-blue-500/30">
+    <div className="min-h-screen bg-background text-foreground selection:bg-primary/20 transition-colors duration-300">
       <script src="https://checkout.razorpay.com/v1/checkout.js" async />
       <div className="max-w-7xl mx-auto px-6 py-24 lg:py-32">
+        {/* Header */}
         <div className="text-center mb-20">
           <MotionDiv
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <h1 className="text-5xl lg:text-7xl font-bold tracking-tight bg-gradient-to-b from-white to-white/40 bg-clip-text text-transparent mb-6">
+            <h1 className="text-5xl lg:text-7xl font-bold tracking-tight mb-6 bg-gradient-to-b from-foreground to-foreground/50 bg-clip-text text-transparent">
               Simple, transparent pricing
             </h1>
-            <p className="text-lg text-zinc-400 max-w-2xl mx-auto">
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               Choose the plan that&apos;s right for you. Start for free and upgrade when you&apos;re ready to scale.
             </p>
           </MotionDiv>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+        {/* Pricing Cards */}
+        <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto mb-32">
           {plans.map((plan, index) => (
             <MotionDiv
               key={plan.name}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
-              className={`relative rounded-3xl p-8 lg:p-10 border transition-all duration-300 ${
+              className={cn(
+                "relative rounded-3xl p-8 lg:p-10 border transition-all duration-300",
                 plan.featured
-                  ? "bg-gradient-to-b from-blue-600/10 to-transparent border-blue-500/50 shadow-[0_0_50px_-12px_rgba(59,130,246,0.25)]"
-                  : "bg-zinc-900/50 border-zinc-800 hover:border-zinc-700"
-              }`}
+                  ? "bg-primary/[0.03] border-primary/50 shadow-2xl shadow-primary/10"
+                  : "bg-card border-border hover:border-primary/30"
+              )}
             >
               {plan.featured && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-blue-500 text-white text-xs font-bold rounded-full flex items-center gap-1 uppercase tracking-wider">
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-primary text-primary-foreground text-xs font-bold rounded-full flex items-center gap-1 uppercase tracking-wider shadow-lg">
                   <Star className="w-3 h-3 fill-current" />
                   Most Popular
                 </div>
@@ -135,22 +191,28 @@ export default function PricingPage() {
                 <h3 className="text-xl font-semibold mb-2">{plan.name}</h3>
                 <div className="flex items-baseline gap-1 mb-4">
                   <span className="text-4xl lg:text-5xl font-bold">{plan.price}</span>
-                  {plan.period && <span className="text-zinc-400">{plan.period}</span>}
+                  {plan.period && <span className="text-muted-foreground">{plan.period}</span>}
                 </div>
-                <p className="text-zinc-400 text-sm leading-relaxed">{plan.description}</p>
+                <p className="text-muted-foreground text-sm leading-relaxed">{plan.description}</p>
               </div>
 
               <div className="space-y-4 mb-10">
                 {plan.features.map((feature) => (
                   <div key={feature.text} className="flex items-start gap-3">
-                    <div className={`mt-0.5 rounded-full p-0.5 ${feature.included ? "bg-blue-500/20 text-blue-400" : "bg-zinc-800 text-zinc-600"}`}>
+                    <div className={cn(
+                      "mt-0.5 rounded-full p-0.5",
+                      feature.included ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+                    )}>
                       {feature.included ? (
                         <Check className="w-3.5 h-3.5" />
                       ) : (
                         <X className="w-3.5 h-3.5" />
                       )}
                     </div>
-                    <span className={`text-sm ${feature.included ? "text-zinc-200" : "text-zinc-500"}`}>
+                    <span className={cn(
+                      "text-sm font-medium",
+                      feature.included ? "text-foreground/90" : "text-muted-foreground/60"
+                    )}>
                       {feature.text}
                     </span>
                   </div>
@@ -160,18 +222,19 @@ export default function PricingPage() {
               {userPlan === plan.id ? (
                 <button
                   disabled
-                  className="w-full py-4 rounded-xl font-semibold bg-zinc-800 text-zinc-400 cursor-not-allowed flex items-center justify-center gap-2"
+                  className="w-full py-4 rounded-xl font-semibold bg-muted text-muted-foreground cursor-not-allowed flex items-center justify-center gap-2 border border-border"
                 >
                   Current Plan
                 </button>
               ) : (
                 <button
                   onClick={plan.id === "pro" ? handleUpgrade : undefined}
-                  className={`w-full py-4 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${
+                  className={cn(
+                    "w-full py-4 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2",
                     plan.featured
-                      ? "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/20"
-                      : "bg-white hover:bg-zinc-100 text-black"
-                  }`}
+                      ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20"
+                      : "bg-foreground text-background hover:opacity-90"
+                  )}
                 >
                   {plan.cta}
                   <ArrowRight className="w-4 h-4" />
@@ -181,11 +244,27 @@ export default function PricingPage() {
           ))}
         </div>
 
-        <div className="mt-24 text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400 text-sm">
-                <ShieldCheck className="w-4 h-4 text-blue-500" />
-                Secure payments via Razorpay
+        {/* Feature Highlights / FAQ Section */}
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Frequently Asked Questions</h2>
+            <p className="text-muted-foreground">Everything you need to know about Linkmate and our Pro features.</p>
+          </div>
+
+          <div className="bg-card border border-border rounded-[32px] p-8 md:p-12">
+            <div className="divide-y divide-border">
+              {faqs.map((faq, i) => (
+                <FAQItem key={i} question={faq.question} answer={faq.answer} />
+              ))}
             </div>
+          </div>
+        </div>
+
+        <div className="mt-24 text-center">
+          <div className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-card border border-border text-muted-foreground text-sm font-medium shadow-sm">
+            <ShieldCheck className="w-4 h-4 text-primary" />
+            Secure payments via Razorpay • SSL Encrypted
+          </div>
         </div>
       </div>
     </div>
