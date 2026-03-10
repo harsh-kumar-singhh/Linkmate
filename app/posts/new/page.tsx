@@ -35,6 +35,7 @@ function EditorContent() {
     const { status, data: session } = useSession()
     const searchParams = useSearchParams()
     const router = useRouter()
+    const userPlan = session?.user?.plan || "free"
 
     // State
     const [mode, setMode] = useState<"ai" | "manual">("ai")
@@ -171,9 +172,15 @@ function EditorContent() {
                 setContent(data.content)
                 setMode("manual")
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Generation failed", error)
-            alert(error instanceof Error ? error.message : "Failed to generate post.")
+            if (error.message.includes("limit") || error.message.includes("quota")) {
+                if (confirm(`You've reached your daily AI post limit for the Free plan. Upgrade to Pro for unlimited AI generation!`)) {
+                    router.push("/pricing");
+                }
+            } else {
+                alert(error instanceof Error ? error.message : "Failed to generate post.");
+            }
         } finally {
             clearInterval(phaseInterval);
             setIsGenerating(false)
@@ -260,9 +267,15 @@ function EditorContent() {
             } else {
                 router.push("/dashboard")
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error saving post:", error);
-            alert(error instanceof Error ? error.message : "Failed to save post");
+            if (error.message.includes("limit") || error.message.includes("quota")) {
+                if (confirm(`You've reached the ${statusArg === "SCHEDULED" ? "monthly scheduling" : "AI usage"} limit for the Free plan. Upgrade to Pro for unlimited access!`)) {
+                    router.push("/pricing");
+                }
+            } else {
+                alert(error instanceof Error ? error.message : "Failed to save post");
+            }
         } finally {
             setIsSaving(false)
         }
@@ -382,6 +395,7 @@ function EditorContent() {
                                             value={style}
                                             onChange={setStyle}
                                             styles={availableStyles}
+                                            plan={userPlan}
                                         />
 
                                         <div className="space-y-2">

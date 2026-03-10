@@ -3,11 +3,13 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react"
+import { useSession } from "next-auth/react"
 import { AnimatedCard } from "@/components/animated/AnimatedCard"
-import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon } from "lucide-react"
+import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Lock, Sparkles, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate()
 const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay()
@@ -15,9 +17,14 @@ const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
 export default function CalendarPage() {
+    const { data: session } = useSession()
+    const router = useRouter()
+    const userPlan = session?.user?.plan || "free"
+    
     const [viewDate, setViewDate] = useState(new Date())
     const [posts, setPosts] = useState<any[]>([])
     const [isLoading, setIsLoading] = useState(true)
+    const [schedulingMode, setSchedulingMode] = useState<"manual" | "autopilot">("manual")
 
     const currentYear = viewDate.getFullYear()
     const currentMonth = viewDate.getMonth()
@@ -59,6 +66,37 @@ export default function CalendarPage() {
                 <div className="space-y-1">
                     <h1 className="text-[10px] font-bold tracking-[0.2em] text-muted-foreground uppercase">Schedule</h1>
                     <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Content Pipeline</h2>
+                </div>
+
+                {/* Scheduling Mode Toggle */}
+                <div className="flex bg-secondary/40 p-1 rounded-xl items-center font-medium self-center md:self-end">
+                    <button
+                        onClick={() => setSchedulingMode("manual")}
+                        className={cn(
+                            "py-1.5 px-4 rounded-lg text-xs transition-all flex items-center gap-2",
+                            schedulingMode === "manual" ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"
+                        )}
+                    >
+                        Manual
+                    </button>
+                    <button
+                        onClick={() => {
+                            if (userPlan === "free") {
+                                if (confirm("Autopilot Mode is a Pro feature. Would you like to upgrade to automate your LinkedIn presence?")) {
+                                    router.push("/pricing")
+                                }
+                            } else {
+                                setSchedulingMode("autopilot")
+                            }
+                        }}
+                        className={cn(
+                            "py-1.5 px-4 rounded-lg text-xs transition-all flex items-center gap-2",
+                            schedulingMode === "autopilot" ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"
+                        )}
+                    >
+                        Autopilot
+                        {userPlan === "free" && <Lock className="w-3 h-3" />}
+                    </button>
                 </div>
 
                 <div className="flex items-center justify-between md:justify-end gap-4 md:gap-8">

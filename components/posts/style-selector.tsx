@@ -3,22 +3,39 @@
 import { ChevronLeft, ChevronRight, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { useRouter } from "next/navigation"
+import { Lock } from "lucide-react"
 
 interface StyleSelectorProps {
     value: string;
     onChange: (style: string) => void;
     styles: string[];
+    plan?: string;
 }
 
-export function StyleSelector({ value, onChange, styles }: StyleSelectorProps) {
+export function StyleSelector({ value, onChange, styles, plan = "free" }: StyleSelectorProps) {
+    const router = useRouter();
+    const isPro = plan === "pro";
     const currentIndex = styles.indexOf(value);
 
     const handlePrevious = () => {
+        if (!isPro && currentIndex === 0) {
+            if (confirm("Multiple writing styles are a Pro feature. Upgrade now to unlock more tones!")) {
+                router.push("/pricing");
+            }
+            return;
+        }
         const newIndex = currentIndex > 0 ? currentIndex - 1 : styles.length - 1;
         onChange(styles[newIndex]);
     };
 
     const handleNext = () => {
+        if (!isPro && currentIndex === 0) {
+            if (confirm("Multiple writing styles are a Pro feature. Upgrade now to unlock more tones!")) {
+                router.push("/pricing");
+            }
+            return;
+        }
         const newIndex = currentIndex < styles.length - 1 ? currentIndex + 1 : 0;
         onChange(styles[newIndex]);
     };
@@ -42,8 +59,9 @@ export function StyleSelector({ value, onChange, styles }: StyleSelectorProps) {
 
                 <div className="flex-1 min-w-0 md:w-auto md:flex-none md:min-w-[240px] min-h-[3.5rem] relative overflow-hidden bg-background border border-border/80 rounded-xl flex items-center justify-center group pl-4 pr-10 py-1 shrink-0 transition-all">
                     <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <span lang="en" className="font-semibold text-sm transition-all duration-300 transform whitespace-normal w-full text-center leading-tight break-words hyphens-auto">
+                    <span lang="en" className="font-semibold text-sm transition-all duration-300 transform whitespace-normal w-full text-center leading-tight break-words hyphens-auto flex items-center justify-center gap-2">
                         {value}
+                        {!isPro && currentIndex > 0 && <Lock className="w-3.5 h-3.5 text-muted-foreground" />}
                     </span>
                     {value.startsWith("Write Like Me") && (
                         <SparklesIcon className="w-4 h-4 text-primary absolute top-2 right-2" />
