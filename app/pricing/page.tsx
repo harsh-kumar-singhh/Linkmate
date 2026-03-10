@@ -105,7 +105,7 @@ export default function PricingPage() {
               Simple, transparent pricing
             </h1>
             <p className="text-lg text-zinc-400 max-w-2xl mx-auto">
-              Choose the plan that's right for you. Start for free and upgrade when you're ready to scale.
+              Choose the plan that&apos;s right for you. Start for free and upgrade when you&apos;re ready to scale.
             </p>
           </motion.div>
         </div>
