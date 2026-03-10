@@ -32,7 +32,8 @@ export async function POST(req: Request) {
 
         // --- ENFORCE DAILY QUOTA (COACH) ---
         // Short-circuit: Check quota BEFORE calling AI or doing heavy DB work
-        const quota = await checkAndIncrementAIQuota(userId, AIUsageType.AI_CONTENT_COACH);
+        const plan = session?.user?.plan || "free";
+        const quota = await checkAndIncrementAIQuota(userId, AIUsageType.AI_CONTENT_COACH, plan);
         if (!quota.allowed) {
             return NextResponse.json(
                 {

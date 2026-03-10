@@ -21,6 +21,7 @@ model User {
   defaultTone   String    @default("Professional") // Stores preferred tone (Professional, Casual, etc.)
   linkedinConnected Boolean @default(false)
   theme         String?   @default("system")
+  plan          String    @default("free") // 'free' or 'pro'
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

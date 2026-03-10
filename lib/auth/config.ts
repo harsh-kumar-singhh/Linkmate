@@ -56,14 +56,25 @@ export const authConfig: NextAuthConfig = {
       return true
     },
 
-    async jwt({ token, user }) {
-      if (user?.id) token.id = user.id
+    async jwt({ token, user, trigger, session }) {
+      if (user?.id) {
+        token.id = user.id
+        // @ts-ignore - plan exists on User model
+        token.plan = user.plan
+      }
+      
+      // Handle session updates (e.g., after upgrading to Pro)
+      if (trigger === "update" && session?.plan) {
+        token.plan = session.plan
+      }
+      
       return token
     },
 
     async session({ session, token }) {
-      if (session.user && token.id) {
-        session.user.id = token.id as string
+      if (session.user) {
+        if (token.id) session.user.id = token.id as string
+        if (token.plan) session.user.plan = token.plan as string
       }
       return session
     },

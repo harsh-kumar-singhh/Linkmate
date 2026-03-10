@@ -1,5 +1,6 @@
 import { getPrisma } from "./prisma";
 import { AIUsageType } from "@prisma/client";
+import { PLAN_LIMITS } from "./plan-limits";
 
 /**
  * Normalizes a date to the start of the UTC day (00:00:00.000Z)
@@ -19,13 +20,20 @@ const DAILY_QUOTA = 3;
  * Checks if a user has exceeded their daily AI usage quota and increments it if they haven't.
  * @param userId The ID of the authenticated user
  * @param type The type of AI usage to check (Post Generation vs Coach)
+ * @param plan The user's current plan
  * @returns Object indicating if the request is allowed and the current count
  */
-export async function checkAndIncrementAIQuota(userId: string, type: AIUsageType): Promise<{
+export async function checkAndIncrementAIQuota(
+  userId: string, 
+  type: AIUsageType,
+  plan: string = "free"
+): Promise<{
   allowed: boolean;
   currentCount: number;
   limit: number;
 }> {
+  const userPlan = (plan === "pro" ? "pro" : "free") as keyof typeof PLAN_LIMITS;
+  const limit = PLAN_LIMITS[userPlan].aiPostsPerDay;
   const prisma = getPrisma();
   const today = getUTCStartOfDay();
 
@@ -38,7 +46,7 @@ export async function checkAndIncrementAIQuota(userId: string, type: AIUsageType
 
     if (!user) {
       console.warn(`[QUOTA] Attempted to check quota for non-existent user: ${userId}`);
-      return { allowed: false, currentCount: -1, limit: DAILY_QUOTA };
+      return { allowed: false, currentCount: -1, limit };
     }
 
     // We use a transaction to ensure atomic increment for correctness
@@ -61,7 +69,7 @@ export async function checkAndIncrementAIQuota(userId: string, type: AIUsageType
         update: {}, // No updates needed if it exists, we just want to fetch/create
       });
 
-      if (usage.count >= DAILY_QUOTA) {
+      if (usage.count >= limit) {
         return { allowed: false, currentCount: usage.count };
       }
 
@@ -77,11 +85,11 @@ export async function checkAndIncrementAIQuota(userId: string, type: AIUsageType
       return { allowed: true, currentCount: updatedUsage.count };
     });
 
-    return { ...result, limit: DAILY_QUOTA };
+    return { ...result, limit };
 
   } catch (error) {
     console.error(`[QUOTA] Error checking AI quota for ${type}:`, error);
     // Fail safe to protect costs
-    return { allowed: false, currentCount: -1, limit: DAILY_QUOTA };
+    return { allowed: false, currentCount: -1, limit };
   }
 }
