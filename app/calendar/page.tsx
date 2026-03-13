@@ -3,16 +3,9 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react"
-import { useSession } from "next-auth/react"
-import { AnimatedCard } from "@/components/animated/AnimatedCard"
-import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Lock, Sparkles, Zap, Edit2, Pause, Play, CheckCircle2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { UpgradeModal } from "@/components/calendar/UpgradeModal"
 import { AutopilotSetupWizard } from "@/components/calendar/AutopilotSetupWizard"
 import { toggleAutopilot } from "@/lib/actions/autopilot"
+import { useUser } from "@/context/UserContext"
 
 const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate()
 const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay()
@@ -20,26 +13,18 @@ const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
 export default function CalendarPage() {
-    const { data: session } = useSession()
+    const { user, isPro, refreshUser } = useUser()
     const router = useRouter()
-    const userPlan = session?.user?.plan || "free"
     
     const [viewDate, setViewDate] = useState(new Date())
     const [posts, setPosts] = useState<any[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [schedulingMode, setSchedulingMode] = useState<"manual" | "autopilot">("manual")
     
-    // Autopilot State
+    // UI State
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false)
     const [isSetupWizardOpen, setIsSetupWizardOpen] = useState(false)
     const [isToggling, setIsToggling] = useState(false)
-    const [autopilotData, setAutopilotData] = useState<{
-        enabled: boolean;
-        topics: string[];
-        frequency: string;
-        days: string[];
-        time: string;
-    } | null>(null)
 
     const currentYear = viewDate.getFullYear()
     const currentMonth = viewDate.getMonth()
@@ -55,8 +40,10 @@ export default function CalendarPage() {
 
     useEffect(() => {
         fetchPosts()
-        fetchAutopilotSettings()
-    }, [])
+        if (user?.autopilotEnabled) {
+            setSchedulingMode("autopilot")
+        }
+    }, [user])
 
     const fetchPosts = async () => {
         try {
@@ -72,35 +59,12 @@ export default function CalendarPage() {
         }
     }
 
-    const fetchAutopilotSettings = async () => {
-        try {
-            const response = await fetch("/api/user/me")
-            if (response.ok) {
-                const data = await response.json()
-                if (data.user) {
-                    setAutopilotData({
-                        enabled: data.user.autopilotEnabled,
-                        topics: data.user.autopilotTopics,
-                        frequency: data.user.autopilotFrequency,
-                        days: data.user.autopilotDays,
-                        time: data.user.autopilotTime
-                    })
-                    if (data.user.autopilotEnabled) {
-                        setSchedulingMode("autopilot")
-                    }
-                }
-            }
-        } catch (error) {
-            console.error("Error fetching autopilot settings:", error)
-        }
-    }
-
     const handleToggleAutopilot = async () => {
-        if (!autopilotData) return;
+        if (!user) return;
         setIsToggling(true);
         try {
-            await toggleAutopilot(!autopilotData.enabled);
-            setAutopilotData(prev => prev ? { ...prev, enabled: !prev.enabled } : null);
+            await toggleAutopilot(!user.autopilotEnabled);
+            await refreshUser();
         } catch (error) {
             alert("Failed to toggle autopilot");
         } finally {
@@ -133,11 +97,10 @@ export default function CalendarPage() {
                     </button>
                     <button
                         onClick={() => {
-                            const isFree = userPlan?.toUpperCase() !== "PRO";
-                            if (isFree) {
+                            if (!isPro) {
                                 setIsUpgradeModalOpen(true)
                             } else {
-                                if (!autopilotData?.topics || autopilotData.topics.length === 0) {
+                                if (!user?.autopilotTopics || user.autopilotTopics.length === 0) {
                                     setIsSetupWizardOpen(true)
                                 } else {
                                     setSchedulingMode("autopilot")
@@ -150,7 +113,7 @@ export default function CalendarPage() {
                         )}
                     >
                         Autopilot
-                        {userPlan?.toUpperCase() !== "PRO" && <Lock className="w-3 h-3" />}
+                        {!isPro && <Lock className="w-3 h-3" />}
                     </button>
                 </div>
 
@@ -176,14 +139,14 @@ export default function CalendarPage() {
             </div>
 
             {/* Autopilot Status Bar (Pro only) */}
-            {userPlan?.toUpperCase() === "PRO" && schedulingMode === "autopilot" && autopilotData?.topics && autopilotData.topics.length > 0 && (
+            {isPro && schedulingMode === "autopilot" && user?.autopilotTopics && user.autopilotTopics.length > 0 && (
                 <div className="mx-2 md:mx-0 bg-blue-600/5 border border-blue-600/20 rounded-[24px] p-6 flex flex-col md:flex-row items-center justify-between gap-6 transition-all duration-500">
                     <div className="flex items-center gap-4">
                         <div className={cn(
                             "p-3 rounded-2xl",
-                            autopilotData.enabled ? "bg-emerald-500/10" : "bg-amber-500/10"
+                            user.autopilotEnabled ? "bg-emerald-500/10" : "bg-amber-500/10"
                         )}>
-                            {autopilotData.enabled ? (
+                            {user.autopilotEnabled ? (
                                 <Zap className="w-6 h-6 text-emerald-600" />
                             ) : (
                                 <Pause className="w-6 h-6 text-amber-600" />
@@ -191,16 +154,16 @@ export default function CalendarPage() {
                         </div>
                         <div className="space-y-1">
                             <div className="flex items-center gap-2">
-                                <h3 className="font-bold text-lg">Autopilot is {autopilotData.enabled ? "Active" : "Paused"}</h3>
-                                {autopilotData.enabled && (
+                                <h3 className="font-bold text-lg">Autopilot is {user.autopilotEnabled ? "Active" : "Paused"}</h3>
+                                {user.autopilotEnabled && (
                                     <div className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 text-[10px] font-bold rounded-full flex items-center gap-1 uppercase tracking-wider">
                                         <CheckCircle2 className="w-3 h-3" />
                                         Optimal
                                     </div>
                                 )}
                             </div>
-                            <p className="text-sm text-muted-foreground">
-                                {autopilotData.frequency} posts/week • {autopilotData.days.length} days active • Posting at {autopilotData.time}
+                             <p className="text-sm text-muted-foreground">
+                                {user.autopilotFrequency} posts/week • {user.autopilotDays.length} days active • Posting at {user.autopilotTime}
                             </p>
                         </div>
                     </div>
@@ -216,16 +179,16 @@ export default function CalendarPage() {
                             Edit Settings
                         </Button>
                         <Button 
-                            variant={autopilotData.enabled ? "outline" : "primary"}
+                            variant={user.autopilotEnabled ? "outline" : "primary"}
                             size="sm" 
                             className={cn(
                                 "flex-1 md:flex-none h-11 rounded-xl gap-2 font-bold px-5",
-                                autopilotData.enabled ? "border-amber-500/30 text-amber-600 hover:bg-amber-500/5" : "bg-emerald-600 hover:bg-emerald-500 text-white"
+                                user.autopilotEnabled ? "border-amber-500/30 text-amber-600 hover:bg-amber-500/5" : "bg-emerald-600 hover:bg-emerald-500 text-white"
                             )}
-                            onClick={handleToggleAutopilot}
+                             onClick={handleToggleAutopilot}
                             disabled={isToggling}
                         >
-                            {autopilotData.enabled ? (
+                            {user.autopilotEnabled ? (
                                 <>
                                     <Pause className="w-4 h-4" />
                                     Pause

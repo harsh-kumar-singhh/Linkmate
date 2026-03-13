@@ -2,7 +2,6 @@
 
 export const dynamic = "force-dynamic";
 
-import { useSession } from "next-auth/react"
 import { useEffect, useState, useRef, Suspense } from "react"
 import Image from "next/image"
 import { AnimatedCard } from "@/components/animated/AnimatedCard"
@@ -31,12 +30,13 @@ import { cn } from "@/lib/utils"
 import { LinkedInPreview } from "@/components/posts/LinkedInPreview"
 import { AICoach } from "@/components/ai/AICoach"
 import { StyleSelector } from "@/components/posts/style-selector"
+import { useUser } from "@/context/UserContext"
 
 function EditorContent() {
-    const { status, data: session } = useSession()
+    const { user, isPro, isLoading } = useUser()
     const searchParams = useSearchParams()
     const router = useRouter()
-    const userPlan = session?.user?.plan || "free"
+    const userPlan = user?.plan || "free"
 
     // State
     const [mode, setMode] = useState<"ai" | "manual">("ai")
@@ -63,48 +63,34 @@ function EditorContent() {
 
     // Auth redirection
     useEffect(() => {
-        if (status === "unauthenticated") {
+        if (!isLoading && !user) {
             router.push("/login")
         }
-    }, [status, router])
+    }, [isLoading, user, router])
 
     // Load User Settings (Tone & Write Like Me Styles)
     useEffect(() => {
-        const fetchSettings = async () => {
-            if (status === 'authenticated') {
-                try {
-                    const res = await fetch("/api/user/me");
-                    if (res.ok) {
-                        const data = await res.json();
+        if (user) {
+            // 1. Set Default Tone
+            if (user.defaultTone) {
+                setStyle(user.defaultTone);
+            }
 
-                        // 1. Set Default Tone
-                        if (data.user?.defaultTone) {
-                            setStyle(data.user.defaultTone);
-                        }
+            // 2. Populate Write Like Me Styles
+            if (user.writingStyles && Array.isArray(user.writingStyles)) {
+                const namedStyles = user.writingStyles
+                    .filter((s: any) => s.name && s.name.trim() && s.sample && s.sample.trim())
+                    .map((s: any) => `Write Like Me - ${s.name.trim()}`);
 
-                        // 2. Populate Write Like Me Styles
-                        if (data.user?.writingStyles && Array.isArray(data.user.writingStyles)) {
-                            const namedStyles = data.user.writingStyles
-                                .filter((s: any) => s.name && s.name.trim() && s.sample && s.sample.trim())
-                                .map((s: any) => `Write Like Me - ${s.name.trim()}`);
-
-                            setAvailableStyles(["Professional", "Casual", "Enthusiastic", "Storytelling", ...namedStyles]);
-                        }
-                    }
-                } catch (e) {
-                    console.error("Failed to fetch user settings", e);
-                }
+                setAvailableStyles(["Professional", "Casual", "Enthusiastic", "Storytelling", ...namedStyles]);
             }
         }
-        if (!postId) {
-            fetchSettings();
-        }
-    }, [status, postId]);
+    }, [user]);
 
     // Fetch existing post
     useEffect(() => {
         const fetchPost = async () => {
-            if (!postId || status !== "authenticated") return
+            if (!postId || !user) return
             setIsInitialLoading(true)
             try {
                 const response = await fetch(`/api/posts/${postId}`)
@@ -139,11 +125,11 @@ function EditorContent() {
             const localYMDHM = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
             setScheduledFor(localYMDHM);
         }
-    }, [searchParams, postId, status])
+    }, [searchParams, postId, user])
 
     // Handlers
     const handleGenerate = async () => {
-        if (status !== "authenticated" || !topic) return
+        if (!user || !topic) return
 
         setIsGenerating(true)
         setLoadingPhase("Brainstorming ideas...")
@@ -231,7 +217,7 @@ function EditorContent() {
     }
 
     const handleSavePost = async (statusArg: "DRAFT" | "SCHEDULED" | "PUBLISHED") => {
-        if (!content.trim() || status !== "authenticated") return
+        if (!content.trim() || !user) return
 
         setIsSaving(true)
         try {
@@ -307,7 +293,7 @@ function EditorContent() {
         }
     }
 
-    if (status === "loading" || isInitialLoading) {
+    if (isLoading || isInitialLoading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
                 <div className="w-12 h-12 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -396,7 +382,6 @@ function EditorContent() {
                                             value={style}
                                             onChange={setStyle}
                                             styles={availableStyles}
-                                            plan={userPlan}
                                         />
 
                                         <div className="space-y-2">

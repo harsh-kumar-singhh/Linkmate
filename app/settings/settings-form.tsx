@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import TextareaAutosize from "react-textarea-autosize";
 import { Button } from "@/components/ui/button";
@@ -27,10 +27,10 @@ import { signOut } from "next-auth/react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
+import { useUser } from "@/context/UserContext";
 
 interface SettingsFormProps {
-    user: any;
-    plan?: string;
+    user: any; // Initial user data from server
 }
 
 function Switch({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
@@ -56,22 +56,29 @@ function Switch({ checked, onChange, disabled }: { checked: boolean; onChange: (
     );
 }
 
-export function SettingsForm({ user, plan = "free" }: SettingsFormProps) {
-    const isPro = plan?.toUpperCase() === "PRO";
-    const [name, setName] = useState(user?.name || "");
+export function SettingsForm({ user: initialUser }: SettingsFormProps) {
+    const { user, isPro, refreshUser } = useUser();
+    const [name, setName] = useState(initialUser?.name || "");
 
-    // Initialize writingStyles based on plan
-    const initialStyles = user?.writingStyles && Array.isArray(user.writingStyles) && user.writingStyles.length > 0
-        ? user.writingStyles
-        : [{ name: "", sample: "" }];
+    // Use context user if available, otherwise fallback to initialUser
+    const activeUser = user || initialUser;
 
-    // If free, limit to only 1 slot even if data has more (from previous pro state)
-    const [writingStyles, setWritingStyles] = useState<Array<{ name: string; sample: string }>>(
-        isPro ? initialStyles : [initialStyles[0]]
-    );
+    // Initialize writingStyles based on activeUser
+    const [writingStyles, setWritingStyles] = useState<Array<{ name: string; sample: string }>>([]);
     const [currentStyleIndex, setCurrentStyleIndex] = useState(0);
 
-    const [tone, setTone] = useState(user?.defaultTone || "Professional");
+    useEffect(() => {
+        if (activeUser?.writingStyles) {
+            const styles = Array.isArray(activeUser.writingStyles) && activeUser.writingStyles.length > 0
+                ? activeUser.writingStyles
+                : [{ name: "", sample: "" }];
+            
+            // If free, strictly limit to 1
+            setWritingStyles(isPro ? styles : [styles[0]]);
+        }
+    }, [activeUser, isPro]);
+
+    const [tone, setTone] = useState(activeUser?.defaultTone || "Professional");
     const [autoHashtags, setAutoHashtags] = useState(true);
     const [smartScheduling, setSmartScheduling] = useState(true);
     const [notifications, setNotifications] = useState({
@@ -103,7 +110,7 @@ export function SettingsForm({ user, plan = "free" }: SettingsFormProps) {
             if (response.ok) {
                 setIsSaved(true);
                 setTimeout(() => setIsSaved(false), 2000);
-                router.refresh();
+                await refreshUser();
             }
         } catch (error) {
             console.error("Failed to save", error);
@@ -151,7 +158,7 @@ export function SettingsForm({ user, plan = "free" }: SettingsFormProps) {
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Email Address</label>
                             <Input
-                                value={user?.email || ""}
+                                value={activeUser?.email || ""}
                                 readOnly
                                 disabled
                                 className="h-12 rounded-xl bg-secondary/30 text-muted-foreground border-border/40 cursor-not-allowed"
@@ -237,11 +244,17 @@ export function SettingsForm({ user, plan = "free" }: SettingsFormProps) {
                             </div>
                         )}
 
+                        <p className="text-sm text-muted-foreground">
+                            {isPro 
+                                ? "Pro Member: Save unlimited writing styles. New slots are created as you need them."
+                                : "Free Plan: You are limited to 1 writing style slot."}
+                        </p>
+
                         <div className="space-y-3">
                             <div className="space-y-2">
                                 <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Style Name</label>
                                 <Input
-                                    value={writingStyles[currentStyleIndex].name}
+                                    value={writingStyles[currentStyleIndex]?.name || ""}
                                     onChange={(e) => updateWritingStyle(currentStyleIndex, 'name', e.target.value)}
                                     placeholder={`e.g., "Personal", "Bold", "Thoughtful"`}
                                     className="h-12 rounded-xl border-border/80"
@@ -252,13 +265,13 @@ export function SettingsForm({ user, plan = "free" }: SettingsFormProps) {
                                 <div className="flex justify-between items-center">
                                     <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Writing Sample</label>
                                     <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-0.5 rounded">
-                                        {writingStyles[currentStyleIndex].sample?.length || 0} chars
+                                        {writingStyles[currentStyleIndex]?.sample?.length || 0} chars
                                     </span>
                                 </div>
                                 <div className="relative group">
                                     <TextareaAutosize
                                         minRows={8}
-                                        value={writingStyles[currentStyleIndex].sample}
+                                        value={writingStyles[currentStyleIndex]?.sample || ""}
                                         onChange={(e) => updateWritingStyle(currentStyleIndex, 'sample', e.target.value)}
                                         placeholder={`Paste a sample of your writing for this style...`}
                                         className="w-full resize-none text-base p-6 rounded-2xl bg-secondary/20 border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all text-foreground"

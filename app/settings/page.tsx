@@ -171,7 +171,7 @@ export default async function SettingsPage() {
                 </div>
 
                 {/* Main Settings Form */}
-                <SettingsForm user={user} plan={userPlan} />
+                <SettingsForm user={user} />
             </div>
         </div>
     );

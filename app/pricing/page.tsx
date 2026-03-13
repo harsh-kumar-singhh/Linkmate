@@ -1,12 +1,13 @@
 "use client"
 
-import { useSession } from "next-auth/react"
 import { Check, X, ShieldCheck, Zap, ArrowRight, Star, HelpCircle, ChevronDown, Sparkles } from "lucide-react"
 import { useState } from "react"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import { PLAN_LIMITS } from "@/lib/plan-limits"
 import { cn } from "@/lib/utils"
+
+import { useUser } from "@/context/UserContext"
 
 const MotionDiv = motion.div as any
 
@@ -41,8 +42,8 @@ function FAQItem({ question, answer }: { question: string, answer: string }) {
 }
 
 export default function PricingPage() {
-  const { data: session } = useSession()
-  const userPlan = session?.user?.plan || "free"
+  const { user } = useUser()
+  const userPlan = user?.plan || "free"
 
   const plans = [
     {
@@ -130,8 +131,8 @@ export default function PricingPage() {
           window.location.href = "/dashboard"
         },
         prefill: {
-          name: session?.user?.name || "",
-          email: session?.user?.email || "",
+          name: user?.name || "",
+          email: user?.email || "",
         },
         theme: {
           color: "#3b82f6",

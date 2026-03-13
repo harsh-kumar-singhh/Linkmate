@@ -2,8 +2,8 @@
 
 export const dynamic = "force-dynamic";
 
-import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
+import { useUser } from "@/context/UserContext"
 import Link from "next/link"
 import { useEffect, useState, useCallback } from "react"
 import { AnimatedCard } from "@/components/animated/AnimatedCard"
@@ -39,7 +39,7 @@ interface Post {
 }
 
 export default function DashboardPage() {
-  const { data: session, status } = useSession()
+  const { user, isLoading: isUserLoading } = useUser()
   const router = useRouter()
 
   const [posts, setPosts] = useState<Post[]>([])
@@ -50,19 +50,18 @@ export default function DashboardPage() {
 
   // Redirect unauthenticated users
   useEffect(() => {
-    if (status === "unauthenticated") {
+    if (!isUserLoading && !user) {
       router.push("/login")
     }
-  }, [status, router])
+  }, [isUserLoading, user, router])
 
   // fetchData wrapped in useCallback
   const fetchData = useCallback(async () => {
     try {
       setIsLoading(true)
 
-      const [postsRes, userRes, statsRes] = await Promise.all([
+      const [postsRes, statsRes] = await Promise.all([
         fetch("/api/posts"),
-        fetch("/api/user/me"),
         fetch("/api/activity")
       ])
 
@@ -84,11 +83,6 @@ export default function DashboardPage() {
         }
       }
 
-      if (userRes.ok) {
-        const data = await userRes.json()
-        setIsConnected(data.user.isConnected)
-      }
-
       if (statsRes.ok) {
         const data = await statsRes.json()
         setStats(data)
@@ -100,11 +94,18 @@ export default function DashboardPage() {
     }
   }, [])
 
+  // Update isConnected from user object
+  useEffect(() => {
+    if (user) {
+      setIsConnected(user.isConnected);
+    }
+  }, [user]);
+
   // Fetch data on mount
   useEffect(() => {
-    if (status !== "authenticated") return
+    if (!user) return
     fetchData()
-  }, [status, fetchData])
+  }, [user, fetchData])
 
   const dismissNotification = async (postId: string) => {
     try {
@@ -115,7 +116,7 @@ export default function DashboardPage() {
     }
   }
 
-  if (status === "loading" || isLoading) {
+  if (isUserLoading || isLoading) {
     return (
       <div className="min-h-full flex items-center justify-center">
         <div className="w-12 h-12 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -123,10 +124,10 @@ export default function DashboardPage() {
     )
   }
 
-  if (!session) return null
+  if (!user) return null
 
   // Get first name for greeting
-  const firstName = session.user?.name?.split(' ')[0] || "there"
+  const firstName = user.name?.split(' ')[0] || "there"
 
   const scheduledPosts = posts.filter(p => p.status === "SCHEDULED")
   const publishedPosts = posts.filter(p => p.status === "PUBLISHED").slice(0, 5) // Recent 5

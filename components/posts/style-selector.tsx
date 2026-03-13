@@ -4,18 +4,16 @@ import { ChevronLeft, ChevronRight, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
-import { Lock } from "lucide-react"
+import { Lock, Sparkles } from "lucide-react"
+import { useUser } from "@/context/UserContext"
 
 interface StyleSelectorProps {
     value: string;
     onChange: (style: string) => void;
     styles: string[];
-    plan?: string;
-}
-
-export function StyleSelector({ value, onChange, styles, plan = "free" }: StyleSelectorProps) {
+export function StyleSelector({ value, onChange, styles }: StyleSelectorProps) {
+    const { isPro } = useUser();
     const router = useRouter();
-    const isPro = plan?.toUpperCase() === "PRO";
     const currentIndex = styles.indexOf(value);
 
     const handlePrevious = () => {
