@@ -117,26 +117,61 @@ export default async function SettingsPage() {
                                     </p>
                                 </div>
                                 
-                                <ul className="space-y-3">
-                                    {[
-                                        { text: userPlan?.toUpperCase() === "PRO" ? "Unlimited AI Generations" : "2 AI generations per day", included: true },
-                                        { text: userPlan?.toUpperCase() === "PRO" ? "Unlimited Scheduled Posts" : "10 scheduled posts per month", included: true },
-                                        { text: userPlan?.toUpperCase() === "PRO" ? "Unlimited Writing Styles" : "1 writing style slot", included: true },
-                                        { text: "Autopilot Automation", included: userPlan?.toUpperCase() === "PRO" },
-                                    ].map((feature, i) => (
-                                        <li key={i} className="flex items-center gap-3 text-sm">
-                                            <div className={cn(
-                                                "p-0.5 rounded-full",
-                                                feature.included ? "text-primary bg-primary/10" : "text-muted-foreground bg-secondary"
-                                            )}>
-                                                {feature.included ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                                    { userPlan?.toUpperCase() === "PRO" ? (
+                                        <>
+                                            <div className="space-y-4 pt-6 border-t border-border/40">
+                                                <h5 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Growth Engine Status</h5>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                    <div className="p-4 rounded-2xl bg-secondary/30 border border-border/40 space-y-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <Sparkles className="w-4 h-4 text-primary" />
+                                                            <span className="text-sm font-bold">Autopilot</span>
+                                                        </div>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Status: <span className={cn(
+                                                                "font-bold",
+                                                                user?.autopilotEnabled ? "text-emerald-500" : "text-amber-500"
+                                                            )}>
+                                                                {user?.autopilotEnabled ? "Active" : user?.autopilotTopics && (user.autopilotTopics as any[]).length > 0 ? "Paused" : "Not Configured"}
+                                                            </span>
+                                                        </p>
+                                                    </div>
+                                                    <div className="p-4 rounded-2xl bg-secondary/30 border border-border/40 space-y-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <Shield className="w-4 h-4 text-primary" />
+                                                            <span className="text-sm font-bold">LinkedIn</span>
+                                                        </div>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Connection: <span className={cn("font-bold", isConnected ? "text-emerald-500" : "text-rose-500")}>
+                                                                {isConnected ? "Synchronized" : "Disconnected"}
+                                                            </span>
+                                                        </p>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <span className={feature.included ? "text-foreground font-medium" : "text-muted-foreground/60"}>
-                                                {feature.text}
-                                            </span>
-                                        </li>
-                                    ))}
-                                </ul>
+                                        </>
+                                    ) : (
+                                        <ul className="space-y-3">
+                                            {[
+                                                { text: userPlan?.toUpperCase() === "PRO" ? "Unlimited AI Generations" : "2 AI generations per day", included: true },
+                                                { text: userPlan?.toUpperCase() === "PRO" ? "Unlimited Scheduled Posts" : "10 scheduled posts per month", included: true },
+                                                { text: userPlan?.toUpperCase() === "PRO" ? "Unlimited Writing Styles" : "1 writing style slot", included: true },
+                                                { text: "Autopilot Automation", included: userPlan?.toUpperCase() === "PRO" },
+                                            ].map((feature, i) => (
+                                                <li key={i} className="flex items-center gap-3 text-sm">
+                                                    <div className={cn(
+                                                        "p-0.5 rounded-full",
+                                                        feature.included ? "text-primary bg-primary/10" : "text-muted-foreground bg-secondary"
+                                                    )}>
+                                                        {feature.included ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                                                    </div>
+                                                    <span className={feature.included ? "text-foreground font-medium" : "text-muted-foreground/60"}>
+                                                        {feature.text}
+                                                    </span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
                             </div>
 
                             <div className="bg-primary/[0.03] rounded-2xl p-6 border border-primary/10 flex flex-col justify-between gap-6">
@@ -151,17 +186,17 @@ export default async function SettingsPage() {
                                             : "Professional creators use Pro to save 10+ hours a week with Autopilot and unlimited generation."}
                                     </p>
                                 </div>
-                                <Link href="/pricing" className="w-full">
+                                <Link href={userPlan?.toUpperCase() === "PRO" ? "/activity" : "/pricing"} className="w-full">
                                     <Button 
                                         className={cn(
                                             "h-12 px-6 rounded-xl font-bold w-full shadow-lg transition-all",
                                             userPlan?.toUpperCase() === "PRO" 
-                                                ? "bg-secondary text-foreground hover:bg-secondary/80" 
+                                                ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-emerald-500/20" 
                                                 : "bg-primary hover:bg-primary/90 text-primary-foreground shadow-primary/20"
                                         )}
-                                        variant={userPlan?.toUpperCase() === "PRO" ? "secondary" : "primary"}
+                                        variant={userPlan?.toUpperCase() === "PRO" ? "primary" : "primary"}
                                     >
-                                        {userPlan?.toUpperCase() === "PRO" ? "View Pricing Details" : "Upgrade to Pro"}
+                                        {userPlan?.toUpperCase() === "PRO" ? "View My Growth" : "Upgrade to Pro"}
                                         <ArrowRight className="w-4 h-4 ml-2" />
                                     </Button>
                                 </Link>

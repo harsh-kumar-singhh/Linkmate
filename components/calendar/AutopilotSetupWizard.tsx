@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AnimatedCard } from "@/components/animated/AnimatedCard";
-import { X, Sparkles, Loader2, ArrowRight, ArrowLeft, Check, Calendar as CalendarIcon, Clock } from "lucide-react";
+import { X, Sparkles, Loader2, ArrowRight, ArrowLeft, Check, Calendar as CalendarIcon, Clock, Plus, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { saveAutopilotSettings } from "@/lib/actions/autopilot";
@@ -35,9 +35,12 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
     const [isSaving, setIsSaving] = useState(false);
 
     const [topics, setTopics] = useState<string[]>(initialData?.topics || []);
+    const [customTopic, setCustomTopic] = useState("");
     const [frequency, setFrequency] = useState(initialData?.frequency || "3");
     const [days, setDays] = useState<string[]>(initialData?.days || ["Monday", "Wednesday", "Friday"]);
     const [time, setTime] = useState(initialData?.time || "10:00");
+
+    const maxDays = parseInt(frequency);
 
     const toggleTopic = (topic: string) => {
         if (topics.includes(topic)) {
@@ -47,10 +50,19 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
         }
     };
 
+    const addCustomTopic = (e: React.FormEvent) => {
+        e.preventDefault();
+        const trimmed = customTopic.trim();
+        if (trimmed && !topics.includes(trimmed) && topics.length < 5) {
+            setTopics([...topics, trimmed]);
+            setCustomTopic("");
+        }
+    };
+
     const toggleDay = (day: string) => {
         if (days.includes(day)) {
             setDays(days.filter(d => d !== day));
-        } else {
+        } else if (days.length < maxDays) {
             setDays([...days, day]);
         }
     };
@@ -130,6 +142,16 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                             <p className="text-sm text-muted-foreground">Select 3-5 topics to help the AI understand your niche.</p>
                                         </div>
                                         <div className="flex flex-wrap gap-2 pt-2">
+                                            {topics.filter(t => !TOPIC_EXAMPLES.includes(t)).map((topic) => (
+                                                <button
+                                                    key={topic}
+                                                    onClick={() => toggleTopic(topic)}
+                                                    className="px-5 py-2.5 rounded-full text-sm font-medium transition-all border bg-blue-600 text-white border-blue-600 shadow-sm flex items-center gap-2"
+                                                >
+                                                    {topic}
+                                                    <X className="w-3 h-3" />
+                                                </button>
+                                            ))}
                                             {TOPIC_EXAMPLES.map((topic) => (
                                                 <button
                                                     key={topic}
@@ -145,8 +167,30 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                                 </button>
                                             ))}
                                         </div>
-                                        <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60 pt-4">
-                                            {topics.length} / 5 Selected
+
+                                        <form onSubmit={addCustomTopic} className="relative pt-4">
+                                            <input
+                                                type="text"
+                                                placeholder="Add Custom Topic"
+                                                value={customTopic}
+                                                onChange={(e) => setCustomTopic(e.target.value)}
+                                                disabled={topics.length >= 5}
+                                                className="w-full h-12 bg-secondary/30 border-none rounded-xl px-4 text-sm focus:ring-2 focus:ring-blue-600/30"
+                                            />
+                                            <Button 
+                                                type="submit"
+                                                disabled={!customTopic.trim() || topics.length >= 5}
+                                                variant="ghost" 
+                                                size="icon" 
+                                                className="absolute right-1 top-[1.25rem] h-10 w-10 text-blue-600"
+                                            >
+                                                <Plus className="w-5 h-5" />
+                                            </Button>
+                                        </form>
+
+                                        <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60 pt-2 flex justify-between">
+                                            <span>{topics.length} / 5 Selected</span>
+                                            {topics.length < 3 && <span className="text-amber-500">Pick at least 3</span>}
                                         </div>
                                     </MotionDiv>
                                 )}
@@ -166,7 +210,14 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                             {FREQUENCY_OPTIONS.map((opt) => (
                                                 <button
                                                     key={opt.value}
-                                                    onClick={() => setFrequency(opt.value)}
+                                                    onClick={() => {
+                                                        setFrequency(opt.value);
+                                                        // Clear excess days if frequency is reduced
+                                                        const limit = parseInt(opt.value);
+                                                        if (days.length > limit) {
+                                                            setDays(days.slice(0, limit));
+                                                        }
+                                                    }}
                                                     className={cn(
                                                         "w-full p-5 rounded-2xl flex items-center justify-between transition-all border text-left",
                                                         frequency === opt.value
@@ -199,9 +250,17 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                         </div>
 
                                         <div className="space-y-4">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <CalendarIcon className="w-4 h-4 text-blue-600" />
-                                                <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Posting Days</label>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <CalendarIcon className="w-4 h-4 text-blue-600" />
+                                                    <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Posting Days</label>
+                                                </div>
+                                                <span className={cn(
+                                                    "text-xs font-bold",
+                                                    days.length === maxDays ? "text-emerald-500" : "text-muted-foreground"
+                                                )}>
+                                                    Selected days: {days.length} / {maxDays}
+                                                </span>
                                             </div>
                                             <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
                                                 {DAYS_OF_WEEK.map((day) => (
@@ -211,7 +270,7 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                                         className={cn(
                                                             "h-10 rounded-lg text-xs font-bold transition-all border",
                                                             days.includes(day)
-                                                                ? "bg-blue-600 text-white border-blue-600"
+                                                                ? "bg-blue-600 text-white border-blue-600 shadow-sm"
                                                                 : "bg-secondary/50 text-muted-foreground border-transparent hover:border-blue-600/30"
                                                         )}
                                                     >
@@ -219,6 +278,12 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                                     </button>
                                                 ))}
                                             </div>
+                                            {days.length < maxDays && (
+                                                <p className="text-[10px] text-amber-500 font-medium flex items-center gap-1">
+                                                    <AlertCircle className="w-3 h-3" />
+                                                    Select {maxDays - days.length} more day{maxDays - days.length > 1 ? 's' : ''} to match your frequency.
+                                                </p>
+                                            )}
                                         </div>
 
                                         <div className="space-y-4">
@@ -261,8 +326,8 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                 ) : (
                                     <Button
                                         onClick={handleActivate}
-                                        className="flex-1 h-14 rounded-2xl text-base font-bold gap-2 bg-emerald-600 hover:bg-emerald-500 text-white"
-                                        disabled={!isStep3Valid || isSaving}
+                                        className="flex-1 h-14 rounded-2xl text-base font-bold gap-2 bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20"
+                                        disabled={days.length !== maxDays || isSaving}
                                     >
                                         {isSaving ? (
                                             <>

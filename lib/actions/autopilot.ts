@@ -17,7 +17,14 @@ export async function saveAutopilotSettings(data: {
         throw new Error("Unauthorized")
     }
 
-    if (session.user.plan?.toUpperCase() !== "PRO") {
+    const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { plan: true }
+    })
+
+    const isPro = user?.plan?.toUpperCase() === "PRO"
+
+    if (!isPro) {
         throw new Error("Pro plan required for Autopilot")
     }
 

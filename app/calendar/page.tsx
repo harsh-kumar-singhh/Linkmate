@@ -179,9 +179,18 @@ export default function CalendarPage() {
                                     </div>
                                 )}
                             </div>
-                             <p className="text-sm text-muted-foreground">
-                                {user.autopilotFrequency} posts/week • {user.autopilotDays.length} days active • Posting at {user.autopilotTime}
-                            </p>
+                             <div className="space-y-2">
+                                <p className="text-sm text-muted-foreground">
+                                    {user.autopilotFrequency} posts/week • {user.autopilotDays.length} days active • Posting at {user.autopilotTime}
+                                </p>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {user.autopilotTopics?.map((topic: string) => (
+                                        <span key={topic} className="px-2 py-0.5 bg-blue-600/5 border border-blue-600/10 text-blue-600/70 text-[10px] font-bold rounded-md">
+                                            {topic}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
                     </div>
 
