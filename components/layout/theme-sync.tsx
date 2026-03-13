@@ -31,7 +31,7 @@ export function ThemeSync() {
             };
             fetchTheme();
         }
-    }, [status, session]); // Keep deps but guard inside with sessionStorage checks
+    }, [status, session, setTheme]); // Keep deps but guard inside with sessionStorage checks
 
     return null;
 }

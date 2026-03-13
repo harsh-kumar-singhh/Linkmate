@@ -67,10 +67,13 @@ export function LinkedInPreview({ content, imageUrl, className }: LinkedInPrevie
             {/* Attachment Preview */}
             {imageUrl ? (
                 <div className="mt-2 border-y border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-950">
-                    <img
+                    <Image
                         src={imageUrl}
                         alt="Post attachment"
+                        width={552}
+                        height={450}
                         className="w-full h-auto object-contain max-h-[450px]"
+                        unoptimized
                     />
                 </div>
             ) : (

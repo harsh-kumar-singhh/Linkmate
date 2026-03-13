@@ -59,7 +59,7 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                                         <Zap className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                                         <div>
                                             <p className="font-bold text-sm">Automated Strategy</p>
-                                            <p className="text-xs text-muted-foreground leading-relaxed">AI creates a week's worth of content in seconds.</p>
+                                            <p className="text-xs text-muted-foreground leading-relaxed">AI creates a week&apos;s worth of content in seconds.</p>
                                         </div>
                                     </div>
                                     <div className="flex items-start gap-3">
