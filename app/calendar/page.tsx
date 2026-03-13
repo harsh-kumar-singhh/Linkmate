@@ -282,18 +282,23 @@ export default function CalendarPage() {
                                             {datePosts.slice(0, 3).map((post) => (
                                                 <Link key={post.id} href={`/posts/new?id=${post.id}`}>
                                                     <div className={cn(
-                                                        "px-1.5 py-0.5 rounded-md text-[9px] font-bold truncate transition-all flex items-center gap-1.5 cursor-pointer",
+                                                        "px-1.5 py-0.5 rounded-md text-[9px] font-bold truncate transition-all flex items-center justify-between gap-1.5 cursor-pointer",
                                                         post.status === "PUBLISHED"
                                                             ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
                                                             : post.status === "SCHEDULED"
                                                                 ? "bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400"
                                                                 : "bg-secondary text-muted-foreground dark:bg-slate-800"
                                                     )}>
-                                                        <div className={cn("w-1 h-1 rounded-full shrink-0",
-                                                            post.status === "PUBLISHED" ? "bg-emerald-500" :
-                                                                post.status === "SCHEDULED" ? "bg-blue-500" : "bg-muted-foreground"
-                                                        )} />
-                                                        <span className="truncate">{post.content}</span>
+                                                        <div className="flex items-center gap-1.5 truncate">
+                                                            <div className={cn("w-1 h-1 rounded-full shrink-0",
+                                                                post.status === "PUBLISHED" ? "bg-emerald-500" :
+                                                                    post.status === "SCHEDULED" ? "bg-blue-500" : "bg-muted-foreground"
+                                                            )} />
+                                                            <span className="truncate">{post.content}</span>
+                                                        </div>
+                                                        {post.source === "autopilot" && (
+                                                            <Sparkles className="w-2.5 h-2.5 text-blue-500 shrink-0" />
+                                                        )}
                                                     </div>
                                                 </Link>
                                             ))}

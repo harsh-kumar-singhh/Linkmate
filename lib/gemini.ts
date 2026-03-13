@@ -71,3 +71,40 @@ Format:
         throw new Error("The AI strategist is briefly offline. Please try manually or check back in a moment.");
     }
 }
+export async function generateAutopilotPost(topic: string) {
+    if (!topic) throw new Error("Topic is required for Autopilot generation.");
+
+    const prompt = `Role: Elite LinkedIn Ghostwriter
+Action: Write a high-engagement LinkedIn post about "${topic}".
+
+Guidelines:
+- Tone: Professional but conversational.
+- Structure:
+    1. Strong hook (first line).
+    2. Deep insight or lesson learned.
+    3. Actionable takeaway for the reader.
+- Use structured points/short paragraphs with whitespace.
+- Emojis: 3-5 professional ones.
+- Length: STRICTLY between 150 and 220 words.
+- End with a strong CTA or question.
+- No labels (e.g., "Hook:", "Insight:").
+- No hashtags (the system adds them if needed).`;
+
+    try {
+        console.log(`[Autopilot] Generating post for topic: ${topic}`);
+        const model = getGeminiModel();
+        const result = await model.generateContent(prompt);
+        const text = result.response.text();
+
+        if (!text) throw new Error("Empty response from AI");
+
+        return text
+            .replace(/^(Hook|Headline|Body|CTA|Conclusion|Post|Draft|Insight|Lesson|Takeaway):\s*/gmi, "")
+            .replace(/\*\*(Hook|Headline|Body|CTA|Conclusion|Post|Draft|Insight|Lesson|Takeaway)\*\*:\s*/gmi, "")
+            .trim();
+
+    } catch (error: any) {
+        console.error("[Autopilot] Generation Failed:", error);
+        throw new Error("Autopilot generation failed.");
+    }
+}
