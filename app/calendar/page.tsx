@@ -3,6 +3,23 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { 
+    ChevronLeft, 
+    ChevronRight, 
+    Plus, 
+    Zap, 
+    Pause, 
+    Play, 
+    CheckCircle2, 
+    Edit2, 
+    Lock,
+    Sparkles
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
+import { UpgradeModal } from "@/components/calendar/UpgradeModal"
 import { AutopilotSetupWizard } from "@/components/calendar/AutopilotSetupWizard"
 import { toggleAutopilot } from "@/lib/actions/autopilot"
 import { useUser } from "@/context/UserContext"
@@ -290,13 +307,13 @@ export default function CalendarPage() {
                 isOpen={isSetupWizardOpen} 
                 onClose={() => {
                     setIsSetupWizardOpen(false);
-                    fetchAutopilotSettings(); // Refresh
+                    refreshUser(); // Refresh user data from context
                 }} 
-                initialData={autopilotData ? {
-                    topics: autopilotData.topics,
-                    frequency: autopilotData.frequency,
-                    days: autopilotData.days,
-                    time: autopilotData.time
+                initialData={user ? {
+                    topics: user.autopilotTopics,
+                    frequency: user.autopilotFrequency,
+                    days: user.autopilotDays,
+                    time: user.autopilotTime
                 } : undefined}
             />
         </div>
