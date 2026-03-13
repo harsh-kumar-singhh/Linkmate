@@ -22,6 +22,11 @@ model User {
   linkedinConnected Boolean @default(false)
   theme         String?   @default("system")
   plan          String    @default("free") // 'free' or 'pro'
+  autopilotEnabled Boolean @default(false)
+  autopilotTopics Json?     @default("[]")
+  autopilotFrequency String?
+  autopilotDays String[]  @default([])
+  autopilotTime String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
