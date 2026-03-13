@@ -32,7 +32,7 @@ export async function checkAndIncrementAIQuota(
   currentCount: number;
   limit: number;
 }> {
-  const userPlan = (plan === "pro" ? "pro" : "free") as keyof typeof PLAN_LIMITS;
+  const userPlan = (plan?.toUpperCase() === "PRO" ? "pro" : "free") as keyof typeof PLAN_LIMITS;
   const limit = PLAN_LIMITS[userPlan].aiPostsPerDay;
   const prisma = getPrisma();
   const today = getUTCStartOfDay();

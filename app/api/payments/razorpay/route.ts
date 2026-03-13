@@ -14,7 +14,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    if (session.user.plan === "pro") {
+    if (session.user.plan?.toUpperCase() === "PRO") {
       return NextResponse.json({ error: "Already on Pro plan" }, { status: 400 })
     }
 

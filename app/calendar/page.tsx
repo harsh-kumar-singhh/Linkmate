@@ -133,7 +133,8 @@ export default function CalendarPage() {
                     </button>
                     <button
                         onClick={() => {
-                            if (userPlan === "free") {
+                            const isFree = userPlan?.toUpperCase() !== "PRO";
+                            if (isFree) {
                                 setIsUpgradeModalOpen(true)
                             } else {
                                 if (!autopilotData?.topics || autopilotData.topics.length === 0) {
@@ -149,7 +150,7 @@ export default function CalendarPage() {
                         )}
                     >
                         Autopilot
-                        {userPlan === "free" && <Lock className="w-3 h-3" />}
+                        {userPlan?.toUpperCase() !== "PRO" && <Lock className="w-3 h-3" />}
                     </button>
                 </div>
 
@@ -175,7 +176,7 @@ export default function CalendarPage() {
             </div>
 
             {/* Autopilot Status Bar (Pro only) */}
-            {userPlan === "pro" && schedulingMode === "autopilot" && autopilotData?.topics && autopilotData.topics.length > 0 && (
+            {userPlan?.toUpperCase() === "PRO" && schedulingMode === "autopilot" && autopilotData?.topics && autopilotData.topics.length > 0 && (
                 <div className="mx-2 md:mx-0 bg-blue-600/5 border border-blue-600/20 rounded-[24px] p-6 flex flex-col md:flex-row items-center justify-between gap-6 transition-all duration-500">
                     <div className="flex items-center gap-4">
                         <div className={cn(

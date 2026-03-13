@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     if (event === "payment.captured") {
       const { userId, plan } = payload.payload.payment.entity.notes
       
-      if (userId && plan === "pro") {
+      if (userId && plan?.toUpperCase() === "PRO") {
         const prisma = getPrisma()
         await prisma.user.update({
           where: { id: userId },

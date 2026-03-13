@@ -22,7 +22,7 @@ export type PlanType = "free" | "pro"
  * Checks if the user has reached their daily AI post generation limit.
  */
 export async function hasReachedDailyPostLimit(userId: string, plan: string = "free"): Promise<boolean> {
-  const userPlan = (plan === "pro" ? "pro" : "free") as PlanType
+  const userPlan = (plan?.toUpperCase() === "PRO" ? "pro" : "free") as PlanType
   const limit = PLAN_LIMITS[userPlan].aiPostsPerDay
 
   if (limit === Infinity) return false
@@ -47,7 +47,7 @@ export async function hasReachedDailyPostLimit(userId: string, plan: string = "f
  * Checks if the user can add another writing style.
  */
 export async function canAddWritingStyle(userId: string, plan: string = "free"): Promise<boolean> {
-  const userPlan = (plan === "pro" ? "pro" : "free") as PlanType
+  const userPlan = (plan?.toUpperCase() === "PRO" ? "pro" : "free") as PlanType
   const limit = PLAN_LIMITS[userPlan].writingStyles
 
   if (limit === Infinity) return false
@@ -66,7 +66,7 @@ export async function canAddWritingStyle(userId: string, plan: string = "free"):
  * Checks if the user can schedule another post this month.
  */
 export async function canSchedulePost(userId: string, plan: string = "free"): Promise<boolean> {
-  const userPlan = (plan === "pro" ? "pro" : "free") as PlanType
+  const userPlan = (plan?.toUpperCase() === "PRO" ? "pro" : "free") as PlanType
   const limit = PLAN_LIMITS[userPlan].scheduledPostsPerMonth
 
   if (limit === Infinity) return false
@@ -93,6 +93,6 @@ export async function canSchedulePost(userId: string, plan: string = "free"): Pr
  * Checks if the user has access to autopilot.
  */
 export function hasAutopilotAccess(plan: string = "free"): boolean {
-  const userPlan = (plan === "pro" ? "pro" : "free") as PlanType
+  const userPlan = (plan?.toUpperCase() === "PRO" ? "pro" : "free") as PlanType
   return PLAN_LIMITS[userPlan].autopilot
 }

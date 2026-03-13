@@ -18,7 +18,7 @@ export async function PUT(req: Request) {
         const data: any = {};
         if (writingStyles !== undefined) {
             // Enforce plan limits for writing styles
-            if (userRecord.plan === "free" && Array.isArray(writingStyles)) {
+            if (userRecord.plan?.toUpperCase() !== "PRO" && Array.isArray(writingStyles)) {
                 // Keep only the first style that has content, or just the first slot
                 data.writingStyles = writingStyles.slice(0, 1);
             } else {

@@ -57,29 +57,18 @@ function Switch({ checked, onChange, disabled }: { checked: boolean; onChange: (
 }
 
 export function SettingsForm({ user, plan = "free" }: SettingsFormProps) {
-    const isPro = plan === "pro";
+    const isPro = plan?.toUpperCase() === "PRO";
     const [name, setName] = useState(user?.name || "");
 
-    // Initialize writingStyles with 5 named slots
-    const initialWritingStyles = user?.writingStyles && Array.isArray(user.writingStyles) && user.writingStyles.length > 0
+    // Initialize writingStyles based on plan
+    const initialStyles = user?.writingStyles && Array.isArray(user.writingStyles) && user.writingStyles.length > 0
         ? user.writingStyles
-        : [
-            { name: "", sample: "" },
-            { name: "", sample: "" },
-            { name: "", sample: "" },
-            { name: "", sample: "" },
-            { name: "", sample: "" }
-        ];
+        : [{ name: "", sample: "" }];
 
-    // Ensure we always have exactly 5 slots
-    while (initialWritingStyles.length < 5) {
-        initialWritingStyles.push({ name: "", sample: "" });
-    }
-    if (initialWritingStyles.length > 5) {
-        initialWritingStyles.length = 5;
-    }
-
-    const [writingStyles, setWritingStyles] = useState<Array<{ name: string; sample: string }>>(initialWritingStyles);
+    // If free, limit to only 1 slot even if data has more (from previous pro state)
+    const [writingStyles, setWritingStyles] = useState<Array<{ name: string; sample: string }>>(
+        isPro ? initialStyles : [initialStyles[0]]
+    );
     const [currentStyleIndex, setCurrentStyleIndex] = useState(0);
 
     const [tone, setTone] = useState(user?.defaultTone || "Professional");
@@ -202,24 +191,28 @@ export function SettingsForm({ user, plan = "free" }: SettingsFormProps) {
                                 <ChevronLeft className="w-4 h-4" />
                             </Button>
                             <span className="text-[11px] font-mono font-bold w-16 text-center">
-                                Slot {currentStyleIndex + 1} / 5
+                                Slot {currentStyleIndex + 1}
                             </span>
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                disabled={currentStyleIndex === 4}
                                 onClick={() => {
-                                    if (!isPro && currentStyleIndex === 0) {
-                                        if (confirm("Multiple writing styles are a Pro feature. Upgrade now to save different voices!")) {
-                                            router.push("/pricing");
-                                        }
+                                    if (!isPro) {
+                                        router.push("/pricing");
                                         return;
                                     }
-                                    setCurrentStyleIndex(prev => Math.min(4, prev + 1));
+                                    if (currentStyleIndex === writingStyles.length - 1) {
+                                        setWritingStyles([...writingStyles, { name: "", sample: "" }]);
+                                    }
+                                    setCurrentStyleIndex(prev => prev + 1);
                                 }}
                                 className="h-6 w-6 p-0"
                             >
-                                <ChevronRight className={cn("w-4 h-4", !isPro && currentStyleIndex === 0 && "text-muted-foreground/40")} />
+                                {isPro ? (
+                                    <ChevronRight className="w-4 h-4" />
+                                ) : (
+                                    <Lock className="w-3.5 h-3.5 text-muted-foreground/40" />
+                                )}
                             </Button>
                         </div>
                     </div>
@@ -233,7 +226,7 @@ export function SettingsForm({ user, plan = "free" }: SettingsFormProps) {
                                     </div>
                                     <div className="space-y-0.5">
                                         <div className="text-xs font-bold text-foreground">Pro Feature</div>
-                                        <div className="text-[11px] text-muted-foreground">You are limited to 1 writing style slot on the Free plan.</div>
+                                        <div className="text-[11px] text-muted-foreground">Unlimited writing style slots are exclusive to Pro members.</div>
                                     </div>
                                 </div>
                                 <Link href="/pricing" className="shrink-0">
@@ -243,9 +236,6 @@ export function SettingsForm({ user, plan = "free" }: SettingsFormProps) {
                                 </Link>
                             </div>
                         )}
-                        <p className="text-sm text-muted-foreground">
-                            Save up to 5 different writing styles. Give each a name and paste a sample of that style.
-                        </p>
 
                         <div className="space-y-3">
                             <div className="space-y-2">

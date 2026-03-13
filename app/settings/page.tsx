@@ -97,12 +97,12 @@ export default async function SettingsPage() {
                             </div>
                             <div className={cn(
                                 "px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 shadow-sm border",
-                                userPlan === "pro" 
+                                userPlan?.toUpperCase() === "PRO" 
                                     ? "text-blue-600 bg-blue-100 border-blue-200 dark:bg-blue-900/30 dark:border-blue-800" 
                                     : "text-zinc-600 bg-zinc-100 border-zinc-200 dark:bg-zinc-800/50 dark:text-zinc-700 dark:border-zinc-700"
                             )}>
-                                {userPlan === "pro" ? <Zap className="w-3.5 h-3.5 fill-current" /> : <Shield className="w-3.5 h-3.5" />}
-                                {userPlan === "pro" ? "Pro Member" : "Free Plan"}
+                                {userPlan?.toUpperCase() === "PRO" ? <Zap className="w-3.5 h-3.5 fill-current" /> : <Shield className="w-3.5 h-3.5" />}
+                                {userPlan?.toUpperCase() === "PRO" ? "Pro Member" : "Free Plan"}
                             </div>
                         </div>
 
@@ -111,7 +111,7 @@ export default async function SettingsPage() {
                                 <div className="space-y-2">
                                     <h5 className="text-sm font-bold text-foreground">Current Plan Details</h5>
                                     <p className="text-sm text-muted-foreground">
-                                        {userPlan === "pro" 
+                                        {userPlan?.toUpperCase() === "PRO" 
                                             ? "You have full access to all premium Linkmate automation features."
                                             : "You are currently using the limited free version of Linkmate."}
                                     </p>
@@ -119,10 +119,10 @@ export default async function SettingsPage() {
                                 
                                 <ul className="space-y-3">
                                     {[
-                                        { text: userPlan === "pro" ? "Unlimited AI Generations" : "2 AI generations per day", included: true },
-                                        { text: userPlan === "pro" ? "Unlimited Scheduled Posts" : "10 scheduled posts per month", included: true },
-                                        { text: userPlan === "pro" ? "Unlimited Writing Styles" : "1 writing style slot", included: true },
-                                        { text: "Autopilot Automation", included: userPlan === "pro" },
+                                        { text: userPlan?.toUpperCase() === "PRO" ? "Unlimited AI Generations" : "2 AI generations per day", included: true },
+                                        { text: userPlan?.toUpperCase() === "PRO" ? "Unlimited Scheduled Posts" : "10 scheduled posts per month", included: true },
+                                        { text: userPlan?.toUpperCase() === "PRO" ? "Unlimited Writing Styles" : "1 writing style slot", included: true },
+                                        { text: "Autopilot Automation", included: userPlan?.toUpperCase() === "PRO" },
                                     ].map((feature, i) => (
                                         <li key={i} className="flex items-center gap-3 text-sm">
                                             <div className={cn(
@@ -143,10 +143,10 @@ export default async function SettingsPage() {
                                 <div className="space-y-3">
                                     <div className="flex items-center gap-2 text-primary font-bold text-sm uppercase tracking-wider">
                                         <Sparkles className="w-4 h-4" />
-                                        {userPlan === "pro" ? "Pro Benefits" : "Unlock Pro"}
+                                        {userPlan?.toUpperCase() === "PRO" ? "Pro Benefits" : "Unlock Pro"}
                                     </div>
                                     <p className="text-sm text-muted-foreground leading-relaxed">
-                                        {userPlan === "pro"
+                                        {userPlan?.toUpperCase() === "PRO"
                                             ? "Your LinkedIn performance is being optimized by our advanced AI. Keep growing!"
                                             : "Professional creators use Pro to save 10+ hours a week with Autopilot and unlimited generation."}
                                     </p>
@@ -155,13 +155,13 @@ export default async function SettingsPage() {
                                     <Button 
                                         className={cn(
                                             "h-12 px-6 rounded-xl font-bold w-full shadow-lg transition-all",
-                                            userPlan === "pro" 
+                                            userPlan?.toUpperCase() === "PRO" 
                                                 ? "bg-secondary text-foreground hover:bg-secondary/80" 
                                                 : "bg-primary hover:bg-primary/90 text-primary-foreground shadow-primary/20"
                                         )}
-                                        variant={userPlan === "pro" ? "secondary" : "primary"}
+                                        variant={userPlan?.toUpperCase() === "PRO" ? "secondary" : "primary"}
                                     >
-                                        {userPlan === "pro" ? "View Pricing Details" : "Upgrade to Pro"}
+                                        {userPlan?.toUpperCase() === "PRO" ? "View Pricing Details" : "Upgrade to Pro"}
                                         <ArrowRight className="w-4 h-4 ml-2" />
                                     </Button>
                                 </Link>

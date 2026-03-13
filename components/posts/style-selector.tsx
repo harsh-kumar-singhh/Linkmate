@@ -15,7 +15,7 @@ interface StyleSelectorProps {
 
 export function StyleSelector({ value, onChange, styles, plan = "free" }: StyleSelectorProps) {
     const router = useRouter();
-    const isPro = plan === "pro";
+    const isPro = plan?.toUpperCase() === "PRO";
     const currentIndex = styles.indexOf(value);
 
     const handlePrevious = () => {

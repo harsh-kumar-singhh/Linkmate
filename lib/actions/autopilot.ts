@@ -17,7 +17,7 @@ export async function saveAutopilotSettings(data: {
         throw new Error("Unauthorized")
     }
 
-    if (session.user.plan !== "pro") {
+    if (session.user.plan?.toUpperCase() !== "PRO") {
         throw new Error("Pro plan required for Autopilot")
     }
 
