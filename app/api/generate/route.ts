@@ -57,16 +57,6 @@ export async function POST(req: Request) {
         // Fetch User Data for Write Like Me styles
         let userWritingSample = undefined;
 
-        // Determine Tone
-        let activeTone: keyof typeof TONE_GUIDELINES = "professional";
-        if (style) {
-            const lowerStyle = style.toLowerCase();
-            if (lowerStyle.includes("enthusiastic")) activeTone = "enthusiastic";
-            else if (lowerStyle.includes("storytelling")) activeTone = "storytelling";
-            else if (lowerStyle.includes("casual")) activeTone = "casual";
-            else if (lowerStyle.includes("bold")) activeTone = "bold";
-        }
-
         if (style && style.includes("Write Like Me")) {
             const userData = await prisma.user.findUnique({
                 where: { id: userId },
@@ -103,74 +93,19 @@ export async function POST(req: Request) {
             }
         }
 
-        // Strict Word Limit Logic: Aim for midpoint
-        const wordMidpoint = Math.floor(targetLength / 6); // Approximation: 6 chars per word
-
-        // Construct canonical prompt using AI Core rules
-        let prompt = `Role: Elite LinkedIn Ghostwriter
-Action: Write a high-engagement LinkedIn post about "${topic}".
-Goal: Aim for a length of ${targetLength} characters.
-
-GLOBAL RULES:
-${AI_CORE_CONFIG.GLOBAL_RULES.hard_constraints.map(c => `- ${c}`).join('\n')}
-${AI_CORE_CONFIG.GLOBAL_RULES.prohibited_behavior.map(b => `- ${b}`).join('\n')}
-
-Tone Enforcement (${activeTone}):
-${TONE_GUIDELINES[activeTone]}
-
-Constraint Rules:
-- Start with a compelling hook.
-- Use structured points/short paragraphs with whitespace.
-- Emojis: Strictly 3-5 professional ones.
-- End with a strong CTA or question.
-- No labels (e.g., "Hook:", "Tone:").
-
-HARD CONSTRAINT - LENGTH:
-- Your response MUST be under ${targetLength} characters.
-- This is a CRITICAL LIMIT. If you exceed it, the response is invalid.
-- Prune unnecessary words to fit.`;
-
-        if (userWritingSample) {
-            // override global rules for Write Like Me to prevent conflict
-            prompt += `\n\nCRITICAL - WRITING STYLE REPLICATION (WRITE LIKE ME):
-${AI_CORE_CONFIG.WRITE_LIKE_ME.instruction}
-${AI_CORE_CONFIG.WRITE_LIKE_ME.rules.map(r => `- ${r}`).join('\n')}
-
-REFERENCE SAMPLE (Everything below is the style truth):
-"""
-${userWritingSample}
-"""
-
-Usage Instructions:
-1. Ignore standard grammar rules if the sample ignores them.
-2. If the sample uses lowercase for line starts, YOU MUST TOO.
-3. If the sample has no emojis, YOU MUST HAVE NONE.
-4. Structure your response directly based on the visual rhythm of the sample.
-
-FORMATTING FIDELITY:
-- Do NOT use markdown bold (**text**) or italics (*text*) unless the Reference Sample EXPLICITLY uses them.
-- Do NOT add stars, bullet points, or visual emphasis symbols unless they appear in the sample.
-- If the sample is plain text, your output MUST be plain text.`;
-        }
-
-        if (context) {
-            prompt += `\n\nSpecific Context to include:\n"${context}"`;
-        }
-
-        const messages = [
-            { role: "user", content: prompt }
-        ];
-
         try {
-            const content = await generateWithFallback(messages);
-            const cleanedContent = content
-                .replace(/^(Hook|Headline|Body|CTA|Conclusion|Post|Draft|Tone|Style):\s*/gmi, "")
-                .replace(/\*\*(Hook|Headline|Body|CTA|Conclusion|Post|Draft|Tone|Style)\*\*:\s*/gmi, "")
-                .trim();
+            const { generatePost } = require("@/lib/gemini");
+            const cleanedContent = await generatePost({
+                topic,
+                style,
+                userWritingSample,
+                targetLength,
+                context
+            });
 
             return NextResponse.json({ content: cleanedContent });
         } catch (aiError: any) {
-            console.error("[GENERATE] AI Fallback failed:", aiError);
+            console.error("[GENERATE] AI Generation failed:", aiError);
             return NextResponse.json(
                 { error: getPublicErrorMessage(aiError) },
                 { status: 500 }

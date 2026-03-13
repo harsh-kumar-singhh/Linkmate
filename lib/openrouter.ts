@@ -22,13 +22,18 @@ export interface AIModel {
 
 export const AI_MODELS: AIModel[] = [
   {
-    id: "mistralai/mistral-7b-instruct",
+    id: "google/gemini-2.0-flash-001",
     priority: 1,
     role: "primary"
   },
   {
-    id: "meta-llama/llama-3-8b-instruct",
+    id: "mistralai/mistral-7b-instruct",
     priority: 2,
+    role: "fallback"
+  },
+  {
+    id: "meta-llama/llama-3-8b-instruct",
+    priority: 3,
     role: "fallback"
   }
 ];

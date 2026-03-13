@@ -1,24 +1,7 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { AI_CORE_CONFIG } from "./ai/config";
+import { generateWithFallback } from "./openrouter";
 
-export const MODELS = ["gemini-2.0-flash"]; // Standardize on a stable, fast model
-
-// Global client instance to reuse across requests
-let genAI: GoogleGenerativeAI | null = null;
-
-function getGenAI() {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-        throw new Error("Gemini API key not configured. Please add GEMINI_API_KEY to your environment variables.");
-    }
-    if (!genAI) {
-        genAI = new GoogleGenerativeAI(apiKey);
-    }
-    return genAI;
-}
-
-export function getGeminiModel(modelName: string = "gemini-2.0-flash") {
-    return getGenAI().getGenerativeModel({ model: modelName });
-}
+const TONE_GUIDELINES = AI_CORE_CONFIG.TONE_MAPPING;
 
 export interface GeneratePostOptions {
     topic: string;
@@ -28,83 +11,98 @@ export interface GeneratePostOptions {
     context?: string; // Additional user context
 }
 
-export async function generatePost({ topic, style, userWritingSample, targetLength = 1000, context }: GeneratePostOptions) {
+/**
+ * Standardized LinkedIn post generation using OpenRouter fallback system.
+ * Used by both manual generation and Autopilot.
+ */
+export async function generatePost({ 
+    topic, 
+    style, 
+    userWritingSample, 
+    targetLength = 1000, 
+    context 
+}: GeneratePostOptions) {
     if (!topic) throw new Error("Topic is required for AI generation.");
 
-    // Optimized prompt for speed and clarity
+    // Determine Tone
+    let activeTone: keyof typeof TONE_GUIDELINES = "professional";
+    if (style) {
+        const lowerStyle = style.toLowerCase();
+        if (lowerStyle.includes("enthusiastic")) activeTone = "enthusiastic";
+        else if (lowerStyle.includes("storytelling")) activeTone = "storytelling";
+        else if (lowerStyle.includes("casual")) activeTone = "casual";
+        else if (lowerStyle.includes("bold")) activeTone = "bold";
+    }
+
+    // Construct canonical prompt using AI Core rules
     let prompt = `Role: Elite LinkedIn Ghostwriter
 Action: Write a high-engagement LinkedIn post about "${topic}".
-Format:
+Goal: Aim for a length of ${targetLength} characters.
+
+GLOBAL RULES:
+${AI_CORE_CONFIG.GLOBAL_RULES.hard_constraints.map(c => `- ${c}`).join('\n')}
+${AI_CORE_CONFIG.GLOBAL_RULES.prohibited_behavior.map(b => `- ${b}`).join('\n')}
+
+Tone Enforcement (${activeTone}):
+${TONE_GUIDELINES[activeTone]}
+
+Constraint Rules:
 - Start with a compelling hook.
 - Use structured points/short paragraphs with whitespace.
-- Emojis: 3-5 professional ones.
-- Length: Target ~${targetLength} characters.
+- Emojis: Strictly 3-5 professional ones.
 - End with a strong CTA or question.
-- No labels (e.g., "Hook:").`;
+- No labels (e.g., "Hook:", "Tone:").
 
-    if (style?.includes("Write Like Me") && userWritingSample) {
-        prompt += `\n\nStyle Reference: Mimic this voice/structure precisely:\n"${userWritingSample}"`;
-    } else if (style) {
-        prompt += `\n\nTone: ${style}`;
+HARD CONSTRAINT - LENGTH:
+- Your response MUST be under ${targetLength} characters.
+- This is a CRITICAL LIMIT. If you exceed it, the response is invalid.
+- Prune unnecessary words to fit.`;
+
+    if (userWritingSample && style?.includes("Write Like Me")) {
+        prompt += `\n\nCRITICAL - WRITING STYLE REPLICATION (WRITE LIKE ME):
+${AI_CORE_CONFIG.WRITE_LIKE_ME.instruction}
+${AI_CORE_CONFIG.WRITE_LIKE_ME.rules.map(r => `- ${r}`).join('\n')}
+
+REFERENCE SAMPLE (Everything below is the style truth):
+"""
+${userWritingSample}
+"""
+
+Usage Instructions:
+1. Ignore standard grammar rules if the sample ignores them.
+2. If the sample uses lowercase for line starts, YOU MUST TOO.
+3. If the sample has no emojis, YOU MUST HAVE NONE.
+4. Structure your response directly based on the visual rhythm of the sample.
+
+FORMATTING FIDELITY:
+- Do NOT use markdown bold (**text**) or italics (*text*) unless the Reference Sample EXPLICITLY uses them.
+- Do NOT add stars, bullet points, or visual emphasis symbols unless they appear in the sample.
+- If the sample is plain text, your output MUST be plain text.`;
     }
 
     if (context) {
         prompt += `\n\nSpecific Context to include:\n"${context}"`;
     }
 
+    const messages = [
+        { role: "user", content: prompt }
+    ];
+
     try {
-        console.log(`[AI] Generating post with gemini-2.0-flash for topic: ${topic.substring(0, 30)}...`);
-        const model = getGeminiModel();
-        const result = await model.generateContent(prompt);
-        const text = result.response.text();
+        console.log(`[AI] Generating post via OpenRouter fallback system for topic: ${topic.substring(0, 30)}...`);
+        const content = await generateWithFallback(messages);
+        
+        if (!content) throw new Error("Empty response from AI");
 
-        if (!text) throw new Error("Empty response from AI");
-
-        return text
-            .replace(/^(Hook|Headline|Body|CTA|Conclusion|Post|Draft):\s*/gmi, "")
-            .replace(/\*\*(Hook|Headline|Body|CTA|Conclusion|Post|Draft)\*\*:\s*/gmi, "")
+        return content
+            .replace(/^(Hook|Headline|Body|CTA|Conclusion|Post|Draft|Tone|Style|Insight|Lesson|Takeaway):\s*/gmi, "")
+            .replace(/\*\*(Hook|Headline|Body|CTA|Conclusion|Post|Draft|Tone|Style|Insight|Lesson|Takeaway)\*\*:\s*/gmi, "")
             .trim();
 
     } catch (error: any) {
         console.error("[AI] Generation Failed:", error);
-        // User-safe fallback message
-        throw new Error("The AI strategist is briefly offline. Please try manually or check back in a moment.");
+        throw error; // Let the caller handle it (e.g. with getPublicErrorMessage)
     }
 }
-export async function generateAutopilotPost(topic: string) {
-    if (!topic) throw new Error("Topic is required for Autopilot generation.");
 
-    const prompt = `Role: Elite LinkedIn Ghostwriter
-Action: Write a high-engagement LinkedIn post about "${topic}".
 
-Guidelines:
-- Tone: Professional but conversational.
-- Structure:
-    1. Strong hook (first line).
-    2. Deep insight or lesson learned.
-    3. Actionable takeaway for the reader.
-- Use structured points/short paragraphs with whitespace.
-- Emojis: 3-5 professional ones.
-- Length: STRICTLY between 150 and 220 words.
-- End with a strong CTA or question.
-- No labels (e.g., "Hook:", "Insight:").
-- No hashtags (the system adds them if needed).`;
-
-    try {
-        console.log(`[Autopilot] Generating post for topic: ${topic}`);
-        const model = getGeminiModel();
-        const result = await model.generateContent(prompt);
-        const text = result.response.text();
-
-        if (!text) throw new Error("Empty response from AI");
-
-        return text
-            .replace(/^(Hook|Headline|Body|CTA|Conclusion|Post|Draft|Insight|Lesson|Takeaway):\s*/gmi, "")
-            .replace(/\*\*(Hook|Headline|Body|CTA|Conclusion|Post|Draft|Insight|Lesson|Takeaway)\*\*:\s*/gmi, "")
-            .trim();
-
-    } catch (error: any) {
-        console.error("[Autopilot] Generation Failed:", error);
-        throw new Error("Autopilot generation failed.");
-    }
-}

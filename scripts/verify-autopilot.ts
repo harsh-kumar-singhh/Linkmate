@@ -1,3 +1,7 @@
+import * as dotenv from "dotenv";
+dotenv.config({ path: ".env.local" });
+dotenv.config();
+
 import { getPrisma } from "../lib/prisma";
 import { generateAutopilotPosts } from "../lib/autopilot/generator";
 import { format } from "date-fns";
