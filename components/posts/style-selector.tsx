@@ -11,6 +11,8 @@ interface StyleSelectorProps {
     value: string;
     onChange: (style: string) => void;
     styles: string[];
+}
+
 export function StyleSelector({ value, onChange, styles }: StyleSelectorProps) {
     const { isPro } = useUser();
     const router = useRouter();
