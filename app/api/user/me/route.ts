@@ -43,11 +43,12 @@ export async function GET() {
         theme: user.theme || "system",
         defaultTone: (user as any).defaultTone || "Professional",
         isConnected,
-        autopilotEnabled: (user as any).autopilotEnabled || false,
+        autopilotEnabled: Boolean((user as any).autopilotEnabled),
         autopilotTopics: (user as any).autopilotTopics || [],
         autopilotFrequency: (user as any).autopilotFrequency || "",
         autopilotDays: (user as any).autopilotDays || [],
         autopilotTime: (user as any).autopilotTime || "",
+        plan: user.plan || "free",
       },
     }, {
       headers: { "Cache-Control": "no-store" },

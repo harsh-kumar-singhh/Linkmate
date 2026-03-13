@@ -20,8 +20,10 @@ import {
     ChevronLeft,
     ChevronRight,
     Languages,
-    Lock
+    Lock,
+    LogOut
 } from "lucide-react";
+import { signOut } from "next-auth/react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
@@ -438,6 +440,18 @@ export function SettingsForm({ user, plan = "free" }: SettingsFormProps) {
                         </div>
                     </div>
                 </div>
+            </div>
+
+            {/* Logout Section */}
+            <div className="pt-8 border-t border-border/40">
+                <Button 
+                    variant="outline" 
+                    className="h-12 px-6 rounded-xl font-bold gap-2 text-red-500 border-red-200 hover:bg-red-50 dark:border-red-900/30 dark:hover:bg-red-900/20"
+                    onClick={() => signOut({ callbackUrl: "/" })}
+                >
+                    <LogOut className="w-4 h-4" />
+                    Sign Out
+                </Button>
             </div>
         </div>
     );
