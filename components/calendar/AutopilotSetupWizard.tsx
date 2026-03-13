@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { saveAutopilotSettings } from "@/lib/actions/autopilot";
 
+// Fix for Framer Motion version 12 type errors on Vercel
+const MotionDiv = motion.div as any;
+
 interface AutopilotSetupWizardProps {
     isOpen: boolean;
     onClose: () => void;
@@ -116,7 +119,7 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
 
                             <div className="min-h-[350px]">
                                 {step === 1 && (
-                                    <motion.div 
+                                    <MotionDiv 
                                         initial={{ opacity: 0, x: 20 }}
                                         animate={{ opacity: 1, x: 0 }}
                                         exit={{ opacity: 0, x: -20 }}
@@ -145,11 +148,11 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                         <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60 pt-4">
                                             {topics.length} / 5 Selected
                                         </div>
-                                    </motion.div>
+                                    </MotionDiv>
                                 )}
 
                                 {step === 2 && (
-                                    <motion.div 
+                                    <MotionDiv 
                                         initial={{ opacity: 0, x: 20 }}
                                         animate={{ opacity: 1, x: 0 }}
                                         exit={{ opacity: 0, x: -20 }}
@@ -180,11 +183,11 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                                 </button>
                                             ))}
                                         </div>
-                                    </motion.div>
+                                    </MotionDiv>
                                 )}
 
                                 {step === 3 && (
-                                    <motion.div 
+                                    <MotionDiv 
                                         initial={{ opacity: 0, x: 20 }}
                                         animate={{ opacity: 1, x: 0 }}
                                         exit={{ opacity: 0, x: -20 }}
@@ -230,7 +233,7 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                                 className="w-full h-14 bg-secondary/30 border-none rounded-2xl px-6 font-bold text-lg focus:ring-2 focus:ring-blue-600/30"
                                             />
                                         </div>
-                                    </motion.div>
+                                    </MotionDiv>
                                 )}
                             </div>
 
