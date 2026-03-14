@@ -327,7 +327,10 @@ export default function CalendarPage() {
                     topics: user.autopilotTopics,
                     frequency: user.autopilotFrequency,
                     days: user.autopilotDays,
-                    time: user.autopilotTime
+                    time: user.autopilotTime,
+                    aboutYou: user.autopilotAboutYou,
+                    currentFocus: user.autopilotCurrentFocus,
+                    writingStyleId: user.autopilotWritingStyleId
                 } : undefined}
             />
         </div>

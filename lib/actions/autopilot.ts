@@ -13,6 +13,9 @@ export async function saveAutopilotSettings(data: {
     frequency: string
     days: string[]
     time: string
+    aboutYou?: string
+    currentFocus?: string
+    writingStyleId?: string
 }) {
     const session = await auth()
     if (!session?.user?.id) {
@@ -48,6 +51,9 @@ export async function saveAutopilotSettings(data: {
                 autopilotFrequency: data.frequency,
                 autopilotDays: data.days,
                 autopilotTime: data.time,
+                autopilotAboutYou: data.aboutYou,
+                autopilotCurrentFocus: data.currentFocus,
+                autopilotWritingStyleId: data.writingStyleId,
             },
         })
 

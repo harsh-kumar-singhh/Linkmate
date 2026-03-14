@@ -11,6 +11,9 @@ export async function generateAutopilotPosts(userId: string) {
             autopilotTopics: true,
             autopilotDays: true,
             autopilotTime: true,
+            autopilotAboutYou: true,
+            autopilotCurrentFocus: true,
+            autopilotWritingStyleId: true,
             plan: true,
             defaultTone: true,
             writingStyles: true,
@@ -29,17 +32,32 @@ export async function generateAutopilotPosts(userId: string) {
     const daysEnabled = (user.autopilotDays as string[]) || [];
     const timeStr = user.autopilotTime || "09:00"; // Default to 9 AM
     
+    // Context compilation
+    const userContext = [
+        user.autopilotAboutYou ? `About Me: ${user.autopilotAboutYou}` : "",
+        user.autopilotCurrentFocus ? `Current Focus: ${user.autopilotCurrentFocus}` : ""
+    ].filter(Boolean).join("\n\n");
+
     // Preparation for "Write Like Me" or Tone
     const style = user.defaultTone || "Professional";
     let userWritingSample = undefined;
 
-    if (style.includes("Write Like Me") && user.writingStyles) {
+    if (user.autopilotWritingStyleId === "default" || style.includes("Write Like Me")) {
+        // If they explicitly enabled the toggle, or their default tone happens to be "Write Like Me"
         const styles = (user.writingStyles as any[]) || [];
-        const parts = style.split(/[\u2014\u2013-]/);
-        const styleName = parts.length > 1 ? parts[parts.length - 1].trim().toLowerCase() : "";
-        const matchedStyle = styles.find(s => s.name?.trim().toLowerCase() === styleName);
-        if (matchedStyle?.sample) {
-            userWritingSample = matchedStyle.sample;
+        
+        // Use the first sample if they toggled it explicitly, else try to match tone name
+        if (styles.length > 0) {
+            if (user.autopilotWritingStyleId === "default") {
+                userWritingSample = styles[0].sample;
+            } else {
+                const parts = style.split(/[\u2014\u2013-]/);
+                const styleName = parts.length > 1 ? parts[parts.length - 1].trim().toLowerCase() : "";
+                const matchedStyle = styles.find(s => s.name?.trim().toLowerCase() === styleName);
+                if (matchedStyle?.sample) {
+                    userWritingSample = matchedStyle.sample;
+                }
+            }
         }
     }
 
@@ -67,13 +85,14 @@ export async function generateAutopilotPosts(userId: string) {
                 continue;
             }
 
-            // Check if post already exists for this slot
+            // Check if post already exists for this exact time slot to prevent duplicates
+            // We use exact timestamp matching or very narrow window because autopilot always schedules at the exact HH:mm
             const existingPost = await prisma.post.findFirst({
                 where: {
                     userId,
                     scheduledFor: {
-                        gte: startOfDay(targetDate),
-                        lte: addDays(startOfDay(targetDate), 1),
+                        gte: scheduledFor,
+                        lte: new Date(scheduledFor.getTime() + 60000), // Within same minute
                     },
                     source: "autopilot",
                 },
@@ -90,8 +109,9 @@ export async function generateAutopilotPosts(userId: string) {
                     const { generatePost } = require("@/lib/gemini");
                     const content = await generatePost({
                         topic,
-                        style,
+                        style: user.autopilotWritingStyleId ? "Write Like Me" : style, // Force Write Like Me if toggle enabled
                         userWritingSample,
+                        context: userContext || undefined,
                         targetLength: 800, // Autopilot prefers slightly shorter, focused posts
                     });
                     console.log(`[Autopilot] AI generation completed in ${Date.now() - startTime}ms.`);

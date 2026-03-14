@@ -18,7 +18,10 @@ interface AutopilotSetupWizardProps {
         topics: string[];
         frequency: string;
         days: string[];
-        time: string;
+        time: string; // UTC
+        aboutYou?: string;
+        currentFocus?: string;
+        writingStyleId?: string;
     };
 }
 
@@ -38,7 +41,23 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
     const [customTopic, setCustomTopic] = useState("");
     const [frequency, setFrequency] = useState(initialData?.frequency || "3");
     const [days, setDays] = useState<string[]>(initialData?.days || ["Monday", "Wednesday", "Friday"]);
-    const [time, setTime] = useState(initialData?.time || "10:00");
+    
+    // Convert initial UTC time to Local Time for the input
+    const [time, setTime] = useState(() => {
+        if (!initialData?.time) return "10:00";
+        try {
+            const [hours, minutes] = initialData.time.split(":").map(Number);
+            const d = new Date();
+            d.setUTCHours(hours, minutes, 0, 0);
+            return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+        } catch {
+            return "10:00";
+        }
+    });
+
+    const [aboutYou, setAboutYou] = useState(initialData?.aboutYou || "");
+    const [currentFocus, setCurrentFocus] = useState(initialData?.currentFocus || "");
+    const [useSavedStyle, setUseSavedStyle] = useState(!!initialData?.writingStyleId);
 
     const maxDays = parseInt(frequency);
 
@@ -73,11 +92,20 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
     const handleActivate = async () => {
         setIsSaving(true);
         try {
+            // Convert selected Local Time to UTC string
+            const [hours, minutes] = time.split(":").map(Number);
+            const d = new Date();
+            d.setHours(hours, minutes, 0, 0);
+            const utcTime = `${d.getUTCHours().toString().padStart(2, '0')}:${d.getUTCMinutes().toString().padStart(2, '0')}`;
+
             await saveAutopilotSettings({
                 topics,
                 frequency,
                 days,
-                time,
+                time: utcTime,
+                aboutYou,
+                currentFocus,
+                writingStyleId: useSavedStyle ? "default" : undefined,
             });
             onClose();
         } catch (error) {
@@ -89,7 +117,7 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
     };
 
     const isStep1Valid = topics.length >= 3 && topics.length <= 5;
-    const isStep3Valid = days.length > 0;
+    const isStep3Valid = days.length === maxDays;
 
     return (
         <AnimatePresence>
@@ -105,7 +133,7 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                         className="bg-card rounded-[32px] shadow-premium w-full max-w-xl overflow-hidden border border-border transition-colors relative"
                     >
                         <div className="absolute top-0 left-0 right-0 h-1.5 bg-blue-600 flex">
-                            {[1, 2, 3].map((s) => (
+                            {[1, 2, 3, 4].map((s) => (
                                 <div 
                                     key={s} 
                                     className={cn(
@@ -300,6 +328,59 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                         </div>
                                     </MotionDiv>
                                 )}
+
+                                {step === 4 && (
+                                    <MotionDiv 
+                                        initial={{ opacity: 0, x: 20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: -20 }}
+                                        className="space-y-8"
+                                    >
+                                        <div className="space-y-1">
+                                            <h3 className="text-xl font-bold">Personalize your AI</h3>
+                                            <p className="text-sm text-muted-foreground">Give the AI context so posts sound like you.</p>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            <div className="space-y-1.5">
+                                                <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">About You (Optional)</label>
+                                                <textarea 
+                                                    value={aboutYou}
+                                                    onChange={(e) => setAboutYou(e.target.value)}
+                                                    placeholder="e.g., Founder building an AI SaaS called Linkmate that helps professionals grow on LinkedIn."
+                                                    className="w-full h-24 bg-secondary/30 border-none rounded-2xl p-4 text-sm focus:ring-2 focus:ring-blue-600/30 resize-none"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-1.5">
+                                                <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Current Focus (Optional)</label>
+                                                <textarea 
+                                                    value={currentFocus}
+                                                    onChange={(e) => setCurrentFocus(e.target.value)}
+                                                    placeholder="e.g., Preparing to launch Linkmate publicly and documenting the journey."
+                                                    className="w-full h-24 bg-secondary/30 border-none rounded-2xl p-4 text-sm focus:ring-2 focus:ring-blue-600/30 resize-none"
+                                                />
+                                            </div>
+
+                                            <button
+                                                onClick={() => setUseSavedStyle(!useSavedStyle)}
+                                                className={cn(
+                                                    "w-full p-4 rounded-2xl flex items-center justify-between transition-all border text-left mt-2",
+                                                    useSavedStyle
+                                                        ? "bg-blue-600/5 border-blue-600 text-foreground ring-1 ring-blue-600"
+                                                        : "bg-secondary/30 border-transparent text-muted-foreground hover:bg-secondary/50"
+                                                )}
+                                            >
+                                                <span className="font-bold text-sm">Use my saved writing style automatically</span>
+                                                {useSavedStyle && (
+                                                    <div className="bg-blue-600 rounded-full p-1 text-white shrink-0">
+                                                        <Check className="w-3 h-3" />
+                                                    </div>
+                                                )}
+                                            </button>
+                                        </div>
+                                    </MotionDiv>
+                                )}
                             </div>
 
                             <div className="flex items-center gap-4 pt-10 mt-auto">
@@ -314,11 +395,11 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                     </Button>
                                 )}
                                 
-                                {step < 3 ? (
+                                {step < 4 ? (
                                     <Button
                                         onClick={handleNext}
                                         className="flex-1 h-14 rounded-2xl text-base font-bold gap-2"
-                                        disabled={step === 1 && !isStep1Valid}
+                                        disabled={(step === 1 && !isStep1Valid) || (step === 3 && !isStep3Valid)}
                                     >
                                         <span>Next Step</span>
                                         <ArrowRight className="w-4 h-4" />
