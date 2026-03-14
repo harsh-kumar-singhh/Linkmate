@@ -18,9 +18,12 @@ export async function generateAutopilotPosts(userId: string) {
     });
 
     if (!user || !user.autopilotEnabled || user.plan?.toUpperCase() !== "PRO") {
-        console.log(`[Autopilot] User ${userId} not eligible for autopilot generation.`);
+        console.log(`[Autopilot] User ${userId} not eligible for autopilot generation. User state: Enabled=${user?.autopilotEnabled}, Plan=${user?.plan}`);
         return;
     }
+
+    console.log(`[Autopilot] Starting generation pipeline for user ${userId}`);
+    console.log(`[Autopilot] Configuration: Topics=${user.autopilotTopics}, Days=${user.autopilotDays}, Time=${user.autopilotTime}`);
 
     const topics = (user.autopilotTopics as string[]) || [];
     const daysEnabled = (user.autopilotDays as string[]) || [];
@@ -48,6 +51,7 @@ export async function generateAutopilotPosts(userId: string) {
     // Generate for the next 7 days
     const now = new Date();
     const generatedPosts = [];
+    let detectedSlots = 0;
 
     for (let i = 0; i < 7; i++) {
         const targetDate = addDays(now, i);
@@ -76,10 +80,13 @@ export async function generateAutopilotPosts(userId: string) {
             });
 
             if (!existingPost) {
+                detectedSlots++;
                 // Select a topic (random rotation)
                 const topic = topics[Math.floor(Math.random() * topics.length)];
 
                 try {
+                    console.log(`[Autopilot] AI generation starting for slot: ${dayName} ${scheduledFor.toISOString()}...`);
+                    const startTime = Date.now();
                     const { generatePost } = require("@/lib/gemini");
                     const content = await generatePost({
                         topic,
@@ -87,24 +94,32 @@ export async function generateAutopilotPosts(userId: string) {
                         userWritingSample,
                         targetLength: 800, // Autopilot prefers slightly shorter, focused posts
                     });
+                    console.log(`[Autopilot] AI generation completed in ${Date.now() - startTime}ms.`);
 
                     const post = await prisma.post.create({
                         data: {
                             userId,
                             content,
-                            status: "DRAFT",
+                            status: "SCHEDULED",
                             scheduledFor,
                             source: "autopilot",
                         },
                     });
 
                     generatedPosts.push(post);
-                    console.log(`[Autopilot] Generated post for user ${userId} on ${dayName} (${scheduledFor.toISOString()})`);
+                    console.log(`[Autopilot] Saved post to DB: ID=${post.id}, Status=${post.status}, ScheduledFor=${post.scheduledFor?.toISOString()}`);
                 } catch (error) {
                     console.error(`[Autopilot] Failed to generate post for user ${userId} on ${dayName}:`, error);
                 }
+            } else {
+                console.log(`[Autopilot] Slot already filled for ${dayName} (${scheduledFor.toISOString()})`);
             }
         }
+    }
+
+    console.log(`[Autopilot] Slot detection complete. Total valid slots found for next 7 days: ${detectedSlots}`);
+    if (detectedSlots === 0) {
+        console.log(`[Autopilot] 0 slots detected. Check if daysEnabled (${daysEnabled.join(", ")}) matches the upcoming 7 days, or if time has already passed for today.`);
     }
 
     return generatedPosts;

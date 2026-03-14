@@ -52,9 +52,11 @@ export async function saveAutopilotSettings(data: {
         })
 
         // Immediate generation for the upcoming week/days
-        generateAutopilotPosts(session.user.id).catch(err => {
+        console.log("[Autopilot] Triggering immediate generation from settings save...");
+        await generateAutopilotPosts(session.user.id).catch(err => {
             console.error("Delayed Autopilot generation failed:", err)
         })
+        console.log("[Autopilot] Generation pipeline completed. Proceeding to return success response.");
 
         revalidatePath("/calendar")
         return { success: true }
