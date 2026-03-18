@@ -83,6 +83,11 @@ export async function generateAutopilotPosts(userId: string) {
             Math.abs(slot.getTime() - post.scheduledFor!.getTime()) < 60000 // Within 1 minute
         );
 
+        if (post.userModified) {
+            console.log(`[Autopilot] Skipping user-modified post: ID=${post.id}`);
+            continue;
+        }
+
         if (!isTopicValid || !isSlotValid) {
             console.log(`[Autopilot] Deleting obsolete post: ID=${post.id}, Reason=${!isTopicValid ? "Topic Outdated" : "Slot Outdated"}`);
             await prisma.post.delete({ where: { id: post.id } });

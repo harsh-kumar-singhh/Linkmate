@@ -86,6 +86,7 @@ export async function PUT(
                 imageUrl: imageUrl !== undefined ? imageUrl : undefined,
                 imageData: imageData !== undefined ? imageData : undefined,
                 writingStyle: writingStyle !== undefined ? writingStyle : undefined,
+                userModified: true, // Mark as user-controlled on any manual edit
             } as any,
         });
 

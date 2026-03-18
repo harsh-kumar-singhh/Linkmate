@@ -105,6 +105,7 @@ model Post {
   failureReason  String?
   retryCount     Int        @default(0)
   notified       Boolean    @default(false)
+  userModified   Boolean    @default(false)
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
   source         String     @default("MANUAL") // "AI", "MANUAL", or "autopilot"

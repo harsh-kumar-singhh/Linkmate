@@ -22,6 +22,7 @@ interface AutopilotSetupWizardProps {
         aboutYou?: string;
         currentFocus?: string;
         writingStyleId?: string;
+        writingStyles?: Array<{ id: string; name: string }>;
     };
 }
 
@@ -57,7 +58,10 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
 
     const [aboutYou, setAboutYou] = useState(initialData?.aboutYou || "");
     const [currentFocus, setCurrentFocus] = useState(initialData?.currentFocus || "");
-    const [useSavedStyle, setUseSavedStyle] = useState(!!initialData?.writingStyleId);
+    const [writingStyleId, setWritingStyleId] = useState<string>(initialData?.writingStyleId || "default");
+    const [selectionMode, setSelectionMode] = useState<"automatic" | "manual">(
+        initialData?.writingStyleId && initialData.writingStyleId !== "default" ? "manual" : "automatic"
+    );
 
     const maxDays = parseInt(frequency);
 
@@ -105,7 +109,7 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                 time: utcTime,
                 aboutYou,
                 currentFocus,
-                writingStyleId: useSavedStyle ? "default" : undefined,
+                writingStyleId: selectionMode === "automatic" ? "default" : writingStyleId,
             });
             onClose();
         } catch (error) {
@@ -362,22 +366,71 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                                 />
                                             </div>
 
-                                            <button
-                                                onClick={() => setUseSavedStyle(!useSavedStyle)}
-                                                className={cn(
-                                                    "w-full p-4 rounded-2xl flex items-center justify-between transition-all border text-left mt-2",
-                                                    useSavedStyle
-                                                        ? "bg-blue-600/5 border-blue-600 text-foreground ring-1 ring-blue-600"
-                                                        : "bg-secondary/30 border-transparent text-muted-foreground hover:bg-secondary/50"
-                                                )}
-                                            >
-                                                <span className="font-bold text-sm">Use my saved writing style automatically</span>
-                                                {useSavedStyle && (
-                                                    <div className="bg-blue-600 rounded-full p-1 text-white shrink-0">
-                                                        <Check className="w-3 h-3" />
+                                            <div className="space-y-4 pt-2">
+                                                <div className="space-y-1">
+                                                    <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Writing Style</label>
+                                                    <div className="flex flex-col gap-2">
+                                                        <button
+                                                            onClick={() => setSelectionMode("automatic")}
+                                                            className={cn(
+                                                                "w-full p-4 rounded-xl flex items-center justify-between transition-all border text-left",
+                                                                selectionMode === "automatic"
+                                                                    ? "bg-blue-600/5 border-blue-600 text-foreground ring-1 ring-blue-600"
+                                                                    : "bg-secondary/30 border-transparent text-muted-foreground hover:bg-secondary/50"
+                                                            )}
+                                                        >
+                                                            <div className="flex flex-col">
+                                                                <span className="font-bold text-sm">Automatic Selection</span>
+                                                                <span className="text-[10px] opacity-70">Best AI style for your profile</span>
+                                                            </div>
+                                                            {selectionMode === "automatic" && <Check className="w-4 h-4 text-blue-600" />}
+                                                        </button>
+
+                                                        <button
+                                                            onClick={() => setSelectionMode("manual")}
+                                                            className={cn(
+                                                                "w-full p-4 rounded-xl flex items-center justify-between transition-all border text-left",
+                                                                selectionMode === "manual"
+                                                                    ? "bg-blue-600/5 border-blue-600 text-foreground ring-1 ring-blue-600"
+                                                                    : "bg-secondary/30 border-transparent text-muted-foreground hover:bg-secondary/50"
+                                                            )}
+                                                        >
+                                                            <div className="flex flex-col">
+                                                                <span className="font-bold text-sm">Select Style Manually</span>
+                                                                <span className="text-[10px] opacity-70">Use a specific style you created</span>
+                                                            </div>
+                                                            {selectionMode === "manual" && <Check className="w-4 h-4 text-blue-600" />}
+                                                        </button>
                                                     </div>
+                                                </div>
+
+                                                {selectionMode === "manual" && initialData?.writingStyles && initialData.writingStyles.length > 0 && (
+                                                    <MotionDiv
+                                                        initial={{ opacity: 0, height: 0 }}
+                                                        animate={{ opacity: 1, height: "auto" }}
+                                                        className="space-y-2"
+                                                    >
+                                                        <select
+                                                            value={writingStyleId}
+                                                            onChange={(e) => setWritingStyleId(e.target.value)}
+                                                            className="w-full h-12 bg-secondary/30 border-none rounded-xl px-4 text-sm font-medium focus:ring-2 focus:ring-blue-600/30"
+                                                        >
+                                                            <option value="default">Select a style...</option>
+                                                            {initialData.writingStyles.map((style: any) => (
+                                                                <option key={style.id} value={style.id}>
+                                                                    {style.name}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </MotionDiv>
                                                 )}
-                                            </button>
+
+                                                {selectionMode === "manual" && (!initialData?.writingStyles || initialData.writingStyles.length === 0) && (
+                                                    <p className="text-[10px] text-amber-500 font-medium">
+                                                        You haven't created any writing styles yet.
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
                                     </MotionDiv>
                                 )}
