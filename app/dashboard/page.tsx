@@ -24,7 +24,7 @@ import {
   Zap,
   Sparkles
 } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, formatTimeAMPM } from "@/lib/utils"
 import { format } from "date-fns"
 import { AICoach } from "@/components/ai/AICoach"
 
@@ -354,7 +354,7 @@ function PostCard({ post, index }: { post: Post, index: number }) {
                 {isScheduled && post.scheduledFor && (
                   <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-primary/5 text-primary text-[11px] font-bold border border-primary/10">
                     <Clock className="w-3 h-3" />
-                    {format(new Date(post.scheduledFor), "MMM d, h:mm a")}
+                    {format(new Date(post.scheduledFor), "MMM d")} • {formatTimeAMPM(post.scheduledFor)}
                   </div>
                 )}
 

@@ -11,6 +11,7 @@ export async function generateAutopilotPosts(userId: string) {
             autopilotTopics: true,
             autopilotDays: true,
             autopilotTime: true,
+            autopilotFrequency: true,
             autopilotAboutYou: true,
             autopilotCurrentFocus: true,
             autopilotWritingStyleId: true,
@@ -20,33 +21,86 @@ export async function generateAutopilotPosts(userId: string) {
         },
     });
 
-    if (!user || !user.autopilotEnabled || user.plan?.toUpperCase() !== "PRO") {
-        console.log(`[Autopilot] User ${userId} not eligible for autopilot generation. User state: Enabled=${user?.autopilotEnabled}, Plan=${user?.plan}`);
+    if (!user || user.plan?.toUpperCase() !== "PRO") {
+        console.log(`[Autopilot] User ${userId} not eligible for autopilot generation.`);
         return;
     }
 
-    console.log(`[Autopilot] Starting generation pipeline for user ${userId}`);
-    console.log(`[Autopilot] Configuration: Topics=${user.autopilotTopics}, Days=${user.autopilotDays}, Time=${user.autopilotTime}`);
-
     const topics = (user.autopilotTopics as string[]) || [];
     const daysEnabled = (user.autopilotDays as string[]) || [];
-    const timeStr = user.autopilotTime || "09:00"; // Default to 9 AM
+    const timeStr = user.autopilotTime || "10:00"; // UTC HH:mm
     
-    // Context compilation
+    if (topics.length === 0 || daysEnabled.length === 0) {
+        console.log(`[Autopilot] User ${userId} has incomplete configuration.`);
+        return;
+    }
+
+    console.log(`[Autopilot] Starting smart generation pipeline for user ${userId}`);
+
+    const now = new Date();
+    
+    // 1. Fetch all future autopilot posts
+    const futurePosts = await prisma.post.findMany({
+        where: {
+            userId,
+            source: "autopilot",
+            scheduledFor: { gt: now }
+        }
+    });
+
+    // 2. Define valid slots for the next 7 days
+    const validSlots: Date[] = [];
+    const [utcHours, utcMinutes] = timeStr.split(":").map(Number);
+
+    for (let i = 0; i < 7; i++) {
+        const targetDate = addDays(now, i);
+        const dayName = format(targetDate, "EEEE");
+
+        if (daysEnabled.includes(dayName)) {
+            // Calculate scheduledFor in UTC
+            let scheduledFor = new Date(Date.UTC(
+                targetDate.getUTCFullYear(),
+                targetDate.getUTCMonth(),
+                targetDate.getUTCDate(),
+                utcHours,
+                utcMinutes,
+                0,
+                0
+            ));
+
+            if (isAfter(scheduledFor, now)) {
+                validSlots.push(scheduledFor);
+            }
+        }
+    }
+
+    // 3. Diffing: Identify posts to delete
+    // - Posts with topics no longer in the list
+    // - Posts not matching one of the new valid slots
+    for (const post of futurePosts) {
+        const isTopicValid = post.topic && topics.includes(post.topic);
+        const isSlotValid = post.scheduledFor && validSlots.some(slot => 
+            Math.abs(slot.getTime() - post.scheduledFor!.getTime()) < 60000 // Within 1 minute
+        );
+
+        if (!isTopicValid || !isSlotValid) {
+            console.log(`[Autopilot] Deleting obsolete post: ID=${post.id}, Reason=${!isTopicValid ? "Topic Outdated" : "Slot Outdated"}`);
+            await prisma.post.delete({ where: { id: post.id } });
+        }
+    }
+
+    // 4. Generate missing slots
+    const generatedPosts = [];
     const userContext = [
         user.autopilotAboutYou ? `About Me: ${user.autopilotAboutYou}` : "",
         user.autopilotCurrentFocus ? `Current Focus: ${user.autopilotCurrentFocus}` : ""
     ].filter(Boolean).join("\n\n");
 
-    // Preparation for "Write Like Me" or Tone
     const style = user.defaultTone || "Professional";
     let userWritingSample = undefined;
 
     if (user.autopilotWritingStyleId === "default" || style.includes("Write Like Me")) {
-        // If they explicitly enabled the toggle, or their default tone happens to be "Write Like Me"
         const styles = (user.writingStyles as any[]) || [];
-        
-        // Use the first sample if they toggled it explicitly, else try to match tone name
         if (styles.length > 0) {
             if (user.autopilotWritingStyleId === "default") {
                 userWritingSample = styles[0].sample;
@@ -61,86 +115,59 @@ export async function generateAutopilotPosts(userId: string) {
         }
     }
 
-    if (topics.length === 0 || daysEnabled.length === 0) {
-        console.log(`[Autopilot] User ${userId} has incomplete configuration.`);
-        return;
-    }
+    const { generatePost } = require("@/lib/gemini");
 
-    // Generate for the next 7 days
-    const now = new Date();
-    const generatedPosts = [];
-    let detectedSlots = 0;
-
-    for (let i = 0; i < 7; i++) {
-        const targetDate = addDays(now, i);
-        const dayName = format(targetDate, "EEEE"); // e.g., "Monday"
-
-        if (daysEnabled.includes(dayName)) {
-            // Calculate scheduled time
-            const [hours, minutes] = timeStr.split(":").map(Number);
-            let scheduledFor = setMinutes(setHours(startOfDay(targetDate), hours), minutes);
-
-            // If it's today and the time has already passed, skip
-            if (i === 0 && !isAfter(scheduledFor, now)) {
-                continue;
+    for (const slot of validSlots) {
+        // Check if we already have a post for this slot (after cleaning)
+        const alreadyHasPost = await prisma.post.findFirst({
+            where: {
+                userId,
+                source: "autopilot",
+                scheduledFor: {
+                    gte: new Date(slot.getTime() - 30000),
+                    lte: new Date(slot.getTime() + 30000)
+                }
             }
+        });
 
-            // Check if post already exists for this exact time slot to prevent duplicates
-            // We use exact timestamp matching or very narrow window because autopilot always schedules at the exact HH:mm
-            const existingPost = await prisma.post.findFirst({
-                where: {
+        if (alreadyHasPost) {
+            console.log(`[Autopilot] Slot already filled: ${slot.toISOString()}`);
+            continue;
+        }
+
+        // Generate new post
+        try {
+            const topic = topics[Math.floor(Math.random() * topics.length)];
+            console.log(`[Autopilot] Generating for slot: ${slot.toISOString()} (Topic: ${topic})`);
+            
+            const content = await generatePost({
+                topic,
+                style: user.autopilotWritingStyleId ? "Write Like Me" : style,
+                userWritingSample,
+                context: userContext || undefined,
+                targetLength: 800,
+            });
+
+            const status = user.autopilotEnabled ? "SCHEDULED" : "PAUSED";
+
+            const post = await prisma.post.create({
+                data: {
                     userId,
-                    scheduledFor: {
-                        gte: scheduledFor,
-                        lte: new Date(scheduledFor.getTime() + 60000), // Within same minute
-                    },
+                    content,
+                    status,
+                    scheduledFor: slot,
                     source: "autopilot",
+                    topic
                 },
             });
 
-            if (!existingPost) {
-                detectedSlots++;
-                // Select a topic (random rotation)
-                const topic = topics[Math.floor(Math.random() * topics.length)];
-
-                try {
-                    console.log(`[Autopilot] AI generation starting for slot: ${dayName} ${scheduledFor.toISOString()}...`);
-                    const startTime = Date.now();
-                    const { generatePost } = require("@/lib/gemini");
-                    const content = await generatePost({
-                        topic,
-                        style: user.autopilotWritingStyleId ? "Write Like Me" : style, // Force Write Like Me if toggle enabled
-                        userWritingSample,
-                        context: userContext || undefined,
-                        targetLength: 800, // Autopilot prefers slightly shorter, focused posts
-                    });
-                    console.log(`[Autopilot] AI generation completed in ${Date.now() - startTime}ms.`);
-
-                    const post = await prisma.post.create({
-                        data: {
-                            userId,
-                            content,
-                            status: "SCHEDULED",
-                            scheduledFor,
-                            source: "autopilot",
-                        },
-                    });
-
-                    generatedPosts.push(post);
-                    console.log(`[Autopilot] Saved post to DB: ID=${post.id}, Status=${post.status}, ScheduledFor=${post.scheduledFor?.toISOString()}`);
-                } catch (error) {
-                    console.error(`[Autopilot] Failed to generate post for user ${userId} on ${dayName}:`, error);
-                }
-            } else {
-                console.log(`[Autopilot] Slot already filled for ${dayName} (${scheduledFor.toISOString()})`);
-            }
+            generatedPosts.push(post);
+        } catch (error) {
+            console.error(`[Autopilot] Failed to generate for slot ${slot.toISOString()}:`, error);
         }
     }
 
-    console.log(`[Autopilot] Slot detection complete. Total valid slots found for next 7 days: ${detectedSlots}`);
-    if (detectedSlots === 0) {
-        console.log(`[Autopilot] 0 slots detected. Check if daysEnabled (${daysEnabled.join(", ")}) matches the upcoming 7 days, or if time has already passed for today.`);
-    }
-
+    console.log(`[Autopilot] Generation complete. New posts: ${generatedPosts.length}`);
     return generatedPosts;
 }
+

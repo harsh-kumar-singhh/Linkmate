@@ -79,12 +79,34 @@ export async function toggleAutopilot(enabled: boolean) {
     }
 
     try {
-        await prisma.user.update({
-            where: { id: session.user.id },
-            data: {
-                autopilotEnabled: enabled,
-            },
-        })
+        const now = new Date();
+
+        await prisma.$transaction([
+            // Update user setting
+            prisma.user.update({
+                where: { id: session.user.id },
+                data: { autopilotEnabled: enabled },
+            }),
+            // Update future posts status
+            prisma.post.updateMany({
+                where: {
+                    userId: session.user.id,
+                    source: "autopilot",
+                    scheduledFor: { gt: now },
+                    status: enabled ? "PAUSED" : "SCHEDULED"
+                },
+                data: {
+                    status: enabled ? "SCHEDULED" : "PAUSED"
+                }
+            })
+        ]);
+
+        if (enabled) {
+            // If resuming, ensure we have posts for the next 7 days
+            await generateAutopilotPosts(session.user.id).catch(err => {
+                console.error("Delayed Autopilot generation failed:", err)
+            });
+        }
 
         revalidatePath("/calendar")
         return { success: true }

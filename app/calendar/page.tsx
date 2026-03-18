@@ -18,7 +18,7 @@ import {
     Sparkles
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { cn, formatTimeAMPM } from "@/lib/utils"
 import { UpgradeModal } from "@/components/calendar/UpgradeModal"
 import { AutopilotSetupWizard } from "@/components/calendar/AutopilotSetupWizard"
 import { toggleAutopilot } from "@/lib/actions/autopilot"
@@ -181,7 +181,13 @@ export default function CalendarPage() {
                             </div>
                              <div className="space-y-2">
                                 <p className="text-sm text-muted-foreground">
-                                    {user.autopilotFrequency} posts/week • {user.autopilotDays.length} days active • Posting at {user.autopilotTime}
+                                    {user.autopilotFrequency} posts/week • {user.autopilotDays.length} days active • Posting at {(() => {
+                                        if (!user.autopilotTime) return "10:00 AM";
+                                        const [h, m] = user.autopilotTime.split(':').map(Number);
+                                        const d = new Date();
+                                        d.setUTCHours(h, m, 0, 0);
+                                        return formatTimeAMPM(d);
+                                    })()}
                                 </p>
                                 <div className="flex flex-wrap gap-1.5">
                                     {user.autopilotTopics?.map((topic: string) => (
