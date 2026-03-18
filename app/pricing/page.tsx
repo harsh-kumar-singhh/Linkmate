@@ -43,7 +43,7 @@ function FAQItem({ question, answer }: { question: string, answer: string }) {
 
 export default function PricingPage() {
   const { user } = useUser()
-  const userPlan = user?.plan || "free"
+  const userPlan = (user?.plan || "FREE").toUpperCase()
 
   const plans = [
     {
@@ -78,7 +78,7 @@ export default function PricingPage() {
         { text: "Priority support", included: true },
       ],
       cta: "Upgrade to Pro",
-      href: "/api/payments/razorpay/checkout",
+      href: "#",
       featured: true,
     },
   ]
@@ -108,7 +108,7 @@ export default function PricingPage() {
 
   const handleUpgrade = async () => {
     try {
-      const response = await fetch("/api/payments/razorpay", {
+      const response = await fetch("/api/create-subscription", {
         method: "POST",
       })
 
@@ -120,15 +120,14 @@ export default function PricingPage() {
       }
 
       const options = {
-        key: data.key,
-        amount: data.amount,
-        currency: data.currency,
+        key: data.razorpayKey,
+        subscription_id: data.subscriptionId,
         name: "Linkmate Pro",
         description: "Monthly subscription for Linkmate Pro",
-        order_id: data.orderId,
         handler: async function (response: any) {
-          alert("Payment successful! Your account will be upgraded shortly.")
-          window.location.href = "/dashboard"
+          console.log("Payment successful for subscription:", response.razorpay_subscription_id);
+          alert("Payment successful! Your account will be upgraded within a few minutes.");
+          window.location.href = "/dashboard";
         },
         prefill: {
           name: user?.name || "",
@@ -137,6 +136,11 @@ export default function PricingPage() {
         theme: {
           color: "#3b82f6",
         },
+        modal: {
+          ondismiss: function() {
+            console.log("Checkout modal closed");
+          }
+        }
       }
 
       const rzp = new (window as any).Razorpay(options)
@@ -221,7 +225,7 @@ export default function PricingPage() {
                 ))}
               </div>
 
-              {userPlan === plan.id ? (
+              {userPlan === plan.id.toUpperCase() ? (
                 <button
                   disabled
                   className="w-full py-4 rounded-xl font-semibold bg-muted text-muted-foreground cursor-not-allowed flex items-center justify-center gap-2 border border-border"

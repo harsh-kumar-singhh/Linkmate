@@ -36,7 +36,7 @@ function EditorContent() {
     const { user, isPro, isLoading } = useUser()
     const searchParams = useSearchParams()
     const router = useRouter()
-    const userPlan = user?.plan || "free"
+    const userPlan = (user?.plan || "FREE").toUpperCase()
 
     // State
     const [mode, setMode] = useState<"ai" | "manual">("ai")

@@ -48,7 +48,7 @@ export async function GET() {
         autopilotFrequency: (user as any).autopilotFrequency || "",
         autopilotDays: (user as any).autopilotDays || [],
         autopilotTime: (user as any).autopilotTime || "",
-        plan: user.plan || "free",
+        plan: (user.plan || "FREE").toUpperCase(),
       },
     }, {
       headers: { "Cache-Control": "no-store" },

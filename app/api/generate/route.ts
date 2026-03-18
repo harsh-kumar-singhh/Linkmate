@@ -42,7 +42,7 @@ export async function POST(req: Request) {
         }
 
         // --- ENFORCE DAILY QUOTA (POST GENERATION) ---
-        const plan = session.user.plan || "free";
+        const plan = (session.user.plan || "FREE").toUpperCase();
         const quota = await checkAndIncrementAIQuota(userId, AIUsageType.AI_POST_GENERATION, plan);
         if (!quota.allowed) {
             return NextResponse.json(

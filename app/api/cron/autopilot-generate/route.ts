@@ -22,7 +22,7 @@ export async function GET(req: Request) {
         const users = await prisma.user.findMany({
             where: {
                 autopilotEnabled: true,
-                plan: "pro", // Case sensitive based on how it's stored, usually 'pro' or 'free'
+                plan: "PRO", // Standardized to uppercase
             },
             select: { id: true }
         });

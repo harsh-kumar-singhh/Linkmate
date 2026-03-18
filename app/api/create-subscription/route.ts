@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getPrisma } from "@/lib/prisma";
+import Razorpay from "razorpay";
 
-const prisma = getPrisma();
+const razorpay = new Razorpay({
+    key_id: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
+    key_secret: process.env.RAZORPAY_KEY_SECRET!,
+});
 
-/**
- * Placeholder for Razorpay subscription creation
- * This route will eventually interface with Razorpay API and save subscription metadata
- */
 export async function POST(req: NextRequest) {
     try {
         const session = await auth();
@@ -15,19 +14,31 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { planType } = await req.json();
+        const planId = process.env.RAZORPAY_PLAN_ID;
+        if (!planId) {
+            console.error("RAZORPAY_PLAN_ID is not configured");
+            return NextResponse.json({ error: "Payment configuration missing" }, { status: 500 });
+        }
 
-        // Placeholder for Razorpay subscription logic
-        console.log(`[Razorpay] Create subscription placeholder for user ${session.user.id}, Plan: ${planType}`);
+        // Create Razorpay subscription
+        const subscription = await razorpay.subscriptions.create({
+            plan_id: planId,
+            customer_notify: 1,
+            total_count: 12, // For a year, or however many cycles
+            notes: {
+                userId: session.user.id,
+            },
+        });
+
+        console.log(`[Razorpay] Created subscription ${subscription.id} for user ${session.user.id}`);
 
         return NextResponse.json({
             success: true,
-            message: "Subscription placeholder created",
-            subscriptionId: "sub_placeholder_" + Date.now(),
-            razorpayKey: process.env.RAZORPAY_KEY_ID || "rzp_test_placeholder"
+            subscriptionId: subscription.id,
+            razorpayKey: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID
         });
-    } catch (error) {
+    } catch (error: any) {
         console.error("Razorpay subscription error:", error);
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+        return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
     }
 }

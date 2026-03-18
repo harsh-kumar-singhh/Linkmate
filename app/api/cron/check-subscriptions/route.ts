@@ -1,0 +1,55 @@
+import { NextResponse } from "next/server";
+import { getPrisma } from "@/lib/prisma";
+
+const prisma = getPrisma();
+
+/**
+ * Cron job to downgrade users whose PRO plan has expired.
+ * This should be called regularly (e.g., daily).
+ */
+export async function GET(req: Request) {
+    try {
+        const now = new Date();
+
+        // 1. Find users with PRO plan that has expired
+        const expiredUsers = await prisma.user.findMany({
+            where: {
+                plan: "PRO",
+                planExpiry: {
+                    lt: now,
+                },
+            } as any,
+            select: { id: true, email: true }
+        });
+
+        if (expiredUsers.length === 0) {
+            return NextResponse.json({ message: "No expired subscriptions found" });
+        }
+
+        console.log(`[CRON] Found ${expiredUsers.length} users with expired PRO plans.`);
+
+        // 2. Downgrade users
+        const updateResult = await prisma.user.updateMany({
+            where: {
+                id: {
+                    in: expiredUsers.map((u) => u.id),
+                },
+            },
+            data: {
+                plan: "FREE",
+                autopilotEnabled: false,
+            },
+        });
+
+        console.log(`[CRON] SUCCESSFULLY Downgraded ${updateResult.count} users.`);
+
+        return NextResponse.json({
+            success: true,
+            message: `Successfully downgraded ${updateResult.count} users`,
+            downgradedCount: updateResult.count
+        });
+    } catch (error: any) {
+        console.error("[CRON ERROR] Subscription check failed:", error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    }
+}

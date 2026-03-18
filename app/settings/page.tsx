@@ -34,7 +34,7 @@ export default async function SettingsPage() {
     });
 
     const isConnected = !!(user?.accounts && user.accounts.some(a => a.access_token));
-    const userPlan = user?.plan || "free";
+    const userPlan = (user?.plan || "FREE").toUpperCase();
 
     return (
         <div className="max-w-4xl mx-auto py-8 md:py-12 px-4 md:px-6 space-y-12">
