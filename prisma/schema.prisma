@@ -43,6 +43,10 @@ model User {
   posts         Post[]
   aiUsage       AIUsage[]
   schedule      Schedule?
+
+  planExpiry              DateTime?
+  razorpayCustomerId      String?
+  razorpaySubscriptionId  String?
 }
 
 // OAuth Account (LinkedIn connection)

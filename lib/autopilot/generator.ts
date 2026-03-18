@@ -77,7 +77,8 @@ export async function generateAutopilotPosts(userId: string) {
     // 3. Diffing: Identify posts to delete
     // - Posts with topics no longer in the list
     // - Posts not matching one of the new valid slots
-    for (const post of futurePosts) {
+    for (const postObj of futurePosts) {
+        const post = postObj as any;
         const isTopicValid = post.topic && topics.includes(post.topic);
         const isSlotValid = post.scheduledFor && validSlots.some(slot => 
             Math.abs(slot.getTime() - post.scheduledFor!.getTime()) < 60000 // Within 1 minute
@@ -89,6 +90,7 @@ export async function generateAutopilotPosts(userId: string) {
         }
 
         if (!isTopicValid || !isSlotValid) {
+
             console.log(`[Autopilot] Deleting obsolete post: ID=${post.id}, Reason=${!isTopicValid ? "Topic Outdated" : "Slot Outdated"}`);
             await prisma.post.delete({ where: { id: post.id } });
         }
@@ -104,23 +106,35 @@ export async function generateAutopilotPosts(userId: string) {
     const style = user.defaultTone || "Professional";
     let userWritingSample = undefined;
 
-    if (user.autopilotWritingStyleId === "default" || style.includes("Write Like Me")) {
-        const styles = (user.writingStyles as any[]) || [];
-        if (styles.length > 0) {
-            if (user.autopilotWritingStyleId === "default") {
-                userWritingSample = styles[0].sample;
-            } else {
-                const parts = style.split(/[\u2014\u2013-]/);
-                const styleName = parts.length > 1 ? parts[parts.length - 1].trim().toLowerCase() : "";
-                const matchedStyle = styles.find(s => s.name?.trim().toLowerCase() === styleName);
-                if (matchedStyle?.sample) {
-                    userWritingSample = matchedStyle.sample;
-                }
-            }
+    // Correct writing style selection logic
+    const styles = (user.writingStyles as any[]) || [];
+    if (user.autopilotWritingStyleId && user.autopilotWritingStyleId !== "default") {
+        const matchedStyle = styles.find(s => s.id === user.autopilotWritingStyleId);
+        if (matchedStyle?.sample) {
+            userWritingSample = matchedStyle.sample;
         }
+    } else if (style.includes("Write Like Me") && styles.length > 0) {
+        // Fallback for global "Write Like Me" setting
+        userWritingSample = styles[0].sample;
     }
 
     const { generatePost } = require("@/lib/gemini");
+
+    // Fetch existing autopilot posts to determine topic usage for rotation
+    const historicalPosts = await prisma.post.findMany({
+        where: { userId, source: "autopilot" },
+        orderBy: { scheduledFor: "desc" },
+        take: 20
+    });
+
+    // Count topic occurrences
+    const topicUsage: Record<string, number> = {};
+    topics.forEach(t => topicUsage[t] = 0);
+    historicalPosts.forEach(p => {
+        if (p.topic && topicUsage[p.topic] !== undefined) {
+            topicUsage[p.topic]++;
+        }
+    });
 
     for (const slot of validSlots) {
         // Check if we already have a post for this slot (after cleaning)
@@ -137,17 +151,27 @@ export async function generateAutopilotPosts(userId: string) {
 
         if (alreadyHasPost) {
             console.log(`[Autopilot] Slot already filled: ${slot.toISOString()}`);
+            // Still count this topic's usage if it already exists
+            if (alreadyHasPost.topic && topicUsage[alreadyHasPost.topic] !== undefined) {
+                topicUsage[alreadyHasPost.topic]++;
+            }
             continue;
         }
 
+        // SMART TOPIC ROTATION: Pick the least used topic
+        const sortedTopics = [...topics].sort((a, b) => topicUsage[a] - topicUsage[b]);
+        const topic = sortedTopics[0];
+
+        // Update local usage for next slots in this run
+        topicUsage[topic]++;
+
         // Generate new post
         try {
-            const topic = topics[Math.floor(Math.random() * topics.length)];
             console.log(`[Autopilot] Generating for slot: ${slot.toISOString()} (Topic: ${topic})`);
             
             const content = await generatePost({
                 topic,
-                style: user.autopilotWritingStyleId ? "Write Like Me" : style,
+                style: user.autopilotWritingStyleId && user.autopilotWritingStyleId !== "default" ? "Write Like Me" : style,
                 userWritingSample,
                 context: userContext || undefined,
                 targetLength: 800,
