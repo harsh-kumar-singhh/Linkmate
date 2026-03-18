@@ -427,7 +427,7 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
 
                                                 {selectionMode === "manual" && (!initialData?.writingStyles || initialData.writingStyles.length === 0) && (
                                                     <p className="text-[10px] text-amber-500 font-medium">
-                                                        You haven't created any writing styles yet.
+                                                        You haven&apos;t created any writing styles yet.
                                                     </p>
                                                 )}
                                             </div>
