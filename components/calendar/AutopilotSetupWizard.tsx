@@ -134,7 +134,7 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                     >
                         {/* Floating Progress Bar - Fixed at top */}
                         <div className="absolute top-0 left-0 right-0 h-1.5 bg-secondary/30 z-10">
-                            <motion.div
+                            <MotionDiv
                                 className="h-full bg-blue-600"
                                 initial={{ width: 0 }}
                                 animate={{ width: `${(step / 4) * 100}%` }}
