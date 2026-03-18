@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AnimatedCard } from "@/components/animated/AnimatedCard";
-import { X, Sparkles, Loader2, ArrowRight, ArrowLeft, Check, Calendar as CalendarIcon, Clock, Plus, AlertCircle, Repeat, Zap } from "lucide-react";
+import { X, Sparkles, Loader2, ArrowRight, ArrowLeft, Check, Calendar as CalendarIcon, Clock, Plus, AlertCircle, Repeat, Zap, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { saveAutopilotSettings } from "@/lib/actions/autopilot";
+import Link from "next/link";
 
 // Fix for Framer Motion version 12 type errors on Vercel
 const MotionDiv = motion.div as any;
@@ -62,6 +63,18 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
     const [selectionMode, setSelectionMode] = useState<"automatic" | "manual">(
         initialData?.writingStyleId && initialData.writingStyleId !== "default" ? "manual" : "automatic"
     );
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsDropdownOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     const maxDays = parseInt(frequency);
 
@@ -418,41 +431,79 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                                             </div>
                                                         </div>
 
-                                                        {selectionMode === "manual" && initialData?.writingStyles && initialData.writingStyles.length > 0 && (
+                                                        {selectionMode === "manual" && (
                                                             <MotionDiv
                                                                 initial={{ opacity: 0, height: 0 }}
                                                                 animate={{ opacity: 1, height: "auto" }}
                                                                 className="space-y-2"
                                                             >
-                                                                <div className="relative group">
-                                                                    <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-600/20 to-indigo-600/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition duration-500"></div>
-                                                                    <select
-                                                                        value={writingStyleId}
-                                                                        onChange={(e) => setWritingStyleId(e.target.value)}
-                                                                        className="relative w-full h-12 bg-background border border-border rounded-xl px-4 text-sm font-medium focus:ring-2 focus:ring-blue-600/30 appearance-none cursor-pointer"
-                                                                    >
-                                                                        <option value="default">Select a style...</option>
-                                                                        {initialData.writingStyles.map((style: any) => (
-                                                                            <option key={style.id} value={style.id}>
-                                                                                {style.name}
-                                                                            </option>
-                                                                        ))}
-                                                                    </select>
-                                                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
-                                                                        <ArrowRight className="w-4 h-4 rotate-90" />
+                                                                {initialData?.writingStyles && initialData.writingStyles.length > 0 ? (
+                                                                    <div className="relative" ref={dropdownRef}>
+                                                                        <button
+                                                                            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                                                                            className="w-full h-12 bg-background border border-border rounded-xl px-4 flex items-center justify-between text-sm font-medium hover:border-blue-600/30 transition-all shadow-sm"
+                                                                        >
+                                                                            <span className="truncate">
+                                                                                {writingStyleId === "default" 
+                                                                                    ? "Select a style..." 
+                                                                                    : initialData.writingStyles.find(s => s.id === writingStyleId)?.name || "Select a style..."
+                                                                                }
+                                                                            </span>
+                                                                            <ChevronDown className={cn("w-4 h-4 transition-transform", isDropdownOpen && "rotate-180")} />
+                                                                        </button>
+
+                                                                        <AnimatePresence>
+                                                                            {isDropdownOpen && (
+                                                                                <MotionDiv
+                                                                                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                                                                                    animate={{ opacity: 1, y: 4, scale: 1 }}
+                                                                                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                                                                                    className="absolute top-full left-0 right-0 z-50 bg-card border border-border rounded-2xl shadow-xl overflow-hidden"
+                                                                                >
+                                                                                    <div className="max-h-[250px] overflow-y-auto p-1 custom-scrollbar">
+                                                                                        {initialData.writingStyles.map((style: any) => (
+                                                                                            <button
+                                                                                                key={style.id}
+                                                                                                onClick={() => {
+                                                                                                    setWritingStyleId(style.id);
+                                                                                                    setIsDropdownOpen(false);
+                                                                                                }}
+                                                                                                className={cn(
+                                                                                                    "w-full px-3 py-2.5 rounded-xl text-left text-sm flex items-center justify-between transition-all",
+                                                                                                    writingStyleId === style.id 
+                                                                                                        ? "bg-blue-600/10 text-blue-600 font-bold" 
+                                                                                                        : "hover:bg-secondary/50 text-muted-foreground"
+                                                                                                )}
+                                                                                            >
+                                                                                                <span className="truncate">{style.name}</span>
+                                                                                                {writingStyleId === style.id && <Check className="w-3.5 h-3.5" />}
+                                                                                            </button>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                </MotionDiv>
+                                                                            )}
+                                                                        </AnimatePresence>
+                                                                        <p className="text-[10px] text-muted-foreground px-1 pt-2">
+                                                                            Choose one of your pre-defined writing personas.
+                                                                        </p>
                                                                     </div>
-                                                                </div>
-                                                                <p className="text-[10px] text-muted-foreground px-1">
-                                                                    Choose one of your pre-defined writing personas.
-                                                                </p>
+                                                                ) : (
+                                                                    <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-2xl space-y-2">
+                                                                        <p className="text-[10px] text-amber-600 font-bold flex items-center gap-2">
+                                                                            <AlertCircle className="w-3 h-3" />
+                                                                            You haven&apos;t created any writing styles yet.
+                                                                        </p>
+                                                                        <Link 
+                                                                            href="/settings" 
+                                                                            className="inline-block text-[10px] font-black text-blue-600 hover:underline underline-offset-4"
+                                                                        >
+                                                                            Create a style now &rarr;
+                                                                        </Link>
+                                                                    </div>
+                                                                )}
                                                             </MotionDiv>
                                                         )}
 
-                                                        {selectionMode === "manual" && (!initialData?.writingStyles || initialData.writingStyles.length === 0) && (
-                                                            <p className="text-[10px] text-amber-500 font-medium px-1">
-                                                                You haven&apos;t created any writing styles yet.
-                                                            </p>
-                                                        )}
                                                     </div>
                                                 </div>
                                             </MotionDiv>
