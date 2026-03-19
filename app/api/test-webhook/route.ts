@@ -14,36 +14,63 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
+        const { searchParams } = new URL(req.url);
+        const type = searchParams.get("type") || "activate";
         const prisma = getPrisma();
         const userId = session.user.id;
 
-        // Simulate 30 days from now
-        const expiryDate = new Date();
-        expiryDate.setDate(expiryDate.getDate() + 30);
+        if (type === "activate") {
+            // Simulate 30 days from now
+            const expiryDate = new Date();
+            expiryDate.setDate(expiryDate.getDate() + 30);
 
-        // Update user to PRO
-        const updatedUser = await prisma.user.update({
-            where: { id: userId },
-            data: {
-                plan: "PRO",
-                planExpiry: expiryDate,
-                razorpaySubscriptionId: "test_sub_sim_123",
-            } as any, // Cast to any to avoid IDE false positives
-        });
+            // Update user to PRO
+            const updatedUser = await prisma.user.update({
+                where: { id: userId },
+                data: {
+                    plan: "PRO",
+                    planExpiry: expiryDate,
+                    razorpaySubscriptionId: "test_sub_" + Math.random().toString(36).substring(7),
+                } as any,
+            });
 
-        console.log(`[TEST WEBHOOK] Successfully simulated PRO upgrade for user: ${userId}`);
+            console.log(`[TEST WEBHOOK] Successfully simulated PRO upgrade for user: ${userId}`);
 
-        return NextResponse.json({
-            success: true,
-            message: "Successfully simulated subscription activation",
-            user: {
-                id: (updatedUser as any).id,
-                plan: (updatedUser as any).plan,
-                planExpiry: (updatedUser as any).planExpiry,
-            }
-        });
+            return NextResponse.json({
+                success: true,
+                message: "Successfully simulated subscription activation",
+                user: {
+                    id: (updatedUser as any).id,
+                    plan: (updatedUser as any).plan,
+                    planExpiry: (updatedUser as any).planExpiry,
+                }
+            });
+        } else if (type === "cancel") {
+            // Update user to FREE
+            const updatedUser = await prisma.user.update({
+                where: { id: userId },
+                data: {
+                    plan: "FREE",
+                    autopilotEnabled: false,
+                } as any,
+            });
+
+            console.log(`[TEST WEBHOOK] Successfully simulated subscription cancellation for user: ${userId}`);
+
+            return NextResponse.json({
+                success: true,
+                message: "Successfully simulated subscription cancellation",
+                user: {
+                    id: (updatedUser as any).id,
+                    plan: (updatedUser as any).plan,
+                }
+            });
+        }
+
+        return NextResponse.json({ error: "Invalid type" }, { status: 400 });
     } catch (error: any) {
         console.error("[TEST WEBHOOK] Simulation failed:", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
+
