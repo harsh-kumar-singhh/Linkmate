@@ -8,6 +8,7 @@ const prisma = getPrisma();
 export async function generateAutopilotPosts(userId: string, testNow?: Date) {
     // 0. Simulation & Timezone Setup
     const simulatedNow = getCurrentTime(testNow);
+    console.log(`[Autopilot] [START] Generation started for user ${userId} at ${simulatedNow.toISOString()}`);
     
     const user = await prisma.user.findUnique({
         where: { id: userId },
@@ -282,19 +283,17 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
         }
 
         try {
-            // DUPLICATE PROTECTION: Final check before creation
-            const duplicateCheck = await prisma.post.findFirst({
-                where: {
-                    userId,
-                    scheduledFor: {
-                        gte: new Date(slot.getTime() - 30000),
-                        lte: new Date(slot.getTime() + 30000)
-                    }
-                }
+            console.log(`[Autopilot] [DB PRE-CREATE] Payload:`, {
+                userId,
+                status: "SCHEDULED",
+                scheduledFor: slot.toISOString(),
+                source: "autopilot",
+                topic: selectedTopic,
+                contentLength: content?.length || 0
             });
 
-            if (duplicateCheck) {
-                console.log(`[Autopilot] Duplicate prevented for slot: ${slot.toISOString()}`);
+            if (!content) {
+                console.error(`[Autopilot] [CRITICAL] No content generated for slot ${slot.toISOString()}. Skipping DB create.`);
                 continue;
             }
 
@@ -310,13 +309,17 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
                 },
             });
 
-            generatedPosts.push(post);
-            generatedPostsCount++;
-            createdTimes.push(slot.toISOString());
-            console.log(`[Autopilot] Successfully created post for slot: ${slot.toISOString()}`);
+            if (post?.id) {
+                console.log(`[Autopilot] [DB SUCCESS] Post created with ID: ${post.id} (Scheduled: ${slot.toISOString()})`);
+                generatedPosts.push(post);
+                generatedPostsCount++;
+                createdTimes.push(slot.toISOString());
+            } else {
+                console.error(`[Autopilot] [DB FAILURE] prisma.create returned empty for slot: ${slot.toISOString()}`);
+            }
 
         } catch (error) {
-            console.error(`[Autopilot] Database error for slot ${slot.toISOString()}:`, error);
+            console.error(`[Autopilot] [DB ERROR] Database error for slot ${slot.toISOString()}:`, error);
         }
     }
 
@@ -352,13 +355,13 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
             if (!alreadyFilled) {
                 console.log(`[Autopilot] [STRICT GUARD] Filling gap for slot: ${slot.toISOString()} with fallback.`);
                 try {
-                    const topicIndex = totalExistingAutopilotPosts % topics.length; // Simplified for deep fill
-                    const selectedTopic = topics[topicIndex];
+                    const topicIndex = totalExistingAutopilotPosts % (topics.length || 1); 
+                    const selectedTopic = topics[topicIndex] || "General Insights";
                     
-                    await prisma.post.create({
+                    const post = await prisma.post.create({
                         data: {
                             userId,
-                            content: `Deep Fill Fallback: Focus on ${selectedTopic}.\n\nSharing some insights about ${selectedTopic} today. It's a key area of interest for our community!\n\n#${selectedTopic.replace(/\s+/g, '')} #Professional #Insights`,
+                            content: `Deep Fill Fallback: Focus on ${selectedTopic}.\n\nSharing some insights about ${selectedTopic} today. It's a key area of interest for our community!\n\n#${selectedTopic?.replace(/\s+/g, '') || "Insights"} #Professional #Insights`,
                             status: "SCHEDULED",
                             scheduledFor: slot,
                             source: "autopilot",
@@ -366,12 +369,36 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
                             userModified: false
                         },
                     });
+                    console.log(`[Autopilot] [STRICT GUARD DB SUCCESS] Post created: ${post.id}`);
                     generatedPostsCount++;
                 } catch (e) {
-                    console.error(`[Autopilot] [STRICT GUARD] Final-ditch attempt failed for ${slot.toISOString()}:`, e);
+                    console.error(`[Autopilot] [STRICT GUARD DB FAILURE] Final attempt failed for ${slot.toISOString()}:`, e);
                 }
             }
         }
+    }
+
+    // PART 4: FORCE GENERATION TEST (BYPASS ALL LOGIC TO PROVE DB VISIBILITY)
+    console.log(`[Autopilot] [FORCE TEST] Creating static test post to verify DB/UI connection...`);
+    try {
+        const testSlot = addDays(simulatedNow, 1); // 1 day in the future
+        testSlot.setMinutes(testSlot.getMinutes() + 10); // slightly different time
+
+        const testPost = await prisma.post.create({
+            data: {
+                userId,
+                content: `🚀 TEST AUTOPILOT POST - Created at ${new Date().toISOString()}.\n\nIf you see this, the database write worked and the frontend is connected.`,
+                status: "SCHEDULED",
+                scheduledFor: testSlot,
+                source: "autopilot",
+                topic: "DEBUG",
+                userModified: false
+            }
+        });
+        console.log(`[Autopilot] [FORCE TEST SUCCESS] ID: ${testPost.id} | Time: ${testSlot.toISOString()}`);
+        generatedPosts.push(testPost);
+    } catch (e: any) {
+        console.error(`[Autopilot] [FORCE TEST FAILURE] Error:`, e.message, e.stack);
     }
 
     // FINAL RE-COUNT for accurate logging
