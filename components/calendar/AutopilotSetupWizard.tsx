@@ -27,6 +27,7 @@ interface AutopilotSetupWizardProps {
     };
 }
 
+const TOPIC_EXAMPLES = ["Startups", "AI", "Productivity", "Marketing", "Career Advice", "Software Engineering", "Entrepreneurship", "Personal Branding"];
 const FREQUENCY_OPTIONS = [
     { label: "2 posts per week", value: "2" },
     { label: "3 posts per week", value: "3" },
@@ -41,7 +42,7 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
     const [topics, setTopics] = useState<string[]>(initialData?.topics || []);
     const [customTopic, setCustomTopic] = useState("");
     const [frequency, setFrequency] = useState(initialData?.frequency || "3");
-    const [days, setDays] = useState<string[]>(initialData?.days || ["Monday", "Wednesday", "Friday"]);
+    const [days, setDays] = useState<string[]>(initialData?.days || []);
     
     // Convert initial UTC time to Local Time for the input
     const [time, setTime] = useState(() => {
@@ -78,7 +79,11 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
     const maxDays = parseInt(frequency);
 
     const toggleTopic = (topic: string) => {
-        setTopics(topics.filter(t => t !== topic));
+        if (topics.includes(topic)) {
+            setTopics(topics.filter(t => t !== topic));
+        } else if (topics.length < 5) {
+            setTopics([...topics, topic]);
+        }
     };
 
     const addCustomTopic = (e: React.FormEvent) => {
@@ -199,7 +204,8 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                                     <p className="text-sm text-muted-foreground">Select 3-5 topics to help the AI understand your niche.</p>
                                                 </div>
                                                 <div className="flex flex-wrap gap-2 pt-2">
-                                                    {topics.map((topic) => (
+                                                    {/* Show selected custom topics that aren't in predefined list */}
+                                                    {topics.filter(t => !TOPIC_EXAMPLES.includes(t)).map((topic) => (
                                                         <button
                                                             key={topic}
                                                             onClick={() => toggleTopic(topic)}
@@ -209,9 +215,22 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                                             <X className="w-3 h-3" />
                                                         </button>
                                                     ))}
-                                                    {topics.length === 0 && (
-                                                        <p className="text-sm text-muted-foreground italic">No topics added yet. Add at least 3 topics below.</p>
-                                                    )}
+                                                    
+                                                    {/* Show predefined topics as toggleable chips */}
+                                                    {TOPIC_EXAMPLES.map((topic) => (
+                                                        <button
+                                                            key={topic}
+                                                            onClick={() => toggleTopic(topic)}
+                                                            className={cn(
+                                                                "px-5 py-2.5 rounded-full text-sm font-medium transition-all border",
+                                                                topics.includes(topic)
+                                                                    ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                                                                    : "bg-secondary/50 text-muted-foreground border-transparent hover:border-blue-600/30 hover:text-blue-600"
+                                                            )}
+                                                        >
+                                                            {topic}
+                                                        </button>
+                                                    ))}
                                                 </div>
 
                                                 <form onSubmit={addCustomTopic} className="relative pt-4">
