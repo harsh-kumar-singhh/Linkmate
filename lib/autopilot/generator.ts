@@ -64,6 +64,8 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
     // LOGGING INITIALIZATION
     let expectedSlotsCount = 0;
     let existingPostsCountTotal = 0;
+    let postsKeptCount = 0;
+    let postsRemovedCount = 0;
     let missingSlotsCount = 0;
     let generatedPostsCount = 0;
     const createdTimes: string[] = [];
@@ -128,30 +130,68 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
     });
     existingPostsCountTotal = existingPosts.length;
 
-    // PART 1 FIX: GENERATION GUARD
-    if (existingPostsCountTotal >= expectedSlotsCount) {
-        console.log(`[Autopilot] [${simulatedNow.toISOString()}] Generation Guard: Pipeline already has ${existingPostsCountTotal} posts for ${expectedSlotsCount} expected slots. Skipping generation.`);
-        // FINAL LOGGING (MANDATORY)
-        console.log(`[Autopilot] SUMMARY:
-            - User ID: ${userId}
-            - Expected Slots: ${expectedSlotsCount}
-            - Existing Posts: ${existingPostsCountTotal}
-            - Missing Slots: 0 (Guard Hit)
-            - Posts Generated: 0`);
-        return [];
+    // --- SMART RECONCILIATION LOGIC ---
+    
+    // Log old days (derived from existing posts) vs new days
+    const oldDays = Array.from(new Set(existingPosts.map(p => {
+        if (!p.scheduledFor) return null;
+        const postZoned = toZonedTime(p.scheduledFor, userTimezone);
+        return format(postZoned, "EEE").toUpperCase();
+    }))).filter(Boolean) as string[];
+    
+    console.log(`[Autopilot] Reconciliation: Old Days (approx): ${oldDays.join(", ")} | New Days: ${daysEnabled.join(", ")}`);
+
+    const postsToRemove = [];
+    const validExistingPosts = [];
+
+    for (const post of existingPosts) {
+        if (!post.scheduledFor) continue;
+
+        const postZoned = toZonedTime(post.scheduledFor, userTimezone);
+        const postDayName = format(postZoned, "EEEE").toUpperCase();
+        const postShortDayName = postDayName.substring(0, 3);
+
+        const isDayStillValid = daysEnabled.includes(postDayName) || daysEnabled.includes(postShortDayName);
+
+        // KEEP if day is still valid OR if user modified it
+        if (isDayStillValid || post.userModified) {
+            validExistingPosts.push(post);
+        } else {
+            postsToRemove.push(post);
+        }
     }
+
+    postsKeptCount = validExistingPosts.length;
+    postsRemovedCount = postsToRemove.length;
+
+    // Delete invalid posts (not matching new schedule AND not user modified)
+    if (postsToRemove.length > 0) {
+        console.log(`[Autopilot] Removing ${postsRemovedCount} invalid posts:`, postsToRemove.map(p => p.scheduledFor?.toISOString()));
+        await prisma.post.deleteMany({
+            where: {
+                id: { in: postsToRemove.map(p => p.id) }
+            }
+        });
+    }
+
+    console.log(`[Autopilot] Kept ${postsKeptCount} valid posts.`);
 
     // 4. Detect Missing Slots
     const missingSlots: Date[] = [];
     for (const slot of validSlots) {
-        const alreadyExists = existingPosts.some(post => 
-            post.scheduledFor && Math.abs(post.scheduledFor.getTime() - slot.getTime()) < 60000 // Minute precision
-        );
+        // Match by Day to avoid double-posting if time changed on the same day
+        const slotDayStr = format(toZonedTime(slot, userTimezone), "yyyy-MM-dd");
+        
+        const alreadyExistsOnDay = validExistingPosts.some(post => {
+            if (!post.scheduledFor) return false;
+            const postDayStr = format(toZonedTime(post.scheduledFor, userTimezone), "yyyy-MM-dd");
+            return postDayStr === slotDayStr;
+        });
 
-        if (!alreadyExists) {
+        if (!alreadyExistsOnDay) {
             missingSlots.push(slot);
         } else {
-            console.log(`[Autopilot] Slot ${slot.toISOString()} already filled.`);
+            console.log(`[Autopilot] Slot for ${slotDayStr} already filled.`);
         }
     }
     missingSlotsCount = missingSlots.length;
@@ -274,8 +314,12 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
         - Email: ${user.email}
         - Simulated Now: ${simulatedNow.toISOString()}
         - User Timezone: ${userTimezone}
+        - Old Days (approx): ${oldDays.join(", ")}
+        - New Days: ${daysEnabled.join(", ")}
         - Expected Slots: ${expectedSlotsCount}
-        - Existing Posts: ${existingPostsCountTotal}
+        - Total Existing (start): ${existingPostsCountTotal}
+        - Posts Kept: ${postsKeptCount}
+        - Posts Removed: ${postsRemovedCount}
         - Missing Slots: ${missingSlotsCount}
         - Posts Generated: ${generatedPostsCount}
         - Created Times: ${createdTimes.join(", ")}`);
