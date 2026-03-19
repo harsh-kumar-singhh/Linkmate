@@ -1,13 +1,19 @@
 import { getPrisma } from "@/lib/prisma";
-import { addDays, format, startOfDay, parse, isAfter, setHours, setMinutes } from "date-fns";
+import { addDays, format, startOfDay, isAfter } from "date-fns";
+import { fromZonedTime, toZonedTime } from "date-fns-tz";
+import { getCurrentTime } from "@/lib/utils/time";
 
 const prisma = getPrisma();
 
-export async function generateAutopilotPosts(userId: string) {
+export async function generateAutopilotPosts(userId: string, testNow?: Date) {
+    // 0. Simulation & Timezone Setup
+    const simulatedNow = getCurrentTime(testNow);
+    
     const user = await prisma.user.findUnique({
         where: { id: userId },
         select: {
             id: true,
+            email: true,
             autopilotEnabled: true,
             autopilotTopics: true,
             autopilotDays: true,
@@ -19,22 +25,27 @@ export async function generateAutopilotPosts(userId: string) {
             plan: true,
             defaultTone: true,
             writingStyles: true,
+            schedule: {
+                select: { timezone: true }
+            }
         },
     });
 
+    const userTimezone = user?.schedule?.timezone || "UTC";
+
     // 1. Fetch User Config & Exit Early Conditions
     if (!user) {
-        console.log(`[Autopilot] User ${userId} not found.`);
+        console.log(`[Autopilot] [${simulatedNow.toISOString()}] User ${userId} not found.`);
         return;
     }
 
     if (!user.autopilotEnabled) {
-        console.log(`[Autopilot] User ${userId} has autopilot disabled. Stopping.`);
+        console.log(`[Autopilot] [${simulatedNow.toISOString()}] User ${userId} has autopilot disabled. Stopping.`);
         return;
     }
 
     if (user.plan?.toUpperCase() !== "PRO") {
-        console.log(`[Autopilot] User ${userId} not eligible (requires PRO plan).`);
+        console.log(`[Autopilot] [${simulatedNow.toISOString()}] User ${userId} not eligible (requires PRO plan).`);
         return;
     }
 
@@ -43,11 +54,12 @@ export async function generateAutopilotPosts(userId: string) {
     const timeStr = user.autopilotTime;
     
     if (topics.length === 0 || daysEnabled.length === 0 || !timeStr) {
-        console.log(`[Autopilot] User ${userId} has incomplete configuration (topics, days, or time missing).`);
+        console.log(`[Autopilot] [${simulatedNow.toISOString()}] User ${userId} has incomplete configuration (topics, days, or time missing).`);
         return;
     }
 
-    console.log(`[Autopilot] Starting Rolling 7-Day Pipeline for user ${userId}`);
+    console.log(`[Autopilot] [${simulatedNow.toISOString()}] Starting Rolling 7-Day Pipeline for user ${user.email} (${userId})`);
+    console.log(`[Autopilot] Timezone: ${userTimezone} | Simulated Now: ${simulatedNow.toISOString()}`);
 
     // LOGGING INITIALIZATION
     let expectedSlotsCount = 0;
@@ -56,50 +68,78 @@ export async function generateAutopilotPosts(userId: string) {
     let generatedPostsCount = 0;
     const createdTimes: string[] = [];
 
-    const now = new Date();
+    // 2. Build Rolling 7-Day Window (Timezone Normalized)
+    const validSlots: Date[] = [];
     const [utcHours, utcMinutes] = timeStr.split(":").map(Number);
     
-    // 2. Build Rolling 7-Day Window
-    const validSlots: Date[] = [];
+    // Get "Now" in User's Timezone
+    const userNow = toZonedTime(simulatedNow, userTimezone);
+    
     for (let i = 0; i < 7; i++) {
-        const targetDate = addDays(now, i);
-        const dayName = format(targetDate, "EEEE").toUpperCase().substring(0, 3); // Convert "Monday" to "MON"
+        // Calculate the target day in user's timezone
+        const targetDay = addDays(userNow, i);
+        const dayName = format(targetDay, "EEEE").toUpperCase(); // "MONDAY"
+        const shortDayName = dayName.substring(0, 3); // "MON"
 
-        // Handle both "Monday" and "MON" formats for flexibility, though UI likely sends "MON"
-        const formattedDayName = format(targetDate, "EEEE").toUpperCase();
-        const shortDayName = formattedDayName.substring(0, 3);
-
-        if (daysEnabled.includes(formattedDayName) || daysEnabled.includes(shortDayName)) {
-            const scheduledFor = new Date(Date.UTC(
-                targetDate.getUTCFullYear(),
-                targetDate.getUTCMonth(),
-                targetDate.getUTCDate(),
+        if (daysEnabled.includes(dayName) || daysEnabled.includes(shortDayName)) {
+            // Create the slot time in user's timezone today
+            // Note: user.autopilotTime is stored as UTC in settings flow, but Requirement 1 says "Normalize to user's timezone".
+            // Wait, the UI currently converts local time -> UTC before saving.
+            // If user.autopilotTime is "14:00" UTC, we should use that.
+            
+            // However, Requirement 1 says "Normalize all slot calculations to user's timezone and start-of-day logic".
+            // This suggests we should calculate the slot as "Time X on Day Y" in User's timezone.
+            
+            // Let's assume user.autopilotTime is the time THEY meant in THEIR timezone, 
+            // OR if it's already UTC, we just need to ensure the "Day" is correct for them.
+            
+            // If the UI sends UTC, then "14:00 UTC" might be "09:00 AM" for them.
+            // Let's stick to the UTC time for the actual slot, but use the user's "Day" to decide if it's applicable.
+            
+            const scheduledForUtc = new Date(Date.UTC(
+                targetDay.getUTCFullYear(),
+                targetDay.getUTCMonth(),
+                targetDay.getUTCDate(),
                 utcHours,
                 utcMinutes,
                 0,
                 0
             ));
 
-            if (isAfter(scheduledFor, now)) {
-                validSlots.push(scheduledFor);
+            // Ensure today's slot is not skipped incorrectly
+            if (isAfter(scheduledForUtc, simulatedNow)) {
+                validSlots.push(scheduledForUtc);
             }
         }
     }
     expectedSlotsCount = validSlots.length;
 
     // 3. Fetch Existing Posts in the window
-    const windowEnd = addDays(now, 7);
+    const windowEnd = addDays(simulatedNow, 7);
     const existingPosts = await prisma.post.findMany({
         where: {
             userId,
             source: "autopilot",
             scheduledFor: {
-                gte: now,
+                gte: simulatedNow,
                 lte: windowEnd
             }
         }
     });
     existingPostsCountTotal = existingPosts.length;
+
+    // PART 1 FIX: GENERATION GUARD
+    if (existingPostsCountTotal >= expectedSlotsCount) {
+        console.log(`[Autopilot] [${simulatedNow.toISOString()}] Generation Guard: Pipeline already has ${existingPostsCountTotal} posts for ${expectedSlotsCount} expected slots. Skipping generation.`);
+        // FINAL LOGGING (MANDATORY)
+        console.log(`[Autopilot] SUMMARY:
+            - User ID: ${userId}
+            - Expected Slots: ${expectedSlotsCount}
+            - Existing Posts: ${existingPostsCountTotal}
+            - Missing Slots: 0 (Guard Hit)
+            - Posts Generated: 0`);
+        return [];
+    }
 
     // 4. Detect Missing Slots
     const missingSlots: Date[] = [];
@@ -110,12 +150,14 @@ export async function generateAutopilotPosts(userId: string) {
 
         if (!alreadyExists) {
             missingSlots.push(slot);
+        } else {
+            console.log(`[Autopilot] Slot ${slot.toISOString()} already filled.`);
         }
     }
     missingSlotsCount = missingSlots.length;
 
     if (missingSlotsCount === 0) {
-        console.log(`[Autopilot] No missing slots for user ${userId}. Pipeline is full.`);
+        console.log(`[Autopilot] [${simulatedNow.toISOString()}] No missing slots for user ${userId}. Pipeline is full.`);
         // FINAL LOGGING (MANDATORY)
         console.log(`[Autopilot] SUMMARY:
             - User ID: ${userId}
@@ -126,7 +168,7 @@ export async function generateAutopilotPosts(userId: string) {
         return [];
     }
 
-    // 5. Generate Posts ONLY for Missing Slots
+    // 5. Generate Posts
     const userContext = [
         user.autopilotAboutYou ? `About Me: ${user.autopilotAboutYou}` : "",
         user.autopilotCurrentFocus ? `Current Focus: ${user.autopilotCurrentFocus}` : ""
@@ -160,6 +202,33 @@ export async function generateAutopilotPosts(userId: string) {
         const topicIndex = (totalExistingAutopilotPosts + i) % topics.length;
         const selectedTopic = topics[topicIndex];
 
+        // PART 1 FIX: AI FAILURE HANDLING (Retry once)
+        let content = null;
+        let attempts = 0;
+        const maxAttempts = 2;
+
+        while (attempts < maxAttempts && !content) {
+            try {
+                attempts++;
+                console.log(`[Autopilot] Generating for slot: ${slot.toISOString()} (Topic: ${selectedTopic}) - Attempt ${attempts}`);
+                
+                content = await generatePost({
+                    topic: selectedTopic,
+                    style: user.autopilotWritingStyleId && user.autopilotWritingStyleId !== "default" ? "Write Like Me" : style,
+                    userWritingSample,
+                    context: userContext || undefined,
+                    targetLength: 800,
+                });
+            } catch (error) {
+                console.error(`[Autopilot] Attempt ${attempts} failed for slot ${slot.toISOString()}:`, error);
+                if (attempts >= maxAttempts) {
+                    console.log(`[Autopilot] Skipping slot ${slot.toISOString()} after ${maxAttempts} failed attempts.`);
+                }
+            }
+        }
+
+        if (!content) continue; // Skip if all attempts failed
+
         try {
             // DUPLICATE PROTECTION: Final check before creation
             const duplicateCheck = await prisma.post.findFirst({
@@ -177,16 +246,6 @@ export async function generateAutopilotPosts(userId: string) {
                 continue;
             }
 
-            console.log(`[Autopilot] Generating for missing slot: ${slot.toISOString()} (Topic: ${selectedTopic})`);
-            
-            const content = await generatePost({
-                topic: selectedTopic,
-                style: user.autopilotWritingStyleId && user.autopilotWritingStyleId !== "default" ? "Write Like Me" : style,
-                userWritingSample,
-                context: userContext || undefined,
-                targetLength: 800,
-            });
-
             const post = await prisma.post.create({
                 data: {
                     userId,
@@ -202,15 +261,19 @@ export async function generateAutopilotPosts(userId: string) {
             generatedPosts.push(post);
             generatedPostsCount++;
             createdTimes.push(slot.toISOString());
+            console.log(`[Autopilot] Successfully created post for slot: ${slot.toISOString()}`);
 
         } catch (error) {
-            console.error(`[Autopilot] Failed to generate for slot ${slot.toISOString()}:`, error);
+            console.error(`[Autopilot] Database error for slot ${slot.toISOString()}:`, error);
         }
     }
 
     // FINAL LOGGING (MANDATORY)
     console.log(`[Autopilot] SUMMARY:
         - User ID: ${userId}
+        - Email: ${user.email}
+        - Simulated Now: ${simulatedNow.toISOString()}
+        - User Timezone: ${userTimezone}
         - Expected Slots: ${expectedSlotsCount}
         - Existing Posts: ${existingPostsCountTotal}
         - Missing Slots: ${missingSlotsCount}

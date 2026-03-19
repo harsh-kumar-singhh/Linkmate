@@ -27,7 +27,6 @@ interface AutopilotSetupWizardProps {
     };
 }
 
-const TOPIC_EXAMPLES = ["Startups", "AI", "Productivity", "Marketing", "Career Advice", "Software Engineering", "Entrepreneurship", "Personal Branding"];
 const FREQUENCY_OPTIONS = [
     { label: "2 posts per week", value: "2" },
     { label: "3 posts per week", value: "3" },
@@ -79,11 +78,7 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
     const maxDays = parseInt(frequency);
 
     const toggleTopic = (topic: string) => {
-        if (topics.includes(topic)) {
-            setTopics(topics.filter(t => t !== topic));
-        } else if (topics.length < 5) {
-            setTopics([...topics, topic]);
-        }
+        setTopics(topics.filter(t => t !== topic));
     };
 
     const addCustomTopic = (e: React.FormEvent) => {
@@ -115,7 +110,7 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
             d.setHours(hours, minutes, 0, 0);
             const utcTime = `${d.getUTCHours().toString().padStart(2, '0')}:${d.getUTCMinutes().toString().padStart(2, '0')}`;
 
-            await saveAutopilotSettings({
+            const payload = {
                 topics,
                 frequency,
                 days,
@@ -123,7 +118,13 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                 aboutYou,
                 currentFocus,
                 writingStyleId: selectionMode === "automatic" ? "default" : writingStyleId,
-            });
+            };
+
+            console.log("[Autopilot] Saving settings with payload:", payload);
+
+            const result = await saveAutopilotSettings(payload);
+            console.log("[Autopilot] Save result:", result);
+            
             onClose();
         } catch (error) {
             console.error("Setup error:", error);
@@ -198,7 +199,7 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                                     <p className="text-sm text-muted-foreground">Select 3-5 topics to help the AI understand your niche.</p>
                                                 </div>
                                                 <div className="flex flex-wrap gap-2 pt-2">
-                                                    {topics.filter(t => !TOPIC_EXAMPLES.includes(t)).map((topic) => (
+                                                    {topics.map((topic) => (
                                                         <button
                                                             key={topic}
                                                             onClick={() => toggleTopic(topic)}
@@ -208,20 +209,9 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                                             <X className="w-3 h-3" />
                                                         </button>
                                                     ))}
-                                                    {TOPIC_EXAMPLES.map((topic) => (
-                                                        <button
-                                                            key={topic}
-                                                            onClick={() => toggleTopic(topic)}
-                                                            className={cn(
-                                                                "px-5 py-2.5 rounded-full text-sm font-medium transition-all border",
-                                                                topics.includes(topic)
-                                                                    ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                                                                    : "bg-secondary/50 text-muted-foreground border-transparent hover:border-blue-600/30 hover:text-blue-600"
-                                                            )}
-                                                        >
-                                                            {topic}
-                                                        </button>
-                                                    ))}
+                                                    {topics.length === 0 && (
+                                                        <p className="text-sm text-muted-foreground italic">No topics added yet. Add at least 3 topics below.</p>
+                                                    )}
                                                 </div>
 
                                                 <form onSubmit={addCustomTopic} className="relative pt-4">
@@ -269,11 +259,8 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                                             key={opt.value}
                                                             onClick={() => {
                                                                 setFrequency(opt.value);
-                                                                // Clear excess days if frequency is reduced
-                                                                const limit = parseInt(opt.value);
-                                                                if (days.length > limit) {
-                                                                    setDays(days.slice(0, limit));
-                                                                }
+                                                                // REQUIREMENT: Reset selected days when frequency changes
+                                                                setDays([]);
                                                             }}
                                                             className={cn(
                                                                 "w-full p-5 rounded-2xl flex items-center justify-between transition-all border text-left",
