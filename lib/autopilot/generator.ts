@@ -2,14 +2,13 @@ import { getPrisma } from "@/lib/prisma";
 import { addDays, format, startOfDay, isAfter } from "date-fns";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { getCurrentTime } from "@/lib/utils/time";
+import { generatePost } from "@/lib/gemini";
 
 const prisma = getPrisma();
 
 export async function generateAutopilotPosts(userId: string, testNow?: Date) {
     // 0. Simulation & Timezone Setup
     const simulatedNow = getCurrentTime(testNow);
-    console.log(`[Autopilot] Generator STARTED`);
-    console.log(`[Autopilot] [START] Generation started for user ${userId} at ${simulatedNow.toISOString()}`);
     
     const user = await prisma.user.findUnique({
         where: { id: userId },
@@ -19,7 +18,7 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
             autopilotEnabled: true,
             autopilotTopics: true,
             autopilotDays: true,
-            autopilotTime: true,
+            autopilotTime: true, // This is stored as "HH:mm" in UTC (converted from Local in Wizard)
             autopilotFrequency: true,
             autopilotAboutYou: true,
             autopilotCurrentFocus: true,
@@ -37,18 +36,18 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
 
     // 1. Fetch User Config & Exit Early Conditions
     if (!user) {
-        console.log(`[Autopilot] [${simulatedNow.toISOString()}] User ${userId} not found.`);
-        return;
+        console.error(`[Autopilot] [${simulatedNow.toISOString()}] User ${userId} not found.`);
+        return [];
     }
 
     if (!user.autopilotEnabled) {
         console.log(`[Autopilot] [${simulatedNow.toISOString()}] User ${userId} has autopilot disabled. Stopping.`);
-        return;
+        return [];
     }
 
     if (user.plan?.toUpperCase() !== "PRO") {
-        console.log(`[Autopilot] [${simulatedNow.toISOString()}] User ${userId} not eligible (requires PRO plan).`);
-        return;
+        console.error(`[Autopilot] [${simulatedNow.toISOString()}] User ${userId} not eligible (requires PRO plan).`);
+        return [];
     }
 
     const topics = (user.autopilotTopics as string[]) || [];
@@ -56,27 +55,17 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
     const timeStr = user.autopilotTime;
     
     if (topics.length === 0 || daysEnabled.length === 0 || !timeStr) {
-        console.log(`[Autopilot] [${simulatedNow.toISOString()}] User ${userId} has incomplete configuration (topics, days, or time missing).`);
-        return;
+        console.error(`[Autopilot] [${simulatedNow.toISOString()}] User ${userId} has incomplete configuration.`);
+        return [];
     }
 
-    console.log(`[Autopilot] [${simulatedNow.toISOString()}] Starting Rolling 7-Day Pipeline for user ${user.email} (${userId})`);
-    console.log(`[Autopilot] Timezone: ${userTimezone} | Simulated Now: ${simulatedNow.toISOString()}`);
+    console.log(`[Autopilot] Starting Pipeline for user ${user.email} (${userId})`);
 
-    // LOGGING INITIALIZATION
-    let expectedSlotsCount = 0;
-    let existingPostsCountTotal = 0;
-    let postsKeptCount = 0;
-    let postsRemovedCount = 0;
-    let missingSlotsCount = 0;
-    let generatedPostsCount = 0;
-    const createdTimes: string[] = [];
-
-    // 2. Build Rolling 7-Day Window (Timezone Normalized)
+    // 2. Build Rolling 7-Day Window
     const validSlots: Date[] = [];
     const [utcHours, utcMinutes] = timeStr.split(":").map(Number);
     
-    // Get "Now" in User's Timezone
+    // Get "Now" in User's Timezone for day name logic, but use UTC for the actual slot
     const userNow = toZonedTime(simulatedNow, userTimezone);
     
     for (let i = 0; i < 7; i++) {
@@ -86,20 +75,8 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
         const shortDayName = dayName.substring(0, 3); // "MON"
 
         if (daysEnabled.includes(dayName) || daysEnabled.includes(shortDayName)) {
-            // Create the slot time in user's timezone today
-            // Note: user.autopilotTime is stored as UTC in settings flow, but Requirement 1 says "Normalize to user's timezone".
-            // Wait, the UI currently converts local time -> UTC before saving.
-            // If user.autopilotTime is "14:00" UTC, we should use that.
-            
-            // However, Requirement 1 says "Normalize all slot calculations to user's timezone and start-of-day logic".
-            // This suggests we should calculate the slot as "Time X on Day Y" in User's timezone.
-            
-            // Let's assume user.autopilotTime is the time THEY meant in THEIR timezone, 
-            // OR if it's already UTC, we just need to ensure the "Day" is correct for them.
-            
-            // If the UI sends UTC, then "14:00 UTC" might be "09:00 AM" for them.
-            // Let's stick to the UTC time for the actual slot, but use the user's "Day" to decide if it's applicable.
-            
+            // Create the slot time as a UTC date for the specific day
+            // If the user's "Today" name matches, we use "Today" (targetDay)
             const scheduledForUtc = new Date(Date.UTC(
                 targetDay.getUTCFullYear(),
                 targetDay.getUTCMonth(),
@@ -110,13 +87,12 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
                 0
             ));
 
-            // Ensure today's slot is not skipped incorrectly
+            // Only add if it's in the future
             if (isAfter(scheduledForUtc, simulatedNow)) {
                 validSlots.push(scheduledForUtc);
             }
         }
     }
-    expectedSlotsCount = validSlots.length;
 
     // 3. Fetch Existing Posts in the window
     const windowEnd = addDays(simulatedNow, 7);
@@ -130,61 +106,14 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
             }
         }
     });
-    existingPostsCountTotal = existingPosts.length;
-
-    // --- SMART RECONCILIATION LOGIC ---
-    
-    // Log old days (derived from existing posts) vs new days
-    const oldDays = Array.from(new Set(existingPosts.map(p => {
-        if (!p.scheduledFor) return null;
-        const postZoned = toZonedTime(p.scheduledFor, userTimezone);
-        return format(postZoned, "EEE").toUpperCase();
-    }))).filter(Boolean) as string[];
-    
-    console.log(`[Autopilot] [RECONCILE] Old Days: ${oldDays.join(", ")} | New Days: ${daysEnabled.join(", ")}`);
-
-    const postsToRemove = [];
-    const validExistingPosts = [];
-
-    for (const post of existingPosts) {
-        if (!post.scheduledFor) continue;
-
-        const postZoned = toZonedTime(post.scheduledFor, userTimezone);
-        const postDayName = format(postZoned, "EEEE").toUpperCase();
-        const postShortDayName = postDayName.substring(0, 3);
-
-        const isDayStillValid = daysEnabled.includes(postDayName) || daysEnabled.includes(postShortDayName);
-
-        // KEEP if day is still valid OR if user modified it
-        if (isDayStillValid || post.userModified) {
-            validExistingPosts.push(post);
-        } else {
-            postsToRemove.push(post);
-        }
-    }
-
-    postsKeptCount = validExistingPosts.length;
-    postsRemovedCount = postsToRemove.length;
-
-    // PART 1 FIX: ALWAYS remove invalid posts BEFORE missing slot detection
-    if (postsToRemove.length > 0) {
-        console.log(`[Autopilot] [RECONCILE] Deleting ${postsRemovedCount} invalid posts:`, postsToRemove.map(p => p.scheduledFor?.toISOString()));
-        await prisma.post.deleteMany({
-            where: {
-                id: { in: postsToRemove.map(p => p.id) }
-            }
-        });
-    }
-
-    console.log(`[Autopilot] [RECONCILE] Kept ${postsKeptCount} valid posts.`);
 
     // 4. Detect Missing Slots
     const missingSlots: Date[] = [];
     for (const slot of validSlots) {
-        // Match by Day to avoid double-posting if time changed on the same day
+        // Match by Day to avoid double-posting on same day
         const slotDayStr = format(toZonedTime(slot, userTimezone), "yyyy-MM-dd");
         
-        const alreadyExistsOnDay = validExistingPosts.some(post => {
+        const alreadyExistsOnDay = existingPosts.some(post => {
             if (!post.scheduledFor) return false;
             const postDayStr = format(toZonedTime(post.scheduledFor, userTimezone), "yyyy-MM-dd");
             return postDayStr === slotDayStr;
@@ -192,27 +121,19 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
 
         if (!alreadyExistsOnDay) {
             missingSlots.push(slot);
-        } else {
-            console.log(`[Autopilot] [SKIP] Slot for ${slotDayStr} already filled.`);
         }
     }
-    missingSlotsCount = missingSlots.length;
-    
-    // PART 2: LOG CORE VALUES (DEBUG)
-    console.log(`[Autopilot DEBUG] expectedSlots: ${expectedSlotsCount}`);
-    console.log(`[Autopilot DEBUG] existingPosts: ${existingPostsCountTotal}`);
-    console.log(`[Autopilot DEBUG] missingSlots: ${missingSlotsCount}`);
-    console.log(`[Autopilot DEBUG] windowEnd: ${windowEnd.toISOString()}`);
-    console.log(`[Autopilot DEBUG] simulatedNow: ${simulatedNow.toISOString()}`);
 
-    if (missingSlotsCount === 0) {
-        console.log(`[Autopilot] [SKIP] No missing slots detected. Pipeline is already full (${existingPostsCountTotal}/${expectedSlotsCount}).`);
-        // We still print the summary as requested
-        console.log(`[Autopilot] FINAL SUMMARY:
-            - expectedSlots: ${expectedSlotsCount}
-            - existingPosts: ${existingPostsCountTotal}
-            - missingSlots: ${missingSlotsCount}
-            - postsCreated: ${generatedPostsCount}`);
+    console.log(`[Autopilot] missingSlotsCount: ${missingSlots.length}`);
+
+    // PART 5 REQUIREMENT: Ensure at least 1 post is created if no posts exist
+    if (missingSlots.length === 0 && existingPosts.length === 0 && validSlots.length > 0) {
+        console.log(`[Autopilot] [GUARD] No missing slots but 0 posts exist. Forcing first slot.`);
+        missingSlots.push(validSlots[0]);
+    }
+
+    if (missingSlots.length === 0) {
+        console.log(`[Autopilot] [SKIP] No missing slots detected.`);
         return [];
     }
 
@@ -222,7 +143,7 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
         user.autopilotCurrentFocus ? `Current Focus: ${user.autopilotCurrentFocus}` : ""
     ].filter(Boolean).join("\n\n");
 
-    const style = user.defaultTone || "Professional";
+    const baseStyle = user.defaultTone || "Professional";
     let userWritingSample = undefined;
 
     const styles = (user.writingStyles as any[]) || [];
@@ -231,11 +152,9 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
         if (matchedStyle?.sample) {
             userWritingSample = matchedStyle.sample;
         }
-    } else if (style.includes("Write Like Me") && styles.length > 0) {
-        userWritingSample = styles[0].sample;
     }
 
-    const { generatePost } = require("@/lib/gemini");
+
     const generatedPosts = [];
 
     // Count all existing autopilot posts to determine topic rotation index
@@ -243,15 +162,14 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
         where: { userId, source: "autopilot" }
     });
 
-        for (let i = 0; i < missingSlots.length; i++) {
-            const slot = missingSlots[i];
-            console.log(`[Autopilot] Generating post for slot: ${slot.toISOString()}`);
-            
-            // Topic rotation logic: (totalExisting + currentBatchIndex) % topics.length
-            const topicIndex = (totalExistingAutopilotPosts + i) % topics.length;
-            const selectedTopic = topics[topicIndex];
+    for (let i = 0; i < missingSlots.length; i++) {
+        const slot = missingSlots[i];
+        const topicIndex = (totalExistingAutopilotPosts + i) % topics.length;
+        const selectedTopic = topics[topicIndex];
 
-        // PART 2 FIX: AI FAILURE HANDLING (Retry + Fallback)
+        console.log(`[Autopilot] Generating post for topic: ${selectedTopic} at ${slot.toISOString()}`);
+
+        // PART 6 FIX: AI FAILURE HANDLING (Retry + Fallback)
         let content = null;
         let attempts = 0;
         const maxAttempts = 2;
@@ -259,180 +177,56 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
         while (attempts < maxAttempts && !content) {
             try {
                 attempts++;
-                console.log(`[Autopilot] Calling AI (Attempt ${attempts})`);
+                console.log(`[Autopilot] Calling AI (Attempt ${attempts})...`);
                 
                 content = await generatePost({
                     topic: selectedTopic,
-                    style: user.autopilotWritingStyleId && user.autopilotWritingStyleId !== "default" ? "Write Like Me" : style,
+                    style: user.autopilotWritingStyleId && user.autopilotWritingStyleId !== "default" ? "Write Like Me" : baseStyle,
                     userWritingSample,
                     context: userContext || undefined,
-                    targetLength: 800,
+                    targetLength: 1000, // PART 6 FIX: SYNC WITH MANUAL POST LENGTH
                 });
                 
-                if (content && content.trim().length > 0) {
-                    console.log(`[Autopilot] AI response received`);
-                } else {
-                    console.warn(`[Autopilot] AI returned empty content on attempt ${attempts}`);
-                    content = null; // Force retry or fallback
+                if (!content || content.trim().length === 0) {
+                    content = null;
+                    console.warn(`[Autopilot] AI returned empty content.`);
                 }
             } catch (error) {
-                console.error(`[Autopilot] AI error on attempt ${attempts}:`, error);
+                console.error(`[Autopilot] AI error:`, error);
                 if (attempts >= maxAttempts) {
-                    // PART 3: Fallback to basic template-based post (DO NOT skip slot)
-                    console.log(`[Autopilot] [FALLBACK] AI failed twice, using template to ensure slot is filled.`);
+                    console.log(`[Autopilot] [FALLBACK] AI failed twice, using static template.`);
                     content = `Exploring ${selectedTopic} today. It's a critical area for professional growth and sharing insights with my network.\n\n#${selectedTopic.replace(/\s+/g, '')} #Professional #Growth`;
                 }
             }
         }
 
-        try {
-            console.log(`[Autopilot] [DB PRE-CREATE] Payload:`, {
-                userId,
-                status: "SCHEDULED",
-                scheduledFor: slot.toISOString(),
-                source: "autopilot",
-                topic: selectedTopic,
-                contentLength: content?.length || 0
-            });
-
-            if (!content) {
-                console.error(`[Autopilot] [CRITICAL] No content generated for slot ${slot.toISOString()}. Skipping DB create.`);
-                continue;
-            }
-
-            const post = await prisma.post.create({
-                data: {
-                    userId,
-                    content,
-                    status: "SCHEDULED",
-                    scheduledFor: slot,
-                    source: "autopilot",
-                    topic: selectedTopic,
-                    userModified: false
-                },
-            });
-
-            if (post?.id) {
-                console.log(`[Autopilot] Post created successfully: ${post.id}`);
+        if (content) {
+            try {
+                // PART 7 FIX: PRISMA CREATE
+                const post = await prisma.post.create({
+                    data: {
+                        userId,
+                        content,
+                        status: "SCHEDULED",
+                        scheduledFor: slot,
+                        source: "autopilot",
+                        topic: selectedTopic,
+                        userModified: false
+                    },
+                });
+                console.log(`[Autopilot] [SUCCESS] Post created: ${post.id}`);
                 generatedPosts.push(post);
-                generatedPostsCount++;
-                createdTimes.push(slot.toISOString());
-            } else {
-                console.error(`[Autopilot] [DB FAILURE] prisma.create returned empty for slot: ${slot.toISOString()}`);
-            }
-
-        } catch (error) {
-            console.error(`[Autopilot] [DB ERROR] Database error for slot ${slot.toISOString()}:`, error);
-        }
-    }
-
-    // PART 3 FIX: STRICT GENERATION GUARANTEE
-    // Check if total posts < expectedSlots and run secondary attempt if needed
-    const finalPostsCount = await prisma.post.count({
-        where: {
-            userId,
-            source: "autopilot",
-            scheduledFor: {
-                gte: simulatedNow,
-                lte: windowEnd
-            }
-        }
-    });
-
-    if (finalPostsCount < expectedSlotsCount) {
-        console.log(`[Autopilot] [STRICT GUARD] Pipeline underfilled (${finalPostsCount}/${expectedSlotsCount}). Running deep fill pass...`);
-        
-        // Final pass: fill any gaps that appeared after initial generation (e.g. database race conditions or AI skip)
-        const currentPosts = await prisma.post.findMany({
-            where: {
-                userId,
-                source: "autopilot",
-                scheduledFor: { gte: simulatedNow, lte: windowEnd }
-            }
-        });
-
-        for (const slot of missingSlots) {
-            const slotDayStr = format(toZonedTime(slot, userTimezone), "yyyy-MM-dd");
-            const alreadyFilled = currentPosts.some(p => p.scheduledFor && format(toZonedTime(p.scheduledFor, userTimezone), "yyyy-MM-dd") === slotDayStr);
-
-            if (!alreadyFilled) {
-                console.log(`[Autopilot] [STRICT GUARD] Filling gap for slot: ${slot.toISOString()} with fallback.`);
-                try {
-                    const topicIndex = totalExistingAutopilotPosts % (topics.length || 1); 
-                    const selectedTopic = topics[topicIndex] || "General Insights";
-                    
-                    const post = await prisma.post.create({
-                        data: {
-                            userId,
-                            content: `Deep Fill Fallback: Focus on ${selectedTopic}.\n\nSharing some insights about ${selectedTopic} today. It's a key area of interest for our community!\n\n#${selectedTopic?.replace(/\s+/g, '') || "Insights"} #Professional #Insights`,
-                            status: "SCHEDULED",
-                            scheduledFor: slot,
-                            source: "autopilot",
-                            topic: selectedTopic,
-                            userModified: false
-                        },
-                    });
-                    console.log(`[Autopilot] [STRICT GUARD DB SUCCESS] Post created: ${post.id}`);
-                    generatedPostsCount++;
-                } catch (e) {
-                    console.error(`[Autopilot] [STRICT GUARD DB FAILURE] Final attempt failed for ${slot.toISOString()}:`, e);
-                }
+            } catch (error) {
+                console.error(`[Autopilot] [DB ERROR]`, error);
             }
         }
     }
 
-    if (generatedPostsCount === 0 && missingSlotsCount > 0) {
-        console.error(`[Autopilot] [CRITICAL FAILURE] ${missingSlotsCount} slots missing but 0 posts were generated!`);
-        // We don't throw here yet to allow the FORCE TEST to run, but we log the critical failure.
-        // Actually, requirement says "Throw error: Autopilot failed: missing slots not filled"
+    if (generatedPosts.length === 0 && missingSlots.length > 0) {
+        throw new Error('Autopilot failed: no posts were successfully created in database');
     }
 
-    // PART 4: FORCE GENERATION TEST (PROVE DB VISIBILITY)
-    console.log(`[Autopilot] [FORCE TEST] Creating static test post...`);
-    try {
-        const testSlot = addDays(simulatedNow, 1);
-        testSlot.setMinutes(testSlot.getMinutes() + 10);
-
-        const testPost = await prisma.post.create({
-            data: {
-                userId,
-                content: `FORCED TEST POST - Created at ${new Date().toISOString()}`,
-                status: "SCHEDULED",
-                scheduledFor: testSlot,
-                source: "autopilot",
-                topic: "DEBUG",
-                userModified: false
-            }
-        });
-        console.log(`[Autopilot] Forced test post created: ${testPost.id}`);
-        generatedPosts.push(testPost);
-        generatedPostsCount++;
-    } catch (e: any) {
-        console.error(`[Autopilot] [FORCE TEST FAILURE]`, e.message);
-    }
-
-    if (generatedPostsCount === 0 && missingSlotsCount > 0) {
-        throw new Error('Autopilot failed: no posts created');
-    }
-
-    // FINAL RE-COUNT
-    const absoluteFinalCount = await prisma.post.count({
-        where: {
-            userId,
-            source: "autopilot",
-            scheduledFor: { gte: simulatedNow, lte: windowEnd }
-        }
-    });
-
-    // FINAL LOGGING (EXACT REQUIREMENTS)
-    console.log(`[Autopilot] [END] Generation Pipeline Completed.`);
-    console.log(`[Autopilot] FINAL SUMMARY:
-        - expectedSlots: ${expectedSlotsCount}
-        - existingPosts: ${existingPostsCountTotal}
-        - missingSlots: ${missingSlotsCount}
-        - postsCreated: ${generatedPostsCount}
-        - Success Rate: ${((absoluteFinalCount / expectedSlotsCount) * 100).toFixed(1)}%`);
-
+    console.log(`[Autopilot] [END] Pipeline Finished. Created ${generatedPosts.length} posts.`);
     return generatedPosts;
 }
 
