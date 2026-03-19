@@ -16,37 +16,42 @@ export async function GET(req: Request) {
     const prisma = getPrisma();
 
     try {
-        console.log("[Cron] Starting Autopilot post generation for all users...");
+        console.log("[Cron] Starting Daily Autopilot Maintenance...");
         
         // Find all users with autopilot enabled and pro plan
         const users = await prisma.user.findMany({
             where: {
                 autopilotEnabled: true,
-                plan: "PRO", // Standardized to uppercase
+                plan: "PRO",
             },
-            select: { id: true }
+            select: { id: true, email: true }
         });
 
-        console.log(`[Cron] Found ${users.length} active Autopilot users.`);
+        console.log(`[Cron] Found ${users.length} eligible PRO users with Autopilot active.`);
 
         const results = [];
         for (const user of users) {
             try {
+                process.stdout.write(`[Cron] Processing user ${user.id} (${user.email})... `);
                 const posts = await generateAutopilotPosts(user.id);
-                results.push({ userId: user.id, postsGenerated: posts?.length || 0 });
+                const count = posts?.length || 0;
+                console.log(`Done. Generated ${count} posts.`);
+                results.push({ userId: user.id, email: user.email, postsGenerated: count });
             } catch (err) {
-                console.error(`[Cron] Failed for user ${user.id}:`, err);
-                results.push({ userId: user.id, error: "Failed" });
+                console.error(`\n[Cron] Failed for user ${user.id}:`, err);
+                results.push({ userId: user.id, email: user.email, error: "Failed" });
             }
         }
 
+        console.log("[Cron] Autopilot Maintenance Complete.");
         return NextResponse.json({
             success: true,
+            totalUsersProcessed: users.length,
             summary: results
         });
 
     } catch (error) {
-        console.error("[Cron] Autopilot error:", error);
+        console.error("[Cron] CRITICAL ERROR:", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
