@@ -33,7 +33,9 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
         },
     });
 
-    // 1. Log All Configuration (Part 2)
+    const userTimezone = user?.schedule?.timezone || "UTC";
+
+    // 1. Log All Configuration
     console.log(`[Autopilot] Config check:
         - user: ${user?.email || "NOT FOUND"}
         - enabled: ${user?.autopilotEnabled}
@@ -41,9 +43,8 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
         - topics: ${JSON.stringify(user?.autopilotTopics)}
         - days: ${JSON.stringify(user?.autopilotDays)}
         - time: ${user?.autopilotTime}
+        - writingStyleId: ${user?.autopilotWritingStyleId}
         - frequency: ${user?.autopilotFrequency}`);
-
-    const userTimezone = user?.schedule?.timezone || "UTC";
 
     if (!user) {
         console.error(`[Autopilot] [EXIT] User ${userId} not found.`);
@@ -56,57 +57,61 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
     }
 
     const topics = (user.autopilotTopics as string[]) || [];
-    const daysEnabled = (user.autopilotDays as string[]) || [];
+    const daysEnabledStr = (user.autopilotDays as string[]) || []; // e.g. ["MONDAY", "WEDNESDAY"]
     const timeStr = user.autopilotTime;
     
-    if (topics.length === 0) {
-        console.error(`[Autopilot] [EXIT] No topics selected.`);
-        return [];
-    }
-    if (daysEnabled.length === 0) {
-        console.error(`[Autopilot] [EXIT] No days enabled.`);
-        return [];
-    }
-    if (!timeStr) {
-        console.error(`[Autopilot] [EXIT] No time set.`);
+    if (topics.length === 0 || daysEnabledStr.length === 0 || !timeStr) {
+        console.error(`[Autopilot] [EXIT] Incomplete configuration.`);
         return [];
     }
 
-    // 2. Build Rolling 7-Day Window
+    // MAP DAYS TO NUMERIC INDEXES (0-6)
+    const dayMap: Record<string, number> = {
+        "SUNDAY": 0, "SUN": 0,
+        "MONDAY": 1, "MON": 1,
+        "TUESDAY": 2, "TUE": 2,
+        "WEDNESDAY": 3, "WED": 3,
+        "THURSDAY": 4, "THU": 4,
+        "FRIDAY": 5, "FRI": 5,
+        "SATURDAY": 6, "SAT": 6
+    };
+    const dayIndexes = daysEnabledStr.map(d => dayMap[d.toUpperCase()]).filter(idx => idx !== undefined);
+
+    // 2. Build Rolling 7-Day Window (Part 1 - Accuracy)
     const validSlots: Date[] = [];
     const [utcHours, utcMinutes] = timeStr.split(":").map(Number);
     const userNow = toZonedTime(simulatedNow, userTimezone);
     
     for (let i = 0; i < 7; i++) {
+        // Calculate the target day in user's timezone
         const targetDay = addDays(userNow, i);
-        const dayName = format(targetDay, "EEEE").toUpperCase();
-        const shortDayName = dayName.substring(0, 3);
+        const dayOfWeek = targetDay.getDay(); // 0-6
 
-        if (daysEnabled.includes(dayName) || daysEnabled.includes(shortDayName)) {
+        if (dayIndexes.includes(dayOfWeek)) {
+            // Create the slot time as a UTC date for the specific day
+            // We use the UTC time stored in settings, and the day derived from the user's timezone today.
             const scheduledForUtc = new Date(Date.UTC(
-                targetDay.getUTCFullYear(),
-                targetDay.getUTCMonth(),
-                targetDay.getUTCDate(),
+                targetDay.getFullYear(),
+                targetDay.getMonth(),
+                targetDay.getDate(),
                 utcHours,
                 utcMinutes,
                 0,
                 0
             ));
 
+            // Only add if it's in the future
             if (isAfter(scheduledForUtc, simulatedNow)) {
                 validSlots.push(scheduledForUtc);
             }
         }
     }
 
-    console.log(`[Autopilot] validSlotsFound: ${validSlots.length}`);
+    console.log(`[Autopilot] validSlots identified: ${validSlots.length}`);
 
-    // If no future slots are found in next 7 days, force one today/tomorrow
+    // If no slots found even with strict indexes, log warning but do NOT force random days
     if (validSlots.length === 0) {
-        console.log(`[Autopilot] [FORCE] No future slots found in 7-day window. Forcing a fallback slot.`);
-        const fallbackSlot = addDays(simulatedNow, 1);
-        fallbackSlot.setUTCHours(utcHours, utcMinutes, 0, 0);
-        validSlots.push(fallbackSlot);
+        console.warn(`[Autopilot] [WAIT] No future slots found in 7-day window for selected days.`);
     }
 
     // 3. Fetch Existing Posts
@@ -122,7 +127,7 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
         }
     });
 
-    // 4. Detect Missing Slots
+    // 4. Detect Missing Slots (Part 2 - Ensure ALL valid slots are filled)
     const missingSlots: Date[] = [];
     for (const slot of validSlots) {
         const slotDayStr = format(toZonedTime(slot, userTimezone), "yyyy-MM-dd");
@@ -139,14 +144,14 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
 
     console.log(`[Autopilot] missingSlots identified: ${missingSlots.length}`);
 
-    // Part 3: Force generation if missingSlots is 0 but NO posts exist
-    if (missingSlots.length === 0 && existingPosts.length === 0) {
-        console.log(`[Autopilot] [FORCE BUILD] 0 slots missing but 0 posts exist. Creating absolute first post.`);
+    // Part 3 Force: If absolutely no posts exist, ensure we do something (but still respect days if possible)
+    if (missingSlots.length === 0 && existingPosts.length === 0 && validSlots.length > 0) {
+        console.log(`[Autopilot] [FORCE] 0 missing slots but 0 posts exist. Creating absolute first post.`);
         missingSlots.push(validSlots[0]);
     }
 
     if (missingSlots.length === 0) {
-        console.log(`[Autopilot] [EXIT] Pipeline full. No new posts needed.`);
+        console.log(`[Autopilot] [EXIT] All slots filled.`);
         return [];
     }
 
@@ -159,12 +164,34 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
     const baseStyle = user.defaultTone || "Professional";
     let userWritingSample = undefined;
 
-    const styles = (user.writingStyles as any[]) || [];
+    // WRITING STYLE PERSISTENCE & PARSE
+    let styleToUse = baseStyle;
+    // Fetch and prepare all styles (including legacy ones for parity)
+    let styles = (user.writingStyles as any[]) || [];
+    if (styles.length === 0) {
+        if ((user as any).writingStyle) styles.push({ name: "Legacy (Main)", sample: (user as any).writingStyle });
+        // Use customStyles from user if it exists and is not empty
+        const customStyles = (user as any).customStyles || [];
+        customStyles.forEach((s: string, i: number) => {
+            if (s) styles.push({ name: `Legacy (Extra ${i + 1})`, sample: s });
+        });
+    }
+
     if (user.autopilotWritingStyleId && user.autopilotWritingStyleId !== "default") {
-        const matchedStyle = styles.find(s => s.id === user.autopilotWritingStyleId);
-        if (matchedStyle?.sample) {
-            userWritingSample = matchedStyle.sample;
+        const matchedStyle = styles.find(s => s.id === user.autopilotWritingStyleId || s.name === user.autopilotWritingStyleId);
+        if (matchedStyle) {
+            styleToUse = `Write Like Me — ${matchedStyle.name}`;
+            userWritingSample = matchedStyle.sample || matchedStyle.content;
+            console.log(`[Autopilot] Using Specific Writing Style: ${matchedStyle.name}`);
         }
+    } else if (styles.length > 0) {
+        // "default" or "automatic" mode -> Use the first available style
+        const defaultStyle = styles[0];
+        styleToUse = `Write Like Me — ${defaultStyle.name}`;
+        userWritingSample = defaultStyle.sample || defaultStyle.content;
+        console.log(`[Autopilot] Using Automatic (Default) Writing Style: ${defaultStyle.name}`);
+    } else {
+        console.log(`[Autopilot] No writing styles found. Using base tone: ${baseStyle}`);
     }
 
     const generatedPostsList = [];
@@ -177,33 +204,27 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
         const topicIndex = (totalExistingCount + i) % topics.length;
         const selectedTopic = topics[topicIndex];
 
-        console.log(`[Autopilot] [LOOP] Generating slot ${i+1}/${missingSlots.length}: Topic=${selectedTopic}, Slot=${slot.toISOString()}`);
+        console.log(`[Autopilot] [LOOP] Generating slot ${i+1}/${missingSlots.length}: Topic=${selectedTopic}, Slot=${slot.toISOString()}, Style=${styleToUse}`);
 
         let content = null;
         try {
-            // Part 4: ALWAYS call AI
-            console.log(`[Autopilot] [AI CALL] Requesting content...`);
             content = await generatePost({
                 topic: selectedTopic,
-                style: user.autopilotWritingStyleId && user.autopilotWritingStyleId !== "default" ? "Write Like Me" : baseStyle,
+                style: styleToUse,
                 userWritingSample,
                 context: userContext || undefined,
                 targetLength: 1000,
             });
             
             if (!content || content.trim().length === 0) {
-                throw new Error("AI returned empty content");
+                throw new Error("Empty content returned");
             }
         } catch (error) {
-            console.error(`[Autopilot] [AI FAILURE]`, error);
-            // Part 6: Fallback Safety
-            console.log(`[Autopilot] [FALLBACK] Using static fallback for topic: ${selectedTopic}`);
+            console.error(`[Autopilot] AI Failure:`, error);
             content = `Focusing on ${selectedTopic} today. It's essential for anyone looking to make a real impact in their field.\n\n#${selectedTopic.replace(/\s+/g, '')} #Insights #Professional`;
         }
 
-        // Part 5: ALWAYS Create Post
         try {
-            console.log(`[Autopilot] [DB WRITE] Creating post...`);
             const post = await prisma.post.create({
                 data: {
                     userId,
@@ -212,23 +233,23 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
                     scheduledFor: slot,
                     source: "autopilot",
                     topic: selectedTopic,
-                    userModified: false
+                    userModified: false,
+                    writingStyle: styleToUse // Part 4 integrity
                 },
             });
             console.log(`[Autopilot] [SUCCESS] Created post ${post.id}`);
             generatedPostsList.push(post);
         } catch (dbError) {
-            console.error(`[Autopilot] [DB ERROR] FATAL during prisma.create:`, dbError);
+            console.error(`[Autopilot] [DB ERROR]`, dbError);
         }
     }
 
-    // Part 7: Final Assertion
+    // Part 7 Assert
     if (generatedPostsList.length === 0 && missingSlots.length > 0) {
-        console.error(`[Autopilot] [CRITICAL] Generated 0 posts despite ${missingSlots.length} missing slots!`);
-        throw new Error('CRITICAL: Autopilot generator ran but created no posts in database.');
+        throw new Error('CRITICAL: Autopilot failed to create any posts.');
     }
 
-    console.log(`[Autopilot] [END] Pipeline finished. Generated ${generatedPostsList.length} posts.`);
+    console.log(`[Autopilot] [END] Created ${generatedPostsList.length} posts.`);
     return generatedPostsList;
 }
 
