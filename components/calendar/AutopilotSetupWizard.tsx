@@ -76,6 +76,33 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
+    // PART 4 & 5 FIX: Sync state with initialData whenever it changes or modal opens
+    useEffect(() => {
+        if (isOpen && initialData) {
+            console.log("[Autopilot] Prefilling wizard with initialData:", initialData);
+            if (initialData.topics) setTopics(initialData.topics);
+            if (initialData.frequency) setFrequency(initialData.frequency);
+            if (initialData.days) setDays(initialData.days);
+            if (initialData.aboutYou) setAboutYou(initialData.aboutYou);
+            if (initialData.currentFocus) setCurrentFocus(initialData.currentFocus);
+            if (initialData.writingStyleId) {
+                setWritingStyleId(initialData.writingStyleId);
+                setSelectionMode(initialData.writingStyleId !== "default" ? "manual" : "automatic");
+            }
+            
+            if (initialData.time) {
+                try {
+                    const [hours, minutes] = initialData.time.split(":").map(Number);
+                    const d = new Date();
+                    d.setUTCHours(hours, minutes, 0, 0);
+                    setTime(`${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`);
+                } catch (e) {
+                    console.error("[Autopilot] Failed to parse initial time:", initialData.time);
+                }
+            }
+        }
+    }, [isOpen, initialData]);
+
     const maxDays = parseInt(frequency);
 
     const toggleTopic = (topic: string) => {

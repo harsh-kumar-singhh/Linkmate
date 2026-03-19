@@ -48,6 +48,9 @@ export async function GET() {
         autopilotFrequency: (user as any).autopilotFrequency || "",
         autopilotDays: (user as any).autopilotDays || [],
         autopilotTime: (user as any).autopilotTime || "",
+        autopilotAboutYou: (user as any).autopilotAboutYou || "",
+        autopilotCurrentFocus: (user as any).autopilotCurrentFocus || "",
+        autopilotWritingStyleId: (user as any).autopilotWritingStyleId || "default",
         plan: (user.plan || "FREE").toUpperCase(),
       },
     }, {

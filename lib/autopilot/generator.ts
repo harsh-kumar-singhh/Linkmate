@@ -139,7 +139,7 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
         return format(postZoned, "EEE").toUpperCase();
     }))).filter(Boolean) as string[];
     
-    console.log(`[Autopilot] Reconciliation: Old Days (approx): ${oldDays.join(", ")} | New Days: ${daysEnabled.join(", ")}`);
+    console.log(`[Autopilot] [RECONCILE] Old Days: ${oldDays.join(", ")} | New Days: ${daysEnabled.join(", ")}`);
 
     const postsToRemove = [];
     const validExistingPosts = [];
@@ -164,9 +164,9 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
     postsKeptCount = validExistingPosts.length;
     postsRemovedCount = postsToRemove.length;
 
-    // Delete invalid posts (not matching new schedule AND not user modified)
+    // PART 1 FIX: ALWAYS remove invalid posts BEFORE missing slot detection
     if (postsToRemove.length > 0) {
-        console.log(`[Autopilot] Removing ${postsRemovedCount} invalid posts:`, postsToRemove.map(p => p.scheduledFor?.toISOString()));
+        console.log(`[Autopilot] [RECONCILE] Deleting ${postsRemovedCount} invalid posts:`, postsToRemove.map(p => p.scheduledFor?.toISOString()));
         await prisma.post.deleteMany({
             where: {
                 id: { in: postsToRemove.map(p => p.id) }
@@ -174,7 +174,7 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
         });
     }
 
-    console.log(`[Autopilot] Kept ${postsKeptCount} valid posts.`);
+    console.log(`[Autopilot] [RECONCILE] Kept ${postsKeptCount} valid posts.`);
 
     // 4. Detect Missing Slots
     const missingSlots: Date[] = [];
@@ -191,9 +191,12 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
         if (!alreadyExistsOnDay) {
             missingSlots.push(slot);
         } else {
-            console.log(`[Autopilot] Slot for ${slotDayStr} already filled.`);
+            console.log(`[Autopilot] [SKIP] Slot for ${slotDayStr} already filled.`);
         }
     }
+    missingSlotsCount = missingSlots.length;
+    
+    console.log(`[Autopilot] [GENERATE] Missing Slots Count: ${missingSlotsCount}`);
     missingSlotsCount = missingSlots.length;
 
     if (missingSlotsCount === 0) {
@@ -242,7 +245,7 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
         const topicIndex = (totalExistingAutopilotPosts + i) % topics.length;
         const selectedTopic = topics[topicIndex];
 
-        // PART 1 FIX: AI FAILURE HANDLING (Retry once)
+        // PART 2 FIX: AI FAILURE HANDLING (Retry + Fallback)
         let content = null;
         let attempts = 0;
         const maxAttempts = 2;
@@ -250,7 +253,7 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
         while (attempts < maxAttempts && !content) {
             try {
                 attempts++;
-                console.log(`[Autopilot] Generating for slot: ${slot.toISOString()} (Topic: ${selectedTopic}) - Attempt ${attempts}`);
+                console.log(`[Autopilot] [AI REQUEST] Slot: ${slot.toISOString()} (Topic: ${selectedTopic}) - Attempt ${attempts}`);
                 
                 content = await generatePost({
                     topic: selectedTopic,
@@ -259,15 +262,24 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
                     context: userContext || undefined,
                     targetLength: 800,
                 });
+                
+                if (content) {
+                    console.log(`[Autopilot] [AI SUCCESS] Slot: ${slot.toISOString()}`);
+                }
             } catch (error) {
-                console.error(`[Autopilot] Attempt ${attempts} failed for slot ${slot.toISOString()}:`, error);
-                if (attempts >= maxAttempts) {
-                    console.log(`[Autopilot] Skipping slot ${slot.toISOString()} after ${maxAttempts} failed attempts.`);
+                console.error(`[Autopilot] [AI FAILURE] Slot ${slot.toISOString()} - Attempt ${attempts} failed:`, error);
+                if (attempts < maxAttempts) {
+                    console.log(`[Autopilot] [AI RETRY] Retrying for slot ${slot.toISOString()}...`);
+                } else {
+                    // PART 2: Fallback to basic template-based post (DO NOT skip slot)
+                    console.log(`[Autopilot] [AI FALLBACK] Generating basic template for slot ${slot.toISOString()}`);
+                    content = `Hey everyone! Today I wanted to share some thoughts on ${selectedTopic}.\n\n` +
+                             `It's a fascinating area that I've been focusing on lately, and I believe there's so much potential for growth and innovation here.\n\n` +
+                             `What are your thoughts on ${selectedTopic}? Let's discuss in the comments!\n\n` +
+                             `#${selectedTopic.replace(/\s+/g, '')} #LinkedIn #Growth`;
                 }
             }
         }
-
-        if (!content) continue; // Skip if all attempts failed
 
         try {
             // DUPLICATE PROTECTION: Final check before creation
@@ -308,7 +320,71 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
         }
     }
 
-    // FINAL LOGGING (MANDATORY)
+    // PART 3 FIX: STRICT GENERATION GUARANTEE
+    // Check if total posts < expectedSlots and run secondary attempt if needed
+    const finalPostsCount = await prisma.post.count({
+        where: {
+            userId,
+            source: "autopilot",
+            scheduledFor: {
+                gte: simulatedNow,
+                lte: windowEnd
+            }
+        }
+    });
+
+    if (finalPostsCount < expectedSlotsCount) {
+        console.log(`[Autopilot] [STRICT GUARD] Pipeline underfilled (${finalPostsCount}/${expectedSlotsCount}). Running deep fill pass...`);
+        
+        // Final pass: fill any gaps that appeared after initial generation (e.g. database race conditions or AI skip)
+        const currentPosts = await prisma.post.findMany({
+            where: {
+                userId,
+                source: "autopilot",
+                scheduledFor: { gte: simulatedNow, lte: windowEnd }
+            }
+        });
+
+        for (const slot of missingSlots) {
+            const slotDayStr = format(toZonedTime(slot, userTimezone), "yyyy-MM-dd");
+            const alreadyFilled = currentPosts.some(p => p.scheduledFor && format(toZonedTime(p.scheduledFor, userTimezone), "yyyy-MM-dd") === slotDayStr);
+
+            if (!alreadyFilled) {
+                console.log(`[Autopilot] [STRICT GUARD] Filling gap for slot: ${slot.toISOString()} with fallback.`);
+                try {
+                    const topicIndex = totalExistingAutopilotPosts % topics.length; // Simplified for deep fill
+                    const selectedTopic = topics[topicIndex];
+                    
+                    await prisma.post.create({
+                        data: {
+                            userId,
+                            content: `Deep Fill Fallback: Focus on ${selectedTopic}.\n\nSharing some insights about ${selectedTopic} today. It's a key area of interest for our community!\n\n#${selectedTopic.replace(/\s+/g, '')} #Professional #Insights`,
+                            status: "SCHEDULED",
+                            scheduledFor: slot,
+                            source: "autopilot",
+                            topic: selectedTopic,
+                            userModified: false
+                        },
+                    });
+                    generatedPostsCount++;
+                } catch (e) {
+                    console.error(`[Autopilot] [STRICT GUARD] Final-ditch attempt failed for ${slot.toISOString()}:`, e);
+                }
+            }
+        }
+    }
+
+    // FINAL RE-COUNT for accurate logging
+    const absoluteFinalCount = await prisma.post.count({
+        where: {
+            userId,
+            source: "autopilot",
+            scheduledFor: { gte: simulatedNow, lte: windowEnd }
+        }
+    });
+
+    // FINAL LOGGING (UPGRADED)
+    console.log(`[Autopilot] [END] Generation Pipeline Completed.`);
     console.log(`[Autopilot] SUMMARY:
         - User ID: ${userId}
         - Email: ${user.email}
@@ -322,7 +398,8 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
         - Posts Removed: ${postsRemovedCount}
         - Missing Slots: ${missingSlotsCount}
         - Posts Generated: ${generatedPostsCount}
-        - Created Times: ${createdTimes.join(", ")}`);
+        - Final Total Pipeline: ${absoluteFinalCount} / ${expectedSlotsCount}
+        - Success Rate: ${((absoluteFinalCount / expectedSlotsCount) * 100).toFixed(1)}%`);
 
     return generatedPosts;
 }
