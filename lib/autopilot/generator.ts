@@ -8,6 +8,7 @@ const prisma = getPrisma();
 export async function generateAutopilotPosts(userId: string, testNow?: Date) {
     // 0. Simulation & Timezone Setup
     const simulatedNow = getCurrentTime(testNow);
+    console.log(`[Autopilot] Generator STARTED`);
     console.log(`[Autopilot] [START] Generation started for user ${userId} at ${simulatedNow.toISOString()}`);
     
     const user = await prisma.user.findUnique({
@@ -258,7 +259,7 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
         while (attempts < maxAttempts && !content) {
             try {
                 attempts++;
-                console.log(`[Autopilot] [AI REQUEST] Slot: ${slot.toISOString()} (Topic: ${selectedTopic}) - Attempt ${attempts}`);
+                console.log(`[Autopilot] Calling AI (Attempt ${attempts})`);
                 
                 content = await generatePost({
                     topic: selectedTopic,
@@ -268,20 +269,18 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
                     targetLength: 800,
                 });
                 
-                if (content) {
-                    console.log(`[Autopilot] AI generated content`);
+                if (content && content.trim().length > 0) {
+                    console.log(`[Autopilot] AI response received`);
+                } else {
+                    console.warn(`[Autopilot] AI returned empty content on attempt ${attempts}`);
+                    content = null; // Force retry or fallback
                 }
             } catch (error) {
-                console.error(`[Autopilot] [AI FAILURE] Slot ${slot.toISOString()} - Attempt ${attempts} failed:`, error);
-                if (attempts < maxAttempts) {
-                    console.log(`[Autopilot] [AI RETRY] Retrying for slot ${slot.toISOString()}...`);
-                } else {
-                    // PART 2: Fallback to basic template-based post (DO NOT skip slot)
-                    console.log(`[Autopilot] [AI FALLBACK] Generating basic template for slot ${slot.toISOString()}`);
-                    content = `Hey everyone! Today I wanted to share some thoughts on ${selectedTopic}.\n\n` +
-                             `It's a fascinating area that I've been focusing on lately, and I believe there's so much potential for growth and innovation here.\n\n` +
-                             `What are your thoughts on ${selectedTopic}? Let's discuss in the comments!\n\n` +
-                             `#${selectedTopic.replace(/\s+/g, '')} #LinkedIn #Growth`;
+                console.error(`[Autopilot] AI error on attempt ${attempts}:`, error);
+                if (attempts >= maxAttempts) {
+                    // PART 3: Fallback to basic template-based post (DO NOT skip slot)
+                    console.log(`[Autopilot] [FALLBACK] AI failed twice, using template to ensure slot is filled.`);
+                    content = `Exploring ${selectedTopic} today. It's a critical area for professional growth and sharing insights with my network.\n\n#${selectedTopic.replace(/\s+/g, '')} #Professional #Growth`;
                 }
             }
         }
@@ -413,7 +412,7 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
     }
 
     if (generatedPostsCount === 0 && missingSlotsCount > 0) {
-        throw new Error(`Autopilot failed: missing slots not filled`);
+        throw new Error('Autopilot failed: no posts created');
     }
 
     // FINAL RE-COUNT
