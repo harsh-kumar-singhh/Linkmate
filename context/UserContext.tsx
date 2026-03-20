@@ -34,10 +34,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const { status } = useSession();
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const isFetchingRef = React.useRef(false);
 
     const refreshUser = useCallback(async () => {
-        if (status !== "authenticated") return;
+        if (status !== "authenticated" || isFetchingRef.current) return;
         
+        isFetchingRef.current = true;
         try {
             const response = await fetch("/api/user/me");
             if (response.ok) {
@@ -50,6 +52,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             console.error("Failed to fetch user data:", error);
         } finally {
             setIsLoading(false);
+            isFetchingRef.current = false;
         }
     }, [status]);
 
