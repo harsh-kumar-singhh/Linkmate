@@ -8,9 +8,9 @@ export function RefreshTrigger() {
     const searchParams = useSearchParams();
     const refreshedRef = useRef(false);
 
-    useEffect(() => {
-        const success = searchParams.get("success");
+    const success = searchParams.get("success");
 
+    useEffect(() => {
         if (success === "true" && !refreshedRef.current) {
             console.log("[LinkedIn] Connection success detected, refreshing state...");
             refreshedRef.current = true;
@@ -20,7 +20,7 @@ export function RefreshTrigger() {
             const newUrl = window.location.pathname;
             window.history.replaceState({}, "", newUrl);
         }
-    }, [searchParams, router]);
+    }, [success, router]);
 
     return null;
 }

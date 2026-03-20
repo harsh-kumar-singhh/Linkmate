@@ -16,15 +16,13 @@ export function LinkedInConnectionStatus({ initialIsConnected }: LinkedInConnect
     const searchParams = useSearchParams();
     const router = useRouter();
 
-    useEffect(() => {
-        const success = searchParams.get("success");
+    const success = searchParams.get("success");
 
+    useEffect(() => {
         if (success === "true" && !isConnected) {
             setIsVerifying(true);
 
             // Give the server a moment to settle, then verify
-            // In the new architecture, the server has already written to the User table
-            // so this check should be immediate and reliable.
             fetch("/api/user/me", {
                 cache: "no-store",
                 headers: {
@@ -42,7 +40,7 @@ export function LinkedInConnectionStatus({ initialIsConnected }: LinkedInConnect
                     setIsVerifying(false);
                 });
         }
-    }, [searchParams, isConnected, router]);
+    }, [success, isConnected, router]);
 
     // Sync with server state if it changes
     useEffect(() => {

@@ -60,6 +60,7 @@ function EditorContent() {
     const [availableStyles, setAvailableStyles] = useState(["Professional", "Casual", "Enthusiastic", "Storytelling"]);
 
     const postId = searchParams.get("id")
+    const dateParam = searchParams.get("date")
 
     // Auth redirection handled by middleware.ts
 
@@ -84,7 +85,7 @@ function EditorContent() {
 
     // Fetch existing post
     useEffect(() => {
-        const fetchPost = async () => {
+        const fetchExistingPost = async () => {
             if (!postId || !user) return
             setIsInitialLoading(true)
             try {
@@ -109,9 +110,10 @@ function EditorContent() {
             }
         }
 
-        fetchPost()
+        if (postId) {
+            fetchExistingPost()
+        }
 
-        const dateParam = searchParams.get("date")
         if (dateParam && !postId) {
             const date = new Date(dateParam)
             if (date < new Date()) {
@@ -120,7 +122,7 @@ function EditorContent() {
             const localYMDHM = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
             setScheduledFor(localYMDHM);
         }
-    }, [searchParams, postId, user])
+    }, [postId, dateParam, user])
 
     // Handlers
     const handleGenerate = async () => {
