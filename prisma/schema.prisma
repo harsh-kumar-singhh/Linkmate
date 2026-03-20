@@ -119,6 +119,7 @@ model Post {
   
   @@index([userId, status])
   @@index([scheduledFor])
+  @@index([status, scheduledFor])
 }
 
 

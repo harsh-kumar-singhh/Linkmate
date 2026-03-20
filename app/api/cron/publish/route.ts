@@ -35,8 +35,9 @@ export async function POST(req: Request) {
         }
 
         const prisma = getPrisma();
+        const BATCH_SIZE = 10;
 
-        // 2. Find all due posts
+        // 2. Find due posts with batching and selective fetching
         const duePosts = await prisma.post.findMany({
             where: {
                 status: "SCHEDULED",
@@ -46,16 +47,20 @@ export async function POST(req: Request) {
             },
             include: {
                 user: {
-                    include: {
+                    select: {
+                        id: true,
+                        linkedinConnected: true,
                         accounts: {
-                            where: { provider: "linkedin" }
+                            where: { provider: "linkedin" },
+                            select: { access_token: true }
                         }
                     }
                 }
             },
             orderBy: {
                 scheduledFor: 'asc'
-            }
+            },
+            take: BATCH_SIZE
         });
 
         if (duePosts.length === 0) {
@@ -71,17 +76,6 @@ export async function POST(req: Request) {
             console.log(`[CRON] Processing post: ${post.id}`);
 
             try {
-                // Idempotency check: Re-fetch post status to ensure it hasn't been changed
-                const currentPost = await prisma.post.findUnique({
-                    where: { id: post.id },
-                    select: { status: true }
-                });
-
-                if (currentPost?.status !== "SCHEDULED") {
-                    console.info(`[CRON] Post ${post.id} status is ${currentPost?.status}. Skipping.`);
-                    continue;
-                }
-
                 // Connection checks
                 if (!post.user.linkedinConnected) {
                     throw new Error("LinkedIn connection flag is disabled for this user.");
