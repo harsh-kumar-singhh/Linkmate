@@ -23,6 +23,7 @@ import { UpgradeModal } from "@/components/calendar/UpgradeModal"
 import { AutopilotSetupWizard } from "@/components/calendar/AutopilotSetupWizard"
 import { toggleAutopilot } from "@/lib/actions/autopilot"
 import { useUser } from "@/context/UserContext"
+import { WeeklyFocusCard } from "@/components/autopilot/WeeklyFocusCard"
 
 const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate()
 const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay()
@@ -164,81 +165,91 @@ export default function CalendarPage() {
 
             {/* Autopilot Status Bar (Pro only) */}
             {isPro && schedulingMode === "autopilot" && user?.autopilotTopics && user.autopilotTopics.length > 0 && (
-                <div className="mx-2 md:mx-0 bg-blue-600/5 border border-blue-600/20 rounded-[24px] p-6 flex flex-col md:flex-row items-center justify-between gap-6 transition-all duration-500">
-                    <div className="flex items-center gap-4">
-                        <div className={cn(
-                            "p-3 rounded-2xl",
-                            user.autopilotEnabled ? "bg-emerald-500/10" : "bg-amber-500/10"
-                        )}>
-                            {user.autopilotEnabled ? (
-                                <Zap className="w-6 h-6 text-emerald-600" />
-                            ) : (
-                                <Pause className="w-6 h-6 text-amber-600" />
-                            )}
-                        </div>
-                        <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                                <h3 className="font-bold text-lg">Autopilot is {user.autopilotEnabled ? "Active" : "Paused"}</h3>
-                                {user.autopilotEnabled && (
-                                    <div className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 text-[10px] font-bold rounded-full flex items-center gap-1 uppercase tracking-wider">
-                                        <CheckCircle2 className="w-3 h-3" />
-                                        Optimal
-                                    </div>
+                <div className="space-y-6">
+                    <div className="mx-2 md:mx-0 bg-blue-600/5 border border-blue-600/20 rounded-[24px] p-6 flex flex-col md:flex-row items-center justify-between gap-6 transition-all duration-500">
+                        <div className="flex items-center gap-4">
+                            <div className={cn(
+                                "p-3 rounded-2xl",
+                                user.autopilotEnabled ? "bg-emerald-500/10" : "bg-amber-500/10"
+                            )}>
+                                {user.autopilotEnabled ? (
+                                    <Zap className="w-6 h-6 text-emerald-600" />
+                                ) : (
+                                    <Pause className="w-6 h-6 text-amber-600" />
                                 )}
                             </div>
-                             <div className="space-y-2">
-                                <p className="text-sm text-muted-foreground">
-                                    {user.autopilotFrequency} posts/week • {user.autopilotDays.length} days active • Posting at {(() => {
-                                        if (!user.autopilotTime) return "10:00 AM";
-                                        const [h, m] = user.autopilotTime.split(':').map(Number);
-                                        const d = new Date();
-                                        d.setUTCHours(h, m, 0, 0);
-                                        return formatTimeAMPM(d);
-                                    })()}
-                                </p>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {user.autopilotTopics?.map((topic: string) => (
-                                        <span key={topic} className="px-2 py-0.5 bg-blue-600/5 border border-blue-600/10 text-blue-600/70 text-[10px] font-bold rounded-md">
-                                            {topic}
-                                        </span>
-                                    ))}
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                    <h3 className="font-bold text-lg">Autopilot is {user.autopilotEnabled ? "Active" : "Paused"}</h3>
+                                    {user.autopilotEnabled && (
+                                        <div className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 text-[10px] font-bold rounded-full flex items-center gap-1 uppercase tracking-wider">
+                                            <CheckCircle2 className="w-3 h-3" />
+                                            Optimal
+                                        </div>
+                                    )}
+                                </div>
+                                 <div className="space-y-2">
+                                    <p className="text-sm text-muted-foreground">
+                                        {user.autopilotFrequency} posts/week • {user.autopilotDays.length} days active • Posting at {(() => {
+                                            if (!user.autopilotTime) return "10:00 AM";
+                                            const [h, m] = user.autopilotTime.split(':').map(Number);
+                                            const d = new Date();
+                                            d.setUTCHours(h, m, 0, 0);
+                                            return formatTimeAMPM(d);
+                                        })()}
+                                    </p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {user.autopilotTopics?.map((topic: string) => (
+                                            <span key={topic} className="px-2 py-0.5 bg-blue-600/5 border border-blue-600/10 text-blue-600/70 text-[10px] font-bold rounded-md">
+                                                {topic}
+                                            </span>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <div className="flex items-center gap-3 w-full md:w-auto">
-                        <Button 
-                            variant="secondary" 
-                            size="sm" 
-                            className="flex-1 md:flex-none h-11 rounded-xl gap-2 font-bold px-5"
-                            onClick={() => setIsSetupWizardOpen(true)}
-                        >
-                            <Edit2 className="w-4 h-4" />
-                            Edit Settings
-                        </Button>
-                        <Button 
-                            variant={user.autopilotEnabled ? "outline" : "primary"}
-                            size="sm" 
-                            className={cn(
-                                "flex-1 md:flex-none h-11 rounded-xl gap-2 font-bold px-5",
-                                user.autopilotEnabled ? "border-amber-500/30 text-amber-600 hover:bg-amber-500/5" : "bg-emerald-600 hover:bg-emerald-500 text-white"
-                            )}
-                             onClick={handleToggleAutopilot}
-                            disabled={isToggling}
-                        >
-                            {user.autopilotEnabled ? (
-                                <>
-                                    <Pause className="w-4 h-4" />
-                                    Pause
-                                </>
-                            ) : (
-                                <>
-                                    <Play className="w-4 h-4" />
-                                    Resume
-                                </>
-                            )}
-                        </Button>
+                        <div className="flex items-center gap-3 w-full md:w-auto">
+                            <Button 
+                                variant="secondary" 
+                                size="sm" 
+                                className="flex-1 md:flex-none h-11 rounded-xl gap-2 font-bold px-5"
+                                onClick={() => setIsSetupWizardOpen(true)}
+                            >
+                                <Edit2 className="w-4 h-4" />
+                                Edit Settings
+                            </Button>
+                            <Button 
+                                variant={user.autopilotEnabled ? "outline" : "primary"}
+                                size="sm" 
+                                className={cn(
+                                    "flex-1 md:flex-none h-11 rounded-xl gap-2 font-bold px-5",
+                                    user.autopilotEnabled ? "border-amber-500/30 text-amber-600 hover:bg-amber-500/5" : "bg-emerald-600 hover:bg-emerald-500 text-white"
+                                )}
+                                 onClick={handleToggleAutopilot}
+                                disabled={isToggling}
+                            >
+                                {user.autopilotEnabled ? (
+                                    <>
+                                        <Pause className="w-4 h-4" />
+                                        Pause
+                                    </>
+                                ) : (
+                                    <>
+                                        <Play className="w-4 h-4" />
+                                        Resume
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    </div>
+                
+                    {/* Weekly Focus Context */}
+                    <div className="mx-2 md:mx-0">
+                        <WeeklyFocusCard 
+                            initialFocus={user?.autopilotCurrentFocus || ""} 
+                            onUpdate={() => refreshUser()} 
+                        />
                     </div>
                 </div>
             )}
