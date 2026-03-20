@@ -1,7 +1,6 @@
-import { getPrisma } from "./prisma";
+import { prisma } from "./prisma";
 
 export async function getCoachContext(userId: string) {
-    const prisma = getPrisma();
 
     try {
         // 1. Fetch only local posts

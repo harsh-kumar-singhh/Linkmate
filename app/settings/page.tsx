@@ -1,13 +1,13 @@
 export const dynamic = "force-dynamic";
 
 import { auth } from "@/lib/auth";
-import { getPrisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { SettingsForm } from "./settings-form";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ConnectLinkedInButton } from "./linkedin/connect-button";
 import { CheckCircle2, XCircle, ArrowRight, Zap, Shield, Sparkles } from "lucide-react";
-import { cn } from "@/lib/utils"; // Added this import for 'cn'
+import { cn } from "@/lib/utils";
 
 export default async function SettingsPage() {
     const session = await auth();
@@ -23,7 +23,6 @@ export default async function SettingsPage() {
         );
     }
 
-    const prisma = getPrisma();
     const user = await prisma.user.findUnique({
         where: { email: session.user.email },
         include: {
@@ -44,7 +43,7 @@ export default async function SettingsPage() {
             </div>
 
             <div className="space-y-8">
-                {/* LinkedIn Connection Section - Keeping existing logic but refining style */}
+                {/* LinkedIn Connection Section */}
                 <div className="bg-card border border-border/60 rounded-[24px] overflow-hidden shadow-sm">
                     <div className="p-6 md:p-8 space-y-6">
                         <div className="flex items-center justify-between">
@@ -138,7 +137,7 @@ export default async function SettingsPage() {
                                                     </div>
                                                     <div className="p-4 rounded-2xl bg-secondary/30 border border-border/40 space-y-2">
                                                         <div className="flex items-center gap-2">
-                                                            <Shield className="w-4 h-4 text-primary" />
+                                                          <Shield className="w-4 h-4 text-primary" />
                                                             <span className="text-sm font-bold">LinkedIn</span>
                                                         </div>
                                                         <p className="text-xs text-muted-foreground">

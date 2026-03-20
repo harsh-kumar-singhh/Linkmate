@@ -1,4 +1,4 @@
-import { getPrisma } from "./prisma";
+import { prisma } from "./prisma";
 
 export async function publishToLinkedIn(
   userId: string, 
@@ -7,7 +7,6 @@ export async function publishToLinkedIn(
   imageData?: string | null,
   providedAccount?: { access_token: string | null, providerAccountId: string | null }
 ) {
-  const prisma = getPrisma();
 
   const account = providedAccount || await prisma.account.findFirst({
     where: {

@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import { resolveUser } from "@/lib/auth/user";
-import { getPrisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { publishToLinkedIn } from "@/lib/linkedin";
 
 export async function GET(req: Request) {
-  const prisma = getPrisma();
   const { searchParams } = new URL(req.url);
   const page = parseInt(searchParams.get("page") || "1");
   const limit = parseInt(searchParams.get("limit") || "20");
@@ -55,7 +54,6 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const prisma = getPrisma();
   try {
     const user = await resolveUser();
     if (!user) {

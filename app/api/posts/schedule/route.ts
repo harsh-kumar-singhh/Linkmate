@@ -1,12 +1,8 @@
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 import { NextResponse } from "next/server";
 import { resolveUser } from "@/lib/auth/user";
-import { getPrisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 
 export async function POST(req: Request) {
-    const prisma = getPrisma();
     try {
         const user = await resolveUser();
         if (!user) {

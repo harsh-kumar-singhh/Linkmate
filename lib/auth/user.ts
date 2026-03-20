@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth"
-import { getPrisma } from "@/lib/prisma"
+import { prisma } from "@/lib/prisma"
 import { Session } from "next-auth"
 import { cache } from "react"
 
@@ -13,8 +13,6 @@ export const resolveUser = cache(async (providedSession?: Session | null) => {
     if (!session?.user?.id) {
         return null
     }
-
-    const prisma = getPrisma()
 
     // Selective fields needed for most operations
     const userSelect = {

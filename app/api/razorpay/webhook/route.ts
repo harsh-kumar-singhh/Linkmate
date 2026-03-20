@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPrisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import crypto from "crypto";
-
-const prisma = getPrisma();
 
 export async function POST(req: NextRequest) {
     try {

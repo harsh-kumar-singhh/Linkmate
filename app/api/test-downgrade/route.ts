@@ -1,8 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server";
-
 import { auth } from "@/lib/auth";
-import { getPrisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 
 /**
  * TEST ENDPOINT: Downgrade the currently logged-in user to FREE plan.
@@ -16,7 +15,6 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const prisma = getPrisma();
         const userId = session.user.id;
 
         // Update user to FREE

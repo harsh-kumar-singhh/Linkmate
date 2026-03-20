@@ -1,12 +1,10 @@
 "use server"
 
 import { auth } from "@/lib/auth"
-import { getPrisma } from "@/lib/prisma"
+import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 
 import { generateAutopilotPosts } from "@/lib/autopilot/generator"
-
-const prisma = getPrisma()
 
 export async function saveAutopilotSettings(data: {
     topics: string[]

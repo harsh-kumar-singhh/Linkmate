@@ -2,7 +2,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { getPrisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 
 export async function PATCH(
@@ -21,7 +21,6 @@ export async function PATCH(
             return NextResponse.json({ success: true, message: "Update skipped: invalid postId" });
         }
 
-        const prisma = getPrisma();
         const post = await prisma.post.update({
             where: {
                 id: postId,

@@ -1,12 +1,9 @@
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 import { NextResponse } from "next/server"
-import { getPrisma } from "@/lib/prisma"
+import { prisma } from "@/lib/prisma"
+import { auth } from "@/lib/auth"
 import bcrypt from "bcryptjs"
 
 export async function POST(request: Request) {
-  const prisma = getPrisma();
   try {
     const { name, email, password } = await request.json()
 

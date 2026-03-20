@@ -1,8 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server";
-
 import { auth } from "@/lib/auth";
-import { getPrisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 
 /**
  * TEMPORARY: Endpoint to simulate a successful Razorpay subscription activation for the current user.
@@ -18,15 +17,12 @@ export async function GET(req: NextRequest) {
 
         const { searchParams } = new URL(req.url);
         const type = searchParams.get("type") || "activate";
-        const prisma = getPrisma();
         const userId = session.user.id;
 
         if (type === "activate") {
-            // Simulate 30 days from now
             const expiryDate = new Date();
             expiryDate.setDate(expiryDate.getDate() + 30);
 
-            // Update user to PRO
             const updatedUser = await prisma.user.update({
                 where: { id: userId },
                 data: {
@@ -35,8 +31,6 @@ export async function GET(req: NextRequest) {
                     razorpaySubscriptionId: "test_sub_" + Math.random().toString(36).substring(7),
                 } as any,
             });
-
-            console.log(`[TEST WEBHOOK] Successfully simulated PRO upgrade for user: ${userId}`);
 
             return NextResponse.json({
                 success: true,
@@ -48,7 +42,6 @@ export async function GET(req: NextRequest) {
                 }
             });
         } else if (type === "cancel") {
-            // Update user to FREE
             const updatedUser = await prisma.user.update({
                 where: { id: userId },
                 data: {
@@ -56,8 +49,6 @@ export async function GET(req: NextRequest) {
                     autopilotEnabled: false,
                 } as any,
             });
-
-            console.log(`[TEST WEBHOOK] Successfully simulated subscription cancellation for user: ${userId}`);
 
             return NextResponse.json({
                 success: true,
@@ -75,4 +66,3 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
-

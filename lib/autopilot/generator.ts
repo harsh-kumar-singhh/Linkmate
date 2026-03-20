@@ -1,10 +1,8 @@
-import { getPrisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { addDays, format, startOfDay, isAfter } from "date-fns";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { getCurrentTime } from "@/lib/utils/time";
 import { generatePost } from "@/lib/gemini";
-
-const prisma = getPrisma();
 
 export async function generateAutopilotPosts(userId: string, testNow?: Date) {
     // 0. Simulation & Timezone Setup

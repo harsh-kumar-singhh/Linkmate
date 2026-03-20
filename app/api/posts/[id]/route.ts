@@ -3,14 +3,13 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getPrisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { publishToLinkedIn } from "@/lib/linkedin";
 
 export async function GET(
     req: Request,
     { params }: { params: { id: string } }
 ) {
-    const prisma = getPrisma();
     try {
         const session = await auth();
         if (!session || !session.user?.id) {
@@ -36,7 +35,6 @@ export async function PUT(
     req: Request,
     { params }: { params: { id: string } }
 ) {
-    const prisma = getPrisma();
     try {
         const session = await auth();
         if (!session || !session.user?.id) {
@@ -105,7 +103,6 @@ export async function DELETE(
     req: Request,
     { params }: { params: { id: string } }
 ) {
-    const prisma = getPrisma();
     try {
         const session = await auth();
         if (!session || !session.user?.id) {

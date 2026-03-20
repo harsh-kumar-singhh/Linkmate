@@ -2,7 +2,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { getPrisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { publishToLinkedIn } from "@/lib/linkedin";
 
 export async function POST(req: Request) {
@@ -15,29 +15,26 @@ export async function POST(req: Request) {
     const method = req.method;
 
     console.log(`[CRON] ${method} request received at ${nowUTC}`);
-    console.log(`[CRON] Auth Header: ${authHeader ? 'Present' : 'Missing'}, X-Cron-Secret: ${xCronSecret ? 'Present' : 'Missing'}`);
 
     try {
-        // 2. Security Check: Support both header types
+        // 2. Security Check
         const cronSecret = process.env.CRON_SECRET;
-
         const isAuthValid = authHeader === `Bearer ${cronSecret}`;
         const isXSecretValid = xCronSecret === cronSecret;
 
         if (!cronSecret) {
-            console.error("[CRON] CRON_SECRET is not set in environment variables.");
+            console.error("[CRON] CRON_SECRET is not set.");
             return NextResponse.json({ error: 'System Configuration Error' }, { status: 500 });
         }
 
         if (!isAuthValid && !isXSecretValid) {
-            console.warn("[CRON] Unauthorized attempt blocked. Invalid or missing secret.");
+            console.warn("[CRON] Unauthorized attempt blocked.");
             return NextResponse.json({ error: 'Unauthorized', timestamp: nowUTC }, { status: 401 });
         }
 
-        const prisma = getPrisma();
         const BATCH_SIZE = 10;
 
-        // 2. Find due posts with batching and selective fetching
+        // 3. Find due posts with batching and selective fetching
         const duePosts = await prisma.post.findMany({
             where: {
                 status: "SCHEDULED",
@@ -79,20 +76,18 @@ export async function POST(req: Request) {
             console.log(`[CRON] Processing post: ${post.id}`);
 
             try {
-                // Connection checks
                 if (!post.user.linkedinConnected) {
                     throw new Error("LinkedIn connection flag is disabled for this user.");
                 }
 
                 const account = post.user.accounts[0];
                 if (!account?.access_token) {
-                    throw new Error("Missing LinkedIn access token (user disconnected).");
+                    throw new Error("Missing LinkedIn access token.");
                 }
 
                 // Attempt publishing
-                console.log(`[CRON] Post ${post.id}: Publishing... (Scheduled: ${post.scheduledFor?.toISOString()} vs Now: ${nowUTC})`);
+                console.log(`[CRON] Post ${post.id}: Publishing...`);
                 
-                // Pass account data directly to eliminate redundant DB query
                 const publishResult = await publishToLinkedIn(
                     post.userId, 
                     post.content, 
@@ -100,7 +95,6 @@ export async function POST(req: Request) {
                     (post as any).imageData,
                     { 
                         access_token: account.access_token, 
-                        // @ts-ignore - providerAccountId was added to select
                         providerAccountId: account.providerAccountId 
                     }
                 );
@@ -112,12 +106,12 @@ export async function POST(req: Request) {
                         status: "PUBLISHED",
                         publishedAt: new Date(),
                         linkedinPostId: publishResult.linkedinPostId,
-                        notified: false, // Trigger UI toast for user
+                        notified: false,
                         failureReason: null
                     }
                 });
 
-                console.log(`[CRON] Post ${post.id}: Published successfully. ID: ${publishResult.linkedinPostId}`);
+                console.log(`[CRON] Post ${post.id}: Published successfully.`);
                 results.push({ id: post.id, status: "SUCCESS" });
 
             } catch (error: any) {
@@ -146,13 +140,10 @@ export async function POST(req: Request) {
             details: results
         };
 
-        console.log(`[CRON] Summary: ${JSON.stringify(summary)}`);
         return NextResponse.json(summary);
 
     } catch (error: any) {
         console.error("[CRON] FATAL ERROR:", error);
-        // We still return HTTP 200 (unless it's a critical auth failure) 
-        // to prevent GitHub Actions from retrying and potentially causing duplicate posts
         return NextResponse.json({
             success: false,
             error: "Global Cron Failure",

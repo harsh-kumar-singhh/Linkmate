@@ -1,7 +1,6 @@
-export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { resolveUser } from "@/lib/auth/user";
-import { getPrisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { startOfDay, differenceInDays, subDays } from "date-fns";
 
 export async function GET(req: Request) {
@@ -11,7 +10,6 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const prisma = getPrisma();
         const today = new Date();
         today.setUTCHours(0, 0, 0, 0);
         const thirtyDaysAgo = subDays(today, 30);

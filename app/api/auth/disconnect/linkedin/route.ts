@@ -1,12 +1,8 @@
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getPrisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 
 export async function POST() {
-    const prisma = getPrisma();
     try {
         const session = await auth();
         if (!session || !session.user?.id) {

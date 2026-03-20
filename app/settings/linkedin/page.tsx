@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { auth } from "@/lib/auth";
-import { getPrisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 
 import { CheckCircle2, XCircle, ArrowRight, LayoutDashboard, Sparkles, Calendar, Zap, ShieldCheck, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,6 @@ export default async function LinkedInSettingsPage() {
         );
     }
 
-    const prisma = getPrisma();
     const user = await prisma.user.findUnique({
         where: { id: session.user.id },
         select: { linkedinConnected: true }

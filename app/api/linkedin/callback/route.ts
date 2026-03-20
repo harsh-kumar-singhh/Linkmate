@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { revalidatePath } from "next/cache"
-import { getPrisma } from "@/lib/prisma"
+import { prisma } from "@/lib/prisma"
 import { decryptState } from "@/lib/oauth-state"
 
 export async function GET(request: Request) {
@@ -85,7 +85,6 @@ export async function GET(request: Request) {
         }
 
         // 3. Store in Database
-        const prisma = getPrisma()
         console.log(`[LinkedIn Callback] Updating user ${userId} with LinkedIn connection...`)
 
         await prisma.$transaction([

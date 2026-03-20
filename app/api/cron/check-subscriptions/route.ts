@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-import { getPrisma } from "@/lib/prisma";
-
-const prisma = getPrisma();
+import { prisma } from "@/lib/prisma";
 
 /**
  * Cron job to downgrade users whose PRO plan has expired.

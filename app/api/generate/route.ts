@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { resolveUser } from "@/lib/auth/user";
-import { getPrisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { generateWithFallback, getPublicErrorMessage } from "@/lib/openrouter";
 import { checkAndIncrementAIQuota } from "@/lib/usage";
 import { AIUsageType } from "@prisma/client";
@@ -13,7 +13,6 @@ import { AI_CORE_CONFIG } from "@/lib/ai/config";
 const TONE_GUIDELINES = AI_CORE_CONFIG.TONE_MAPPING;
 
 export async function POST(req: Request) {
-    const prisma = getPrisma();
     try {
         const session = await auth();
 

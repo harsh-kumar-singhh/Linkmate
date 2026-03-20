@@ -1,4 +1,4 @@
-import { getPrisma } from "@/lib/prisma"
+import { prisma } from "@/lib/prisma"
 import { startOfDay } from "date-fns"
 
 export const PLAN_LIMITS = {
@@ -27,7 +27,6 @@ export async function hasReachedDailyPostLimit(userId: string, plan: string = "f
 
   if (limit === Infinity) return false
 
-  const prisma = getPrisma()
   const today = startOfDay(new Date())
 
   const usage = await prisma.aIUsage.findUnique({
@@ -52,7 +51,6 @@ export async function canAddWritingStyle(userId: string, plan: string = "free"):
 
   if (limit === Infinity) return false
 
-  const prisma = getPrisma()
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { writingStyles: true },
@@ -71,7 +69,6 @@ export async function canSchedulePost(userId: string, plan: string = "free"): Pr
 
   if (limit === Infinity) return false
 
-  const prisma = getPrisma()
   const startOfMonth = new Date()
   startOfMonth.setDate(1)
   startOfMonth.setHours(0, 0, 0, 0)

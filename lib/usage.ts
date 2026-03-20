@@ -1,4 +1,4 @@
-import { getPrisma } from "./prisma";
+import { prisma } from "./prisma";
 import { AIUsageType } from "@prisma/client";
 import { PLAN_LIMITS } from "./plan-limits";
 
@@ -34,7 +34,6 @@ export async function checkAndIncrementAIQuota(
 }> {
   const userPlan = (plan?.toUpperCase() === "PRO" ? "pro" : "free") as keyof typeof PLAN_LIMITS;
   const limit = PLAN_LIMITS[userPlan].aiPostsPerDay;
-  const prisma = getPrisma();
   const today = getUTCStartOfDay();
 
   try {

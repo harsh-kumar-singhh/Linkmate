@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getPrisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import crypto from "crypto";
 
 export async function POST(req: Request) {
@@ -35,14 +35,11 @@ export async function POST(req: Request) {
     const event = payload.event;
     
     console.log(`[WEBHOOK] Verified signature. Event type: ${event}`);
-    console.log("[WEBHOOK] Payload summary:", JSON.stringify(payload, null, 2));
-
-    const prisma = getPrisma();
 
     if (event === "subscription.activated") {
       const subscription = payload.payload.subscription.entity;
       const notes = subscription.notes;
-      const userId = notes.userId;
+      const userId = notes?.userId;
 
       if (userId) {
         // Calculate expiry: 30 days from now
@@ -57,15 +54,13 @@ export async function POST(req: Request) {
             razorpaySubscriptionId: subscription.id,
           },
         });
-        console.log(`[WEBHOOK] User ${userId} plan upgraded to PRO (Expiry: ${expiryDate.toISOString()})`);
-      } else {
-        console.warn("[WEBHOOK] userId not found in subscription notes");
+        console.log(`[WEBHOOK] User ${userId} plan upgraded to PRO`);
       }
     } 
     else if (event === "subscription.cancelled") {
       const subscription = payload.payload.subscription.entity;
       const notes = subscription.notes;
-      const userId = notes.userId;
+      const userId = notes?.userId;
 
       if (userId) {
         await prisma.user.update({
@@ -75,13 +70,8 @@ export async function POST(req: Request) {
             autopilotEnabled: false,
           },
         });
-        console.log(`[WEBHOOK] User ${userId} plan downgraded to FREE and autopilot disabled`);
-      } else {
-        console.warn("[WEBHOOK] userId not found in cancellation notes");
+        console.log(`[WEBHOOK] User ${userId} plan downgraded to FREE`);
       }
-    }
-    else if (event === "payment.captured") {
-      console.log("[WEBHOOK] Payment captured - logging only");
     }
 
     return NextResponse.json({ success: true }, { status: 200 });

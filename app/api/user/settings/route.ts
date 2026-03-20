@@ -3,10 +3,9 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { resolveUser } from "@/lib/auth/user";
-import { getPrisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 
 export async function PUT(req: Request) {
-    const prisma = getPrisma();
     try {
         const userRecord = await resolveUser();
         if (!userRecord) {
