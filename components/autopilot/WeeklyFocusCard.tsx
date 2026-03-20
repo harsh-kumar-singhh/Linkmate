@@ -61,40 +61,47 @@ export function WeeklyFocusCard({ initialFocus = "", onUpdate }: WeeklyFocusCard
                     </div>
                 </div>
 
-                <div className="relative group">
+                <div className="space-y-4">
                     <textarea
                         value={focus}
                         onChange={(e) => setFocus(e.target.value)}
-                        placeholder="Add this week’s focus so that the autopilot can generate more personalized posts"
-                        className="w-full bg-secondary/30 border border-border/50 rounded-2xl p-5 text-sm min-h-[100px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/40 transition-all resize-none placeholder:text-muted-foreground/50"
-                        maxLength={500}
+                        placeholder="Add this week’s focus context so the autopilot can generate more personalized posts. E.g., 'Focusing on AI innovation and new product launches this week.'"
+                        className="w-full bg-secondary/30 border border-border/50 rounded-2xl p-5 text-base md:text-sm min-h-[160px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/40 transition-all resize-y placeholder:text-muted-foreground/50 leading-relaxed overflow-y-auto"
+                        maxLength={3000}
                     />
-                    <div className="absolute bottom-4 right-4 flex items-center gap-3">
-                         <span className={cn(
-                            "text-[10px] font-bold text-muted-foreground transition-opacity",
-                            focus.length > 400 ? "opacity-100" : "opacity-0"
-                        )}>
-                            {focus.length}/500
-                        </span>
+                    
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-2">
+                        <div className="flex items-center gap-2 px-2">
+                            <div className={cn(
+                                "h-1.5 w-1.5 rounded-full",
+                                focus.length > 2500 ? "bg-amber-500" : "bg-blue-600/40"
+                            )} />
+                            <span className={cn(
+                                "text-[11px] font-bold font-mono tracking-tight",
+                                focus.length > 2500 ? "text-amber-600" : "text-muted-foreground/70"
+                            )}>
+                                {focus.length.toLocaleString()} / 3,000 characters
+                            </span>
+                        </div>
+
                         <Button 
                             onClick={handleSave}
                             disabled={isSaving || focus === initialFocus}
                             className={cn(
-                                "h-10 px-5 rounded-xl gap-2 font-bold shadow-sm transition-all",
+                                "h-11 px-8 rounded-xl gap-2.5 font-bold shadow-sm transition-all active:scale-[0.98] w-full sm:w-auto",
                                 status === "success" 
                                     ? "bg-emerald-500 hover:bg-emerald-600 text-white" 
-                                    : "bg-blue-600 hover:bg-blue-500 text-white shadow-blue-500/20"
+                                    : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20"
                             )}
-                            size="sm"
                         >
                             {isSaving ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <Loader2 className="w-4 h-4 animate-spin text-white" />
                             ) : status === "success" ? (
-                                <CheckCircle2 className="w-4 h-4" />
+                                <CheckCircle2 className="w-4 h-4 text-white" />
                             ) : (
-                                <Save className="w-4 h-4" />
+                                <Save className="w-4 h-4 text-white" />
                             )}
-                            {status === "success" ? "Saved" : "Save Focus"}
+                            {status === "success" ? "Selection Saved" : "Update Focus"}
                         </Button>
                     </div>
                 </div>

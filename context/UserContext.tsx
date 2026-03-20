@@ -64,8 +64,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
     const isPro = user?.plan?.toUpperCase() === "PRO";
 
+    const value = React.useMemo(() => ({
+        user,
+        isPro,
+        isLoading,
+        refreshUser
+    }), [user, isPro, isLoading, refreshUser]);
+
     return (
-        <UserContext.Provider value={{ user, isPro, isLoading, refreshUser }}>
+        <UserContext.Provider value={value}>
             {children}
         </UserContext.Provider>
     );

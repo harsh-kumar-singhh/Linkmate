@@ -61,12 +61,7 @@ function EditorContent() {
 
     const postId = searchParams.get("id")
 
-    // Auth redirection
-    useEffect(() => {
-        if (!isLoading && !user) {
-            router.push("/login")
-        }
-    }, [isLoading, user, router])
+    // Auth redirection handled by middleware.ts
 
     // Load User Settings (Tone & Write Like Me Styles)
     useEffect(() => {

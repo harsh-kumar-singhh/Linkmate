@@ -154,10 +154,11 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
     }
 
     // 5. Generate and Save Posts
-    const userContext = [
-        user.autopilotAboutYou ? `About Me: ${user.autopilotAboutYou}` : "",
-        user.autopilotCurrentFocus ? `Current Focus: ${user.autopilotCurrentFocus}` : ""
-    ].filter(Boolean).join("\n\n");
+    // Prioritize Weekly Focus in the context to ensure it influences the AI meaningfully
+    const focusContext = user.autopilotCurrentFocus ? `IMPORTANT CURRENT WEEKLY FOCUS (High Priority): ${user.autopilotCurrentFocus}` : "";
+    const aboutContext = user.autopilotAboutYou ? `Background/About Me: ${user.autopilotAboutYou}` : "";
+    
+    const userContext = [focusContext, aboutContext].filter(Boolean).join("\n\n");
 
     const baseStyle = user.defaultTone || "Professional";
     let userWritingSample = undefined;
