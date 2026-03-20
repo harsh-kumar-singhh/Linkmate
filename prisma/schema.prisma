@@ -84,6 +84,7 @@ model Session {
 
 enum PostStatus {
   DRAFT
+  PENDING
   SCHEDULED
   PAUSED
   PUBLISHED

@@ -1,17 +1,27 @@
 import { getPrisma } from "./prisma";
 
-export async function publishToLinkedIn(userId: string, content: string, imageUrl?: string | null, imageData?: string | null) {
+export async function publishToLinkedIn(
+  userId: string, 
+  content: string, 
+  imageUrl?: string | null, 
+  imageData?: string | null,
+  providedAccount?: { access_token: string | null, providerAccountId: string | null }
+) {
   const prisma = getPrisma();
 
-  const account = await prisma.account.findFirst({
+  const account = providedAccount || await prisma.account.findFirst({
     where: {
       userId,
       provider: "linkedin",
     },
+    select: {
+      access_token: true,
+      providerAccountId: true
+    }
   });
 
   if (!account?.access_token || !account.providerAccountId) {
-    throw new Error("LinkedIn account not connected");
+    throw new Error("LinkedIn account not connected (missing token or ID)");
   }
 
   console.log("[LinkedIn] Attempting to post with author URN:", `urn:li:person:${account.providerAccountId}`);

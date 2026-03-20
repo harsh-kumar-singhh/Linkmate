@@ -11,7 +11,7 @@ export async function GET(req: Request) {
     try {
         const now = new Date();
 
-        // 1. Find users with PRO plan that has expired
+        // 1. Find users with PRO plan that has expired (batching)
         const expiredUsers = await prisma.user.findMany({
             where: {
                 plan: "PRO",
@@ -19,7 +19,9 @@ export async function GET(req: Request) {
                     lt: now,
                 },
             } as any,
-            select: { id: true, email: true }
+            select: { id: true, email: true },
+            orderBy: { planExpiry: 'asc' },
+            take: 50, // Process in batches of 50
         });
 
         if (expiredUsers.length === 0) {

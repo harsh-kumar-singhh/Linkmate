@@ -12,143 +12,100 @@ export async function GET(req: Request) {
         }
 
         const prisma = getPrisma();
+        const today = new Date();
+        today.setUTCHours(0, 0, 0, 0);
+        const thirtyDaysAgo = subDays(today, 30);
 
-        // 1. Fetch all published posts
-        const allPublishedPosts = await prisma.post.findMany({
+        // 1. Efficient Counts (No full post objects fetched)
+        const totalPostsPublished = await prisma.post.count({
+            where: { userId: user.id, status: "PUBLISHED" }
+        });
+
+        const scheduledPostsCount = await prisma.post.count({
+            where: { userId: user.id, status: "SCHEDULED" }
+        });
+
+        // 2. Targeted Fetch: Only last 30 days for streak and charts
+        const recentPosts = await prisma.post.findMany({
             where: {
                 userId: user.id,
                 status: "PUBLISHED",
+                publishedAt: { gte: thirtyDaysAgo }
             },
-            orderBy: {
-                publishedAt: "desc",
-            },
+            select: { publishedAt: true },
+            orderBy: { publishedAt: "desc" }
         });
 
-        // 2. Scheduled Posts Count
-        const scheduledPostsCount = await prisma.post.count({
-            where: {
-                userId: user.id,
-                status: "SCHEDULED",
-            },
-        });
-
-        // 3. Consistency Score (Percentage of days in last 15 days with at least one post)
-        // Normalize to UTC start of day to avoid timezone issues
-        const today = new Date();
-        today.setUTCHours(0, 0, 0, 0);
-
-        const fifteenDaysAgo = new Date(today);
-        fifteenDaysAgo.setUTCDate(today.getUTCDate() - 14); // Include today (0 to 14 = 15 days)
-
-        const recentPosts = allPublishedPosts.filter(p => {
-            if (!p.publishedAt) return false;
-            const postDate = new Date(p.publishedAt);
-            postDate.setUTCHours(0, 0, 0, 0);
-            return postDate >= fifteenDaysAgo;
-        });
-
-        const uniqueDaysWithPosts = new Set(
-            recentPosts.map(p => {
-                const d = new Date(p.publishedAt!);
-                d.setUTCHours(0, 0, 0, 0);
-                return d.getTime();
-            })
+        // 3. Consistency Score (Last 15 days)
+        const fifteenDaysAgo = subDays(today, 14);
+        const uniqueDaysWithPostsLast15 = new Set(
+            recentPosts
+                .filter(p => p.publishedAt && new Date(p.publishedAt) >= fifteenDaysAgo)
+                .map(p => {
+                    const d = new Date(p.publishedAt!);
+                    d.setUTCHours(0, 0, 0, 0);
+                    return d.getTime();
+                })
         ).size;
+        const consistencyScore = Math.round((uniqueDaysWithPostsLast15 / 15) * 100);
 
-        const consistencyScore = Math.round((uniqueDaysWithPosts / 15) * 100);
-
-        // 4. Posting Streak Calculation
+        // 4. Posting Streak (using cached recentPosts)
         let streak = 0;
-        if (allPublishedPosts.length > 0) {
+        if (recentPosts.length > 0) {
             const daysWithPosts = Array.from(new Set(
-                allPublishedPosts
-                    .filter(p => p.publishedAt)
-                    .map(p => {
-                        const d = new Date(p.publishedAt!);
-                        d.setUTCHours(0, 0, 0, 0);
-                        return d.getTime();
-                    })
-            )).sort((a, b) => b - a); // Descending
+                recentPosts.map(p => {
+                    const d = new Date(p.publishedAt!);
+                    d.setUTCHours(0, 0, 0, 0);
+                    return d.getTime();
+                })
+            )).sort((a, b) => b - a);
 
             const mostRecentPostDay = daysWithPosts[0];
-            const todayTime = today.getTime();
-
-            // Check if user has posted today or yesterday to continue streak
-            const diffTime = Math.abs(todayTime - mostRecentPostDay);
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-            if (diffDays <= 1) { // 0 (today) or 1 (yesterday)
+            if ((today.getTime() - mostRecentPostDay) / (1000 * 60 * 60 * 24) <= 1) {
                 streak = 1;
                 for (let i = 0; i < daysWithPosts.length - 1; i++) {
-                    const current = daysWithPosts[i];
-                    const next = daysWithPosts[i + 1];
-                    const gap = (current - next) / (1000 * 60 * 60 * 24);
-                    if (Math.round(gap) === 1) {
+                    if (Math.round((daysWithPosts[i] - daysWithPosts[i+1]) / (1000 * 60 * 60 * 24)) === 1) {
                         streak++;
-                    } else {
-                        break;
-                    }
+                    } else break;
                 }
             }
         }
 
-        // 5. Line Chart Data (Last 15 Days)
+        // 5. Chart Data (Last 15 Days)
         const labels: string[] = [];
         const data: number[] = [];
-
         for (let i = 14; i >= 0; i--) {
-            const date = new Date(today);
-            date.setUTCDate(today.getUTCDate() - i);
-
-            // Format as YYYY-MM-DD for consistent frontend parsing
-            const dateString = date.toISOString().split('T')[0];
-
-            const count = allPublishedPosts.filter(p => {
-                if (!p.publishedAt) return false;
-                const pDate = new Date(p.publishedAt);
-                // Compare using ISO date strings to avoid timezone mismatch
-                return pDate.toISOString().split('T')[0] === dateString;
-            }).length;
-
-            labels.push(dateString);
+            const date = subDays(today, i);
+            const dateStr = date.toISOString().split('T')[0];
+            const count = recentPosts.filter(p => p.publishedAt?.toISOString().split('T')[0] === dateStr).length;
+            labels.push(dateStr);
             data.push(count);
         }
 
-        const chartData = { labels, data };
+        // 6. Avg Posts per Week
+        const avgPostsPerWeek = (recentPosts.length / 30 * 7).toFixed(1);
 
-        // 6. Average Posts Per Week (Last 30 Days)
-        const thirtyDaysAgo = subDays(new Date(), 30);
-        const postsInLast30Days = allPublishedPosts.filter(p =>
-            p.publishedAt && new Date(p.publishedAt) >= thirtyDaysAgo
-        ).length;
-        const avgPostsPerWeek = (postsInLast30Days / 30 * 7).toFixed(1);
-
-        // 7. AI Usage This Week (Coaching + Generation)
+        // 7. AI Usage This Week
         const startOfWeek = new Date();
-        startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // Sunday
+        startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
         startOfWeek.setHours(0, 0, 0, 0);
-
         const aiUsage = await prisma.aIUsage.findMany({
-            where: {
-                userId: user.id,
-                date: {
-                    gte: startOfWeek
-                }
-            }
+            where: { userId: user.id, date: { gte: startOfWeek } },
+            select: { count: true }
         });
         const aiUsageThisWeek = aiUsage.reduce((sum, u) => sum + u.count, 0);
 
         return NextResponse.json({
             stats: {
                 postingStreak: streak,
-                totalPostsPublished: allPublishedPosts.length,
+                totalPostsPublished,
                 postsQueued: scheduledPostsCount,
                 avgPostsPerWeek,
                 aiUsageThisWeek,
                 consistencyScore,
-                activeDaysLast15: uniqueDaysWithPosts
+                activeDaysLast15: uniqueDaysWithPostsLast15
             },
-            chartData
+            chartData: { labels, data }
         });
 
     } catch (error) {

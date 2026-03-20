@@ -4,21 +4,50 @@ import { resolveUser } from "@/lib/auth/user";
 import { getPrisma } from "@/lib/prisma";
 import { publishToLinkedIn } from "@/lib/linkedin";
 
-export async function GET() {
+export async function GET(req: Request) {
   const prisma = getPrisma();
+  const { searchParams } = new URL(req.url);
+  const page = parseInt(searchParams.get("page") || "1");
+  const limit = parseInt(searchParams.get("limit") || "20");
+  const skip = (page - 1) * limit;
+
   try {
     const user = await resolveUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-
     const posts = await prisma.post.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+      select: {
+        id: true,
+        content: true,
+        status: true,
+        scheduledFor: true,
+        publishedAt: true,
+        linkedinPostId: true,
+        imageUrl: true,
+        writingStyle: true,
+        createdAt: true,
+        source: true,
+        // Exclude imageData for list view efficiency
+      }
     });
 
-    return NextResponse.json({ posts });
+    const total = await prisma.post.count({ where: { userId: user.id } });
+
+    return NextResponse.json({ 
+      posts, 
+      pagination: { 
+        page, 
+        limit, 
+        total,
+        totalPages: Math.ceil(total / limit)
+      } 
+    });
   } catch (error) {
     console.error("Error fetching posts:", error);
     return NextResponse.json({ error: "Failed to fetch posts" }, { status: 500 });
@@ -38,36 +67,50 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 });
     }
 
-    // If status is PUBLISHED, try to publish to LinkedIn first
-    let finalLinkedinPostId = linkedinPostId;
-    if (status === "PUBLISHED") {
-      try {
-        // @ts-ignore - Ignore type desync for new imageData field
-        const result = await publishToLinkedIn(user.id, content, imageUrl, imageData);
-        finalLinkedinPostId = result.linkedinPostId;
-      } catch (error) {
-        console.error("LinkedIn publishing failed:", error);
-        return NextResponse.json(
-          { error: error instanceof Error ? error.message : "Failed to publish to LinkedIn" },
-          { status: 500 }
-        );
-      }
-    }
-
-    const post = await prisma.post.create({
+    // Harden flow: Create record first as PENDING if status is PUBLISHED
+    let post = await prisma.post.create({
       data: {
         userId: user.id,
         content,
-        status: status || "DRAFT", // DRAFT, SCHEDULED, PUBLISHED
+        status: status === "PUBLISHED" ? "PENDING" : (status || "DRAFT"),
         scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
-        publishedAt: status === "PUBLISHED" ? new Date() : null,
-        linkedinPostId: finalLinkedinPostId,
         imageUrl: imageUrl || null,
         imageData: imageData || null,
         writingStyle: writingStyle || null,
         source: source || "MANUAL",
       } as any,
     });
+
+    // If status is PUBLISHED, try to publish to LinkedIn
+    if (status === "PUBLISHED") {
+      try {
+        const result = await publishToLinkedIn(user.id, content, imageUrl, imageData);
+        
+        post = await prisma.post.update({
+          where: { id: post.id },
+          data: {
+            status: "PUBLISHED",
+            publishedAt: new Date(),
+            linkedinPostId: result.linkedinPostId,
+          }
+        });
+      } catch (error) {
+        console.error("LinkedIn publishing failed:", error);
+        
+        await prisma.post.update({
+          where: { id: post.id },
+          data: {
+            status: "FAILED",
+            failureReason: error instanceof Error ? error.message : "Failed to publish"
+          }
+        });
+
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : "LinkedIn publishing failed" },
+          { status: 500 }
+        );
+      }
+    }
 
     return NextResponse.json(post);
   } catch (error) {
