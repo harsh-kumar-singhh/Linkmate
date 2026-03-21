@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { generateAutopilotPosts } from "./generator";
 import { toZonedTime } from "date-fns-tz";
-import { format } from "date-fns";
+import { addDays, format } from "date-fns";
 
 /**
  * Main logic for maintaining the rolling autopilot pipeline.
@@ -48,13 +48,18 @@ export async function maintainAutopilotPipeline() {
 
         // 2. Optimized Batch Count: Fetch upcoming post counts for all users in one query
         const userIds = activeUsers.map(u => u.id);
+        const windowEnd = addDays(now, 21);
+        
         const postCounts = await prisma.post.groupBy({
             by: ['userId'],
             where: {
                 userId: { in: userIds },
                 status: "SCHEDULED",
                 source: "autopilot",
-                scheduledFor: { gte: now }
+                scheduledFor: { 
+                    gte: now,
+                    lte: windowEnd 
+                }
             },
             _count: { id: true }
         });
@@ -78,19 +83,17 @@ export async function maintainAutopilotPipeline() {
 
                 console.log(`[Autopilot-Maintenance] User ${user.id}: Scheduled=${upcomingPostsCount}, Target=${frequency}`);
 
-                // 3. Gap Detection & Generation
+                // 3. Gap Detection & Generation (Strict)
                 if (upcomingPostsCount < frequency) {
                     const missing = frequency - upcomingPostsCount;
-                    console.log(`[Autopilot-Maintenance] User ${user.id}: ${missing} posts missing. Triggering generation.`);
+                    console.log(`[Autopilot-Maintenance] User ${user.id}: ${missing} posts missing (Target=${frequency}, Current=${upcomingPostsCount}). Triggering generation.`);
                     
-                    // Limit generation to 2 per run for safety (idempotency & rate limiting)
-                    const toGenerate = Math.min(missing, 2);
+                    // Generate EXACTLY what is missing up to a safety cap (3 per run)
+                    const toGenerate = Math.min(missing, 3);
                     
-                    // We don't await this to keep the loop moving, but in serverless we MUST await it to ensure completion.
-                    // Given this is a cron job, we await it.
                     await generateAutopilotPosts(user.id, undefined, toGenerate);
                 } else {
-                    console.log(`[Autopilot-Maintenance] User ${user.id}: Pipeline is full.`);
+                    console.log(`[Autopilot-Maintenance] User ${user.id}: Pipeline is full (${upcomingPostsCount}/${frequency} within 21 days).`);
                 }
             } catch (userError) {
                 console.error(`[Autopilot-Maintenance] Error processing user ${user.id}:`, userError);

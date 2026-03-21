@@ -110,11 +110,14 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date, max
     const [utcHours, utcMinutes] = timeStr.split(":").map(Number);
     const userNow = toZonedTime(simulatedNow, userTimezone);
     
+    console.log(`[Autopilot] Building 21-day window starting from ${userNow.toISOString()} (${userTimezone})`);
+
     // We look 21 days ahead to ensure we always find the next available slots across weeks
     for (let i = 0; i < 21; i++) {
         // Calculate the target day in user's timezone
         const targetDay = addDays(userNow, i);
         const dayOfWeek = targetDay.getDay(); // 0-6
+        const dayName = format(targetDay, "EEEE").toUpperCase();
 
         if (dayIndexes.includes(dayOfWeek)) {
             // Create the slot time as a UTC date for the specific day
@@ -131,6 +134,7 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date, max
             // Only add if it's in the future
             if (isAfter(scheduledForUtc, simulatedNow)) {
                 validSlots.push(scheduledForUtc);
+                // console.log(`[Autopilot] Potential slot found: ${scheduledForUtc.toISOString()} (${dayName})`);
             }
         }
     }
@@ -160,37 +164,32 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date, max
             .filter((t): t is number => t !== undefined && t !== null)
     );
 
+    console.log(`[Autopilot] Currently occupied slots in next 21 days: ${occupiedTimestamps.size}`);
+
     // 4. Detect Missing Slots (Part 2 - Exact Datetime Validation)
     const missingSlots: Date[] = [];
     for (const slot of validSlots) {
         const slotTime = slot.getTime();
         
         if (!occupiedTimestamps.has(slotTime)) {
-            console.log(`[Autopilot] [SLOT-FOUND] ${slot.toISOString()} is free.`);
+            console.log(`[Autopilot] [SLOT-FREE] ${slot.toISOString()} is available.`);
             missingSlots.push(slot);
         } else {
-            console.log(`[Autopilot] [SLOT-SKIP] ${slot.toISOString()} is already occupied.`);
+            console.log(`[Autopilot] [SLOT-OCCUPIED] ${slot.toISOString()} already has a post.`);
         }
     }
 
-    console.log(`[Autopilot] missingSlots identified: ${missingSlots.length} (Limit: ${maxToGenerate})`);
+    console.log(`[Autopilot] Total missing slots identified: ${missingSlots.length}`);
 
-    // Apply safety limit
+    // Apply strict limit - only generate exactly what is requested (minimized and precise)
     const slotsToProcess = missingSlots.slice(0, maxToGenerate);
-    if (slotsToProcess.length < missingSlots.length) {
-        console.log(`[Autopilot] Capping generation to ${maxToGenerate} posts per run.`);
-    }
-
-    // Part 3 Force: If absolutely no posts exist, ensure we do something (but still respect days if possible)
-    if (slotsToProcess.length === 0 && occupiedTimestamps.size === 0 && validSlots.length > 0) {
-        console.log(`[Autopilot] [FORCE] 0 missing slots but 0 posts exist. Creating absolute first post.`);
-        slotsToProcess.push(validSlots[0]);
-    }
-
+    
     if (slotsToProcess.length === 0) {
-        console.log(`[Autopilot] [EXIT] All slots filled or no slots available.`);
+        console.log(`[Autopilot] [EXIT] No missing slots found in the 21-day window. Pipeline is correct.`);
         return [];
     }
+
+    console.log(`[Autopilot] Will generate ${slotsToProcess.length} posts for the earliest available slots.`);
 
     // 5. Generate and Save Posts
     // Prioritize Weekly Focus in the context to ensure it influences the AI meaningfully
