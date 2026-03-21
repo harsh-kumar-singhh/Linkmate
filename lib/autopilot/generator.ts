@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { addDays, format, startOfDay, isAfter } from "date-fns";
-import { fromZonedTime, toZonedTime } from "date-fns-tz";
+import { addDays, format, isAfter } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 import { getCurrentTime } from "@/lib/utils/time";
 import { generatePost } from "@/lib/gemini";
 
@@ -13,36 +13,32 @@ const HOOK_STYLES = [
     "a direct, no-nonsense practical tip"
 ];
 
+// ---------------- SIMILARITY ----------------
 function calculateSimilarity(str1: string, str2: string): number {
     const s1 = str1.toLowerCase().replace(/[^\w\s]/g, '');
     const s2 = str2.toLowerCase().replace(/[^\w\s]/g, '');
-    
-    const words1 = new Set(s1.split(/\s+/).slice(0, 40)); 
+
+    const words1 = new Set(s1.split(/\s+/).slice(0, 40));
     const words2 = new Set(s2.split(/\s+/).slice(0, 40));
-    
-    if (unionSize(words1, words2) === 0) return 0;
-    return intersectionSize(words1, words2) / unionSize(words1, words2);
+
+    const intersection = [...words1].filter(w => words2.has(w)).length;
+    const union = new Set([...words1, ...words2]).size;
+
+    return union === 0 ? 0 : intersection / union;
 }
 
-function intersectionSize(s1: Set<string>, s2: Set<string>): number {
-    let count = 0;
-    for (const item of s1) if (s2.has(item)) count++;
-    return count;
-}
-
-function unionSize(s1: Set<string>, s2: Set<string>): number {
-    return new Set([...s1, ...s2]).size;
-}
-
-export async function generateAutopilotPosts(userId: string, testNow?: Date, maxToGenerate: number = 10) {
-    // 0. Simulation & Timezone Setup
+// ---------------- MAIN FUNCTION ----------------
+export async function generateAutopilotPosts(
+    userId: string,
+    testNow?: Date,
+    maxToGenerate: number = 2
+) {
     const simulatedNow = getCurrentTime(testNow);
-    console.log(`[Autopilot] [START] Generation started for user ${userId} at ${simulatedNow.toISOString()}`);
-    
+    console.log(`[Autopilot] START → ${simulatedNow.toISOString()}`);
+
     const user = await prisma.user.findUnique({
         where: { id: userId },
         select: {
-            id: true,
             email: true,
             autopilotEnabled: true,
             autopilotTopics: true,
@@ -51,317 +47,203 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date, max
             autopilotFrequency: true,
             autopilotAboutYou: true,
             autopilotCurrentFocus: true,
-            autopilotWritingStyleId: true,
-            plan: true,
-            defaultTone: true,
-            writingStyles: true,
-            schedule: {
-                select: { timezone: true }
-            }
-        },
+            schedule: { select: { timezone: true } }
+        }
     });
 
-    const userTimezone = user?.schedule?.timezone || "UTC";
-
-    // 1. Log All Configuration
-    console.log(`[Autopilot] Config check:
-        - user: ${user?.email || "NOT FOUND"}
-        - enabled: ${user?.autopilotEnabled}
-        - plan: ${user?.plan}
-        - topics: ${JSON.stringify(user?.autopilotTopics)}
-        - days: ${JSON.stringify(user?.autopilotDays)}
-        - time: ${user?.autopilotTime}
-        - writingStyleId: ${user?.autopilotWritingStyleId}
-        - frequency: ${user?.autopilotFrequency}`);
-
-    if (!user) {
-        console.error(`[Autopilot] [EXIT] User ${userId} not found.`);
+    if (!user || !user.autopilotEnabled) {
+        console.log(`[Autopilot] EXIT → invalid user/config`);
         return [];
     }
 
-    if (!user.autopilotEnabled) {
-        console.log(`[Autopilot] [EXIT] Autopilot disabled for user ${userId}.`);
-        return [];
-    }
-
-    const topics = (user.autopilotTopics as string[]) || [];
-    const daysEnabledStr = (user.autopilotDays as string[]) || []; // e.g. ["MONDAY", "WEDNESDAY"]
+    const timezone = user.schedule?.timezone || "UTC";
+    const topics = user.autopilotTopics as string[];
+    const days = user.autopilotDays as string[];
     const timeStr = user.autopilotTime;
-    
-    if (topics.length === 0 || daysEnabledStr.length === 0 || !timeStr) {
-        console.error(`[Autopilot] [EXIT] Incomplete configuration.`);
+
+    if (!topics?.length || !days?.length || !timeStr) {
+        console.log(`[Autopilot] EXIT → incomplete config`);
         return [];
     }
 
-    // MAP DAYS TO NUMERIC INDEXES (0-6)
-    const dayMap: Record<string, number> = {
-        "SUNDAY": 0, "SUN": 0,
-        "MONDAY": 1, "MON": 1,
-        "TUESDAY": 2, "TUE": 2,
-        "WEDNESDAY": 3, "WED": 3,
-        "THURSDAY": 4, "THU": 4,
-        "FRIDAY": 5, "FRI": 5,
-        "SATURDAY": 6, "SAT": 6
-    };
-    const dayIndexes = daysEnabledStr.map(d => dayMap[d.toUpperCase()]).filter(idx => idx !== undefined);
+    const frequency = parseInt(user.autopilotFrequency || "0");
+    if (frequency <= 0) return [];
 
-    // Helper for ISO week key (e.g., 2026-W12)
+    // ---------------- DAY MAP ----------------
+    const dayMap: Record<string, number> = {
+        SUNDAY: 0, MONDAY: 1, TUESDAY: 2,
+        WEDNESDAY: 3, THURSDAY: 4, FRIDAY: 5, SATURDAY: 6
+    };
+
+    // ✅ FIXED (keeps Sunday = 0)
+    const enabledDays = days
+        .map(d => dayMap[d.toUpperCase()])
+        .filter((d): d is number => d !== undefined);
+
     const getWeekKey = (date: Date) => format(date, "yyyy-'W'II");
 
-    // 2. Build Rolling 21-Day Window (Weekly Grouped)
+    // ---------------- BUILD SLOTS ----------------
+    const userNow = toZonedTime(simulatedNow, timezone);
+    const [hours, minutes] = timeStr.split(":").map(Number);
+
     const slotsByWeek = new Map<string, Date[]>();
-    const [utcHours, utcMinutes] = timeStr.split(":").map(Number);
-    const userNow = toZonedTime(simulatedNow, userTimezone);
-    
-    console.log(`[Autopilot] Building weekly slots starting from ${userNow.toISOString()} (${userTimezone})`);
 
     for (let i = 0; i < 21; i++) {
-        const targetDay = addDays(userNow, i);
-        const dayOfWeek = targetDay.getDay();
+        const d = addDays(userNow, i);
+        const dow = d.getDay();
 
-        if (dayIndexes.includes(dayOfWeek)) {
-            const scheduledForUtc = new Date(Date.UTC(
-                targetDay.getFullYear(),
-                targetDay.getMonth(),
-                targetDay.getDate(),
-                utcHours,
-                utcMinutes,
-                0,
-                0
-            ));
+        if (!enabledDays.includes(dow)) continue;
 
-            if (isAfter(scheduledForUtc, simulatedNow)) {
-                const weekKey = getWeekKey(scheduledForUtc);
-                if (!slotsByWeek.has(weekKey)) slotsByWeek.set(weekKey, []);
-                slotsByWeek.get(weekKey)!.push(scheduledForUtc);
-            }
-        }
+        const slot = new Date(Date.UTC(
+            d.getFullYear(),
+            d.getMonth(),
+            d.getDate(),
+            hours,
+            minutes
+        ));
+
+        if (!isAfter(slot, simulatedNow)) continue;
+
+        const weekKey = getWeekKey(slot);
+        if (!slotsByWeek.has(weekKey)) slotsByWeek.set(weekKey, []);
+        slotsByWeek.get(weekKey)!.push(slot);
     }
 
-    // 3. Fetch Existing Posts (Weekly Grouped)
+    console.log(`[Autopilot] Slots built: ${slotsByWeek.size} weeks`);
+
+    // ---------------- EXISTING POSTS ----------------
     const windowEnd = addDays(simulatedNow, 21);
-    const existingPosts = await prisma.post.findMany({
+
+    const existing = await prisma.post.findMany({
         where: {
             userId,
-            status: { in: ["SCHEDULED", "PENDING", "PUBLISHED"] },
-            scheduledFor: {
-                gte: simulatedNow,
-                lte: windowEnd
-            }
+            status: { in: ["SCHEDULED", "PUBLISHED", "PENDING"] },
+            scheduledFor: { gte: simulatedNow, lte: windowEnd }
         },
-        select: {
-            scheduledFor: true
-        }
+        select: { scheduledFor: true }
     });
 
     const postsByWeek = new Map<string, Set<number>>();
-    existingPosts.forEach(p => {
-        if (p.scheduledFor) {
-            const weekKey = getWeekKey(p.scheduledFor);
-            if (!postsByWeek.has(weekKey)) postsByWeek.set(weekKey, new Set());
-            postsByWeek.get(weekKey)!.add(p.scheduledFor.getTime());
-        }
+
+    existing.forEach(p => {
+        if (!p.scheduledFor) return;
+        const wk = getWeekKey(p.scheduledFor);
+        if (!postsByWeek.has(wk)) postsByWeek.set(wk, new Set());
+        postsByWeek.get(wk)!.add(p.scheduledFor.getTime());
     });
 
-    // 4. Per-Week Slot Selection (Main Logic)
-    const frequency = parseInt(user.autopilotFrequency || "0");
+    // ---------------- SLOT SELECTION ----------------
     const selectedSlots: Date[] = [];
-    
-    // Sort week keys to ensure chronological processing
     const weekKeys = Array.from(slotsByWeek.keys()).sort();
 
-    for (const weekKey of weekKeys) {
+    for (const wk of weekKeys) {
         if (selectedSlots.length >= maxToGenerate) break;
 
-        const weekSlots = slotsByWeek.get(weekKey) || [];
-        const occupiedInWeek = postsByWeek.get(weekKey) || new Set<number>();
-        const currentCountInWeek = occupiedInWeek.size;
-        
-        let allowedInWeek = frequency - currentCountInWeek;
-        
-        if (allowedInWeek <= 0) {
-            console.log(`[Autopilot] [WEEK-FULL] ${weekKey}: Already has ${currentCountInWeek}/${frequency} posts.`);
-            continue;
-        }
+        const slots = slotsByWeek.get(wk) || [];
+        const occupied = postsByWeek.get(wk) || new Set();
 
-        console.log(`[Autopilot] [WEEK-GAP] ${weekKey}: ${currentCountInWeek}/${frequency} posts. Can add ${allowedInWeek}.`);
+        const current = occupied.size;
+        let allowed = frequency - current;
 
-        // Find earliest free slots in this week
-        for (const slot of weekSlots) {
+        if (allowed <= 0) continue;
+
+        console.log(`[Autopilot] WEEK ${wk}: ${current}/${frequency}`);
+
+        for (const slot of slots) {
             if (selectedSlots.length >= maxToGenerate) break;
-            if (allowedInWeek <= 0) break;
+            if (allowed <= 0) break;
 
-            if (!occupiedInWeek.has(slot.getTime())) {
-                console.log(`[Autopilot] [SLOT-SELECT] ${slot.toISOString()} picked for ${weekKey}.`);
+            if (!occupied.has(slot.getTime())) {
                 selectedSlots.push(slot);
-                allowedInWeek--;
-            } else {
-                console.log(`[Autopilot] [SLOT-SKIP] ${slot.toISOString()} occupied.`);
+                allowed--;
             }
         }
+
+        // 🔥 CRITICAL STOP
+        if (selectedSlots.length > 0) break;
     }
 
-    const slotsToProcess = selectedSlots;
-    
+    // ✅ FINAL SAFETY (never exceed limit)
+    const slotsToProcess = selectedSlots.slice(0, maxToGenerate);
+
     if (slotsToProcess.length === 0) {
-        console.log(`[Autopilot] [EXIT] All weeks satisfied according to frequency (${frequency}/week).`);
+        console.log(`[Autopilot] EXIT → nothing to generate`);
         return [];
     }
 
-    console.log(`[Autopilot] Will generate total ${slotsToProcess.length} posts across all weeks.`);
+    // ---------------- CONTEXT ----------------
+    const context = [
+        user.autopilotCurrentFocus && `FOCUS: ${user.autopilotCurrentFocus}`,
+        user.autopilotAboutYou && `ABOUT: ${user.autopilotAboutYou}`
+    ].filter(Boolean).join("\n\n");
 
-    // 5. Generate and Save Posts
-    // Prioritize Weekly Focus in the context to ensure it influences the AI meaningfully
-    const focusContext = user.autopilotCurrentFocus ? `IMPORTANT CURRENT WEEKLY FOCUS (High Priority): ${user.autopilotCurrentFocus}` : "";
-    const aboutContext = user.autopilotAboutYou ? `Background/About Me: ${user.autopilotAboutYou}` : "";
-    
-    const userContext = [focusContext, aboutContext].filter(Boolean).join("\n\n");
-
-    const baseStyle = user.defaultTone || "Professional";
-    let userWritingSample = undefined;
-
-    // WRITING STYLE PERSISTENCE & PARSE
-    let styleToUse = baseStyle;
-    // Fetch and prepare all styles (including legacy ones for parity)
-    let styles = (user.writingStyles as any[]) || [];
-    if (styles.length === 0) {
-        if ((user as any).writingStyle) styles.push({ name: "Legacy (Main)", sample: (user as any).writingStyle });
-        // Use customStyles from user if it exists and is not empty
-        const customStyles = (user as any).customStyles || [];
-        customStyles.forEach((s: string, i: number) => {
-            if (s) styles.push({ name: `Legacy (Extra ${i + 1})`, sample: s });
-        });
-    }
-
-    if (user.autopilotWritingStyleId && user.autopilotWritingStyleId !== "default") {
-        const matchedStyle = styles.find(s => s.id === user.autopilotWritingStyleId || s.name === user.autopilotWritingStyleId);
-        if (matchedStyle) {
-            styleToUse = `Write Like Me — ${matchedStyle.name}`;
-            userWritingSample = matchedStyle.sample || matchedStyle.content;
-            console.log(`[Autopilot] Using Specific Writing Style: ${matchedStyle.name}`);
-        }
-    } else if (styles.length > 0) {
-        // "default" or "automatic" mode -> Use the first available style
-        const defaultStyle = styles[0];
-        styleToUse = `Write Like Me — ${defaultStyle.name}`;
-        userWritingSample = defaultStyle.sample || defaultStyle.content;
-        console.log(`[Autopilot] Using Automatic (Default) Writing Style: ${defaultStyle.name}`);
-    } else {
-        console.log(`[Autopilot] No writing styles found. Using base tone: ${baseStyle}`);
-    }
-
-    // ROUND-ROBIN TOPIC LOGIC
-    const lastAutopilotPost = await prisma.post.findFirst({
-        where: { userId, source: "autopilot" },
-        orderBy: { createdAt: "desc" },
-        select: { topic: true }
-    });
-
-    let nextTopicIndex = 0;
-    if (lastAutopilotPost?.topic) {
-        const lastIdx = topics.indexOf(lastAutopilotPost.topic);
-        if (lastIdx !== -1) {
-            nextTopicIndex = (lastIdx + 1) % topics.length;
-        }
-    }
-
-    // DUPLICATE PREVENTION - Fetch recent posts for similarity check
-    const recentAutopilotPosts = await prisma.post.findMany({
+    const recentPosts = await prisma.post.findMany({
         where: { userId, source: "autopilot" },
         orderBy: { createdAt: "desc" },
         take: 10,
         select: { content: true }
     });
 
-    const generatedPostsList = [];
-    const totalExistingCount = await prisma.post.count({
-        where: { userId, source: "autopilot" }
+    // ---------------- TOPIC ROTATION ----------------
+    const last = await prisma.post.findFirst({
+        where: { userId, source: "autopilot" },
+        orderBy: { createdAt: "desc" },
+        select: { topic: true }
     });
+
+    let topicIndex = 0;
+    if (last?.topic) {
+        const idx = topics.indexOf(last.topic);
+        if (idx !== -1) topicIndex = (idx + 1) % topics.length;
+    }
+
+    // ---------------- GENERATION ----------------
+    const results = [];
 
     for (let i = 0; i < slotsToProcess.length; i++) {
         const slot = slotsToProcess[i];
-        const topicIndex = (nextTopicIndex + i) % topics.length;
-        const selectedTopic = topics[topicIndex];
-        const hookStyle = HOOK_STYLES[Math.floor(Math.random() * HOOK_STYLES.length)];
+        const topic = topics[(topicIndex + i) % topics.length];
+        const hook = HOOK_STYLES[Math.floor(Math.random() * HOOK_STYLES.length)];
 
-        console.log(`[Autopilot] [LOOP] Generating slot ${i+1}/${slotsToProcess.length}: Topic=${selectedTopic}, Slot=${slot.toISOString()}, Style=${styleToUse}, Hook=${hookStyle}`);
+        let content = "";
+        let tries = 0;
 
-        let content = null;
-        let retryCount = 0;
-        const MAX_RETRIES = 2;
-
-        while (retryCount <= MAX_RETRIES) {
-            try {
-                content = await generatePost({
-                    topic: selectedTopic,
-                    style: styleToUse,
-                    userWritingSample,
-                    context: `${userContext}\n\nSTYLE TASK: Start with ${hookStyle}. Ensure this content feels unique and distinct from previous posts. Avoid typical LinkedIn cliches.`,
-                    targetLength: 1000,
-                });
-                
-                if (!content || content.trim().length === 0) {
-                    throw new Error("Empty content returned");
-                }
-
-                // Check for similarity with recent posts
-                const isDuplicate = recentAutopilotPosts.some(p => calculateSimilarity(p.content, content!) > 0.7);
-                if (isDuplicate) {
-                    console.warn(`[Autopilot] [SIMILARITY] Detected high similarity with recent post. Retrying (${retryCount + 1}/${MAX_RETRIES})...`);
-                    retryCount++;
-                    continue;
-                }
-
-                break; // Content is good
-            } catch (error) {
-                console.error(`[Autopilot] AI Failure/Similarity Issue:`, error);
-                retryCount++;
-                if (retryCount > MAX_RETRIES) {
-                    content = `Focusing on ${selectedTopic} today. It's essential for anyone looking to make a real impact in their field.\n\n#${selectedTopic.replace(/\s+/g, '')} #Insights #Professional`;
-                }
-            }
-        }
-
-        try {
-            // IDEMPOTENCY GUARD: Final check before creation to prevent duplicates in high-concurrency or race conditions
-            const finalCheck = await prisma.post.findFirst({
-                where: {
-                    userId,
-                    scheduledFor: slot,
-                    status: { in: ["SCHEDULED", "PUBLISHED", "PENDING"] }
-                }
+        while (tries <= 2) {
+            content = await generatePost({
+                topic,
+                style: "Professional",
+                context: `${context}\n\nStart with ${hook}`
             });
 
-            if (finalCheck) {
-                console.warn(`[Autopilot] [IDEMPOTENCY] Slot ${slot.toISOString()} was filled by another process. Skipping.`);
-                continue;
-            }
+            const duplicate = recentPosts.some(p =>
+                calculateSimilarity(p.content, content) > 0.7
+            );
 
-            const post = await prisma.post.create({
-                data: {
-                    userId,
-                    content,
-                    status: "SCHEDULED",
-                    scheduledFor: slot,
-                    source: "autopilot",
-                    topic: selectedTopic,
-                    userModified: false,
-                    writingStyle: styleToUse // Part 4 integrity
-                },
-            });
-            console.log(`[Autopilot] [SUCCESS] Created post ${post.id}`);
-            generatedPostsList.push(post);
-        } catch (dbError) {
-            console.error(`[Autopilot] [DB ERROR]`, dbError);
+            if (!duplicate) break;
+            tries++;
         }
+
+        // idempotency
+        const exists = await prisma.post.findFirst({
+            where: { userId, scheduledFor: slot }
+        });
+
+        if (exists) continue;
+
+        const post = await prisma.post.create({
+            data: {
+                userId,
+                content,
+                status: "SCHEDULED",
+                scheduledFor: slot,
+                source: "autopilot",
+                topic
+            }
+        });
+
+        results.push(post);
     }
 
-    // Part 7 Assert
-    if (generatedPostsList.length === 0 && slotsToProcess.length > 0) {
-        throw new Error('CRITICAL: Autopilot failed to create any posts.');
-    }
-
-    console.log(`[Autopilot] [END] Created ${generatedPostsList.length} posts.`);
-    return generatedPostsList;
+    console.log(`[Autopilot] CREATED → ${results.length}`);
+    return results;
 }
-
