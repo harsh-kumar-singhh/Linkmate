@@ -4,7 +4,7 @@ import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { getCurrentTime } from "@/lib/utils/time";
 import { generatePost } from "@/lib/gemini";
 
-export async function generateAutopilotPosts(userId: string, testNow?: Date) {
+export async function generateAutopilotPosts(userId: string, testNow?: Date, maxToGenerate: number = 10) {
     // 0. Simulation & Timezone Setup
     const simulatedNow = getCurrentTime(testNow);
     console.log(`[Autopilot] [START] Generation started for user ${userId} at ${simulatedNow.toISOString()}`);
@@ -140,16 +140,22 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
         }
     }
 
-    console.log(`[Autopilot] missingSlots identified: ${missingSlots.length}`);
+    console.log(`[Autopilot] missingSlots identified: ${missingSlots.length} (Limit: ${maxToGenerate})`);
 
-    // Part 3 Force: If absolutely no posts exist, ensure we do something (but still respect days if possible)
-    if (missingSlots.length === 0 && existingPosts.length === 0 && validSlots.length > 0) {
-        console.log(`[Autopilot] [FORCE] 0 missing slots but 0 posts exist. Creating absolute first post.`);
-        missingSlots.push(validSlots[0]);
+    // Apply safety limit
+    const slotsToProcess = missingSlots.slice(0, maxToGenerate);
+    if (slotsToProcess.length < missingSlots.length) {
+        console.log(`[Autopilot] Capping generation to ${maxToGenerate} posts per run.`);
     }
 
-    if (missingSlots.length === 0) {
-        console.log(`[Autopilot] [EXIT] All slots filled.`);
+    // Part 3 Force: If absolutely no posts exist, ensure we do something (but still respect days if possible)
+    if (slotsToProcess.length === 0 && existingPosts.length === 0 && validSlots.length > 0) {
+        console.log(`[Autopilot] [FORCE] 0 missing slots but 0 posts exist. Creating absolute first post.`);
+        slotsToProcess.push(validSlots[0]);
+    }
+
+    if (slotsToProcess.length === 0) {
+        console.log(`[Autopilot] [EXIT] All slots filled or no slots available.`);
         return [];
     }
 
@@ -198,12 +204,12 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
         where: { userId, source: "autopilot" }
     });
 
-    for (let i = 0; i < missingSlots.length; i++) {
-        const slot = missingSlots[i];
+    for (let i = 0; i < slotsToProcess.length; i++) {
+        const slot = slotsToProcess[i];
         const topicIndex = (totalExistingCount + i) % topics.length;
         const selectedTopic = topics[topicIndex];
 
-        console.log(`[Autopilot] [LOOP] Generating slot ${i+1}/${missingSlots.length}: Topic=${selectedTopic}, Slot=${slot.toISOString()}, Style=${styleToUse}`);
+        console.log(`[Autopilot] [LOOP] Generating slot ${i+1}/${slotsToProcess.length}: Topic=${selectedTopic}, Slot=${slot.toISOString()}, Style=${styleToUse}`);
 
         let content = null;
         try {
@@ -244,7 +250,7 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date) {
     }
 
     // Part 7 Assert
-    if (generatedPostsList.length === 0 && missingSlots.length > 0) {
+    if (generatedPostsList.length === 0 && slotsToProcess.length > 0) {
         throw new Error('CRITICAL: Autopilot failed to create any posts.');
     }
 

@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { publishToLinkedIn } from "@/lib/linkedin";
+import { maintainAutopilotPipeline } from "@/lib/autopilot/maintenance";
 
 export async function POST(req: Request) {
     const now = new Date();
@@ -130,6 +131,15 @@ export async function POST(req: Request) {
             }
         }
 
+        console.log("[CRON] Phase 1 (Publishing) completed. Starting Phase 2 (Maintenance)...");
+        
+        // 4. Trigger Autopilot Maintenance Pipeline
+        try {
+            await maintainAutopilotPipeline();
+        } catch (maintenanceError) {
+            console.error("[CRON] Phase 2 (Maintenance) failed:", maintenanceError);
+        }
+
         const summary = {
             success: true,
             timestamp: nowUTC,
@@ -137,6 +147,7 @@ export async function POST(req: Request) {
             processed: results.length,
             succeeded: results.filter(r => r.status === "SUCCESS").length,
             failed: results.filter(r => r.status === "FAILED").length,
+            maintenanceTriggered: true,
             details: results
         };
 
