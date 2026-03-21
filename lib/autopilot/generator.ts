@@ -94,7 +94,6 @@ export async function generateAutopilotPosts(
             minutes
         ));
 
-        // ONLY SKIP IF TIME ALREADY PASSED
         if (!isAfter(slot, now)) continue;
 
         const weekKey = getWeekKey(slot);
@@ -110,7 +109,8 @@ export async function generateAutopilotPosts(
         where: {
             userId,
             status: { in: ["SCHEDULED", "PUBLISHED", "PENDING"] },
-            scheduledFor: { gte: now, lte: windowEnd }
+            // ✅ FIXED: removed gte: now
+            scheduledFor: { lte: windowEnd }
         },
         select: { scheduledFor: true }
     });
@@ -154,7 +154,6 @@ export async function generateAutopilotPosts(
             }
         }
 
-        // ONLY FIRST INCOMPLETE WEEK
         if (selectedSlots.length > 0) break;
     }
 
