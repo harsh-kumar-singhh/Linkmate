@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { addDays, format, isAfter } from "date-fns";
+import { addDays, format, isAfter, startOfWeek, endOfWeek } from "date-fns";
 import { getCurrentTime } from "@/lib/utils/time";
 import { generatePost } from "@/lib/gemini";
 
@@ -12,7 +12,6 @@ const HOOK_STYLES = [
     "a direct, no-nonsense practical tip"
 ];
 
-// ---------------- SIMILARITY ----------------
 function calculateSimilarity(str1: string, str2: string): number {
     const s1 = str1.toLowerCase().replace(/[^\w\s]/g, '');
     const s2 = str2.toLowerCase().replace(/[^\w\s]/g, '');
@@ -26,7 +25,6 @@ function calculateSimilarity(str1: string, str2: string): number {
     return union === 0 ? 0 : intersection / union;
 }
 
-// ---------------- MAIN FUNCTION ----------------
 export async function generateAutopilotPosts(
     userId: string,
     testNow?: Date,
@@ -77,7 +75,6 @@ export async function generateAutopilotPosts(
 
     const [hours, minutes] = timeStr.split(":").map(Number);
 
-    // ---------------- BUILD SLOTS ----------------
     const slotsByWeek = new Map<string, Date[]>();
 
     for (let i = 0; i < 21; i++) {
@@ -97,14 +94,13 @@ export async function generateAutopilotPosts(
         slotsByWeek.get(weekKey)!.push(slot);
     }
 
-    // ---------------- EXISTING POSTS (FIXED) ----------------
     const windowEnd = addDays(now, 21);
 
     const existing = await prisma.post.findMany({
         where: {
             userId,
             status: { in: ["SCHEDULED", "PUBLISHED", "PENDING"] },
-            scheduledFor: { lte: windowEnd } // ✅ FIX: include past posts
+            scheduledFor: { lte: windowEnd }
         },
         select: { scheduledFor: true }
     });
@@ -115,11 +111,12 @@ export async function generateAutopilotPosts(
         if (!p.scheduledFor) return;
 
         const wk = getWeekKey(p.scheduledFor);
+
+        // ✅ CRITICAL FIX: ensure only correct week grouping
         if (!postsByWeek.has(wk)) postsByWeek.set(wk, new Set());
         postsByWeek.get(wk)!.add(p.scheduledFor.getTime());
     });
 
-    // ---------------- SLOT SELECTION ----------------
     const selectedSlots: Date[] = [];
     const weekKeys = Array.from(slotsByWeek.keys()).sort();
 
@@ -134,9 +131,8 @@ export async function generateAutopilotPosts(
 
         let allowed = frequency - occupied.size;
 
-        // ✅ CORE LOGIC: skip full week
         if (allowed <= 0) {
-            console.log(`[Autopilot] WEEK FULL ${wk}: ${occupied.size}/${frequency}`);
+            console.log(`[Autopilot] WEEK FULL ${wk}`);
             continue;
         }
 
@@ -153,13 +149,11 @@ export async function generateAutopilotPosts(
             }
         }
 
-        // ONLY FIRST INCOMPLETE WEEK
         if (selectedSlots.length > 0) break;
     }
 
     if (selectedSlots.length === 0) return [];
 
-    // ---------------- CONTEXT ----------------
     const context = [
         user.autopilotCurrentFocus && `FOCUS: ${user.autopilotCurrentFocus}`,
         user.autopilotAboutYou && `ABOUT: ${user.autopilotAboutYou}`
@@ -184,7 +178,6 @@ export async function generateAutopilotPosts(
         if (idx !== -1) topicIndex = (idx + 1) % topics.length;
     }
 
-    // ---------------- GENERATION ----------------
     const results = [];
 
     for (let i = 0; i < selectedSlots.length; i++) {
