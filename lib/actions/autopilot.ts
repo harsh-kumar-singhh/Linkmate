@@ -4,9 +4,9 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 
-import { maintainAutopilotPipeline } from "@/lib/autopilot/maintenance"
-import { reconcileAutopilotSchedule } from "@/lib/autopilot/maintenance"
+import { maintainAutopilotPipeline, reconcileAutopilotSchedule } from "@/lib/autopilot/maintenance"
 
+// ---------------- SAVE SETTINGS ----------------
 export async function saveAutopilotSettings(data: {
     topics: string[]
     frequency: string
@@ -17,6 +17,7 @@ export async function saveAutopilotSettings(data: {
     writingStyleId?: string
 }) {
     const session = await auth()
+
     if (!session?.user?.id) {
         throw new Error("Unauthorized")
     }
@@ -32,8 +33,8 @@ export async function saveAutopilotSettings(data: {
         throw new Error("Pro plan required for Autopilot")
     }
 
-    // Validation
-    if (data.topics.length < 1) { // Loosened from 3 to allow testing, but user had 3-5 in original code. I'll stick to original unless asked.
+    // ---------------- VALIDATION ----------------
+    if (data.topics.length < 1) {
         throw new Error("Please select at least one topic")
     }
 
@@ -42,6 +43,7 @@ export async function saveAutopilotSettings(data: {
     }
 
     try {
+        // ---------------- SAVE CONFIG ----------------
         await prisma.user.update({
             where: { id: session.user.id },
             data: {
@@ -56,58 +58,69 @@ export async function saveAutopilotSettings(data: {
             },
         })
 
-        // Use unified maintenance pipeline as the single source of truth for generation
-        console.log(`[Autopilot] Triggering maintenance for user ${session.user.id}`);
-        await reconcileAutopilotSchedule(session.user.id, data.days);
-        await maintainAutopilotPipeline(session.user.id);
-        console.log("[Autopilot] Sync finished");
+        // ---------------- PIPELINE FLOW ----------------
+        console.log(`[Autopilot] RECONCILE → ${session.user.id}`)
+        await reconcileAutopilotSchedule(session.user.id, data.days)
+
+        console.log(`[Autopilot] MAINTENANCE TRIGGER → ${session.user.id}`)
+        await maintainAutopilotPipeline(session.user.id)
+
+        console.log(`[Autopilot] SYNC COMPLETE`)
 
         revalidatePath("/calendar")
+
         return { success: true }
+
     } catch (error) {
         console.error("Failed to save autopilot settings:", error)
         throw new Error("Internal server error")
     }
 }
 
+// ---------------- TOGGLE AUTOPILOT ----------------
 export async function toggleAutopilot(enabled: boolean) {
     const session = await auth()
+
     if (!session?.user?.id) {
         throw new Error("Unauthorized")
     }
 
     try {
-        const now = new Date();
+        const now = new Date()
 
         await prisma.$transaction([
-            // Update user setting
+            // Update user flag
             prisma.user.update({
                 where: { id: session.user.id },
                 data: { autopilotEnabled: enabled },
             }),
-            // Update future posts status
+
+            // Update future posts
             prisma.post.updateMany({
                 where: {
                     userId: session.user.id,
                     source: "autopilot",
-                    scheduledFor: { gt: now },
-                    status: enabled ? "PAUSED" : "SCHEDULED"
+                    scheduledFor: { gt: now }
                 },
                 data: {
                     status: enabled ? "SCHEDULED" : "PAUSED"
                 }
             })
-        ]);
+        ])
 
+        // ---------------- RESUME FLOW ----------------
         if (enabled) {
-            // If resuming, trigger maintenance pipeline
+            console.log(`[Autopilot] RESUME → Trigger maintenance`)
+
             await maintainAutopilotPipeline(session.user.id).catch(err => {
-                console.error("Delayed Autopilot maintenance failed:", err)
-            });
+                console.error("Autopilot maintenance failed:", err)
+            })
         }
 
         revalidatePath("/calendar")
+
         return { success: true }
+
     } catch (error) {
         console.error("Failed to toggle autopilot:", error)
         throw new Error("Internal server error")

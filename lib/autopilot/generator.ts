@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { addDays, format, isAfter, startOfISOWeek } from "date-fns";
+import { addDays, format, isAfter } from "date-fns";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
 import { getCurrentTime } from "@/lib/utils/time";
 import { generatePost } from "@/lib/gemini";
@@ -46,15 +46,13 @@ export async function generateAutopilotPosts(
             autopilotFrequency: true,
             autopilotAboutYou: true,
             autopilotCurrentFocus: true,
-            schedule: {
-                select: { timezone: true }
-            }
+            schedule: { select: { timezone: true } }
         }
     });
 
     if (!user || !user.autopilotEnabled) return [];
 
-    const timezone = (user.schedule as any)?.timezone || "UTC";
+    const timezone = user.schedule?.timezone || "UTC";
 
     const topics = user.autopilotTopics as string[];
     const days = user.autopilotDays as string[];
@@ -79,68 +77,54 @@ export async function generateAutopilotPosts(
         .map(d => dayMap[d.toUpperCase()])
         .filter((d): d is number => d !== undefined);
 
-    const loggedNow = toZonedTime(now, timezone);
-    console.log(`[Autopilot] START → ${loggedNow.toISOString()} (${timezone})`);
-
     const getWeekKey = (date: Date) => format(date, "yyyy-'W'II");
 
     // ---------------- BUILD SLOTS ----------------
     const slotsByWeek = new Map<string, Date[]>();
 
     for (let i = 0; i < 21; i++) {
-        const d = addDays(now, i);
-        const zonedD = toZonedTime(d, timezone);
-        const dow = zonedD.getDay();
+        const base = addDays(now, i);
+        const zoned = toZonedTime(base, timezone);
+        const dow = zoned.getDay();
 
         if (!enabledDays.includes(dow)) continue;
 
-        // Create slot at the specified hours/minutes in user's timezone
-        // PRINCIPAL RULE: 
-        // 1. Past days -> reject
-        // 2. Today -> allow if not already published
-        // 3. Future -> allow
-        
-        const slotDateStr = format(zonedD, "yyyy-MM-dd");
-        const slotLocalStr = `${slotDateStr}T${timeStr}:00`;
-        const slot = fromZonedTime(slotLocalStr, timezone);
+        const dateStr = format(zoned, "yyyy-MM-dd");
+        const slot = fromZonedTime(`${dateStr}T${timeStr}:00`, timezone);
 
-        const nowDateOnly = format(toZonedTime(now, timezone), "yyyy-MM-dd");
-        const isToday = slotDateStr === nowDateOnly;
+        const isToday =
+            format(toZonedTime(now, timezone), "yyyy-MM-dd") === dateStr;
 
-        if (!isToday && !isAfter(slot, now)) continue; // Past day rejection
+        // ✅ Allow TODAY even if time passed
+        if (!isToday && !isAfter(slot, now)) continue;
 
-        const weekKey = getWeekKey(slot);
+        const wk = getWeekKey(slot);
 
-        if (!slotsByWeek.has(weekKey)) slotsByWeek.set(weekKey, []);
-        slotsByWeek.get(weekKey)!.push(slot);
+        if (!slotsByWeek.has(wk)) slotsByWeek.set(wk, []);
+        slotsByWeek.get(wk)!.push(slot);
     }
 
     // ---------------- EXISTING POSTS ----------------
-    // We need to count posts from the START of the current week to verify frequency accurately
-    const startOfCurrentWeek = new Date(now);
-    const dayOfWeek = startOfCurrentWeek.getDay(); // 0 (Sun) to 6 (Sat)
-    // ISO week starts on Monday (1). Adjust accordingly if needed, but getWeekKey uses ISO week.
-    // For simplicity, let's just go back 7 days to cover the current ISO week fully.
-    startOfCurrentWeek.setDate(startOfCurrentWeek.getDate() - 7);
-    startOfCurrentWeek.setHours(0, 0, 0, 0);
-
     const windowEnd = addDays(now, 21);
 
     const existingPosts = await prisma.post.findMany({
         where: {
             userId,
             status: { in: ["SCHEDULED", "PUBLISHED", "PENDING"] },
-            scheduledFor: { gte: startOfCurrentWeek, lte: windowEnd }
+            scheduledFor: { lte: windowEnd }
         },
-        select: { status: true, scheduledFor: true }
+        select: {
+            status: true,
+            scheduledFor: true
+        }
     });
 
     const postsByWeek = new Map<string, Set<number>>();
 
     existingPosts.forEach(p => {
         if (!p.scheduledFor) return;
-
         const wk = getWeekKey(p.scheduledFor);
+
         if (!postsByWeek.has(wk)) postsByWeek.set(wk, new Set());
         postsByWeek.get(wk)!.add(p.scheduledFor.getTime());
     });
@@ -149,8 +133,6 @@ export async function generateAutopilotPosts(
     const selectedSlots: Date[] = [];
     const weekKeys = Array.from(slotsByWeek.keys()).sort();
 
-    const currentWeekKey = getWeekKey(now);
-
     for (const wk of weekKeys) {
         if (selectedSlots.length >= maxToGenerate) break;
 
@@ -158,65 +140,29 @@ export async function generateAutopilotPosts(
             (a, b) => a.getTime() - b.getTime()
         );
 
-        // ---------------- WEEK LOCK AUDIT ----------------
-        // 🚨 PRINCIPAL RULE: A week is LOCKED if:
-        // 1. Any slot for this week has already been PUBLISHED.
-        // 2. We've passed the first possible slot of the week (deterministic lock).
-        
-        let isWeekLocked = false;
-
-        // Condition 1: Check published status
-        const publishedInWeek = existingPosts.some(p => 
-            p.status === "PUBLISHED" && getWeekKey(p.scheduledFor!) === wk
-        );
-        
-        if (publishedInWeek) {
-            console.log(`[Autopilot] LOCK: Week ${wk} has published posts. Skipping remainder.`);
-            isWeekLocked = true;
-        }
-
-        // Condition 2: Check current week "started" status
-        if (wk === currentWeekKey && !isWeekLocked) {
-            const weekStart = startOfISOWeek(now);
-            const isoEnabledDays = [...enabledDays].sort((a, b) => {
-                const valA = a === 0 ? 7 : a;
-                const valB = b === 0 ? 7 : b;
-                return valA - valB;
-            });
-
-            if (isoEnabledDays.length > 0) {
-                const firstDay = isoEnabledDays[0];
-                const daysToAdd = firstDay === 0 ? 6 : firstDay - 1;
-                
-                const firstDayDate = addDays(weekStart, daysToAdd);
-                const firstDayZoned = toZonedTime(firstDayDate, timezone);
-                const firstDayStr = format(firstDayZoned, "yyyy-MM-dd");
-                const firstSlotDate = fromZonedTime(`${firstDayStr}T${timeStr}:00`, timezone);
-
-                // If now is strictly after the FIRST POSSIBLE slot of the week, the week is "started".
-                // Exception: If NOTHING was published yet and we are still "Today", we allow catch-up.
-                if (!isAfter(firstSlotDate, now)) {
-                    // Only lock if we have NO published posts and we are NOT in the "Today catch-up" window?
-                    // Actually, the user says "Once a week is locked -> NEVER generate remaining posts".
-                    // And "Saturday already posted -> LOCK week -> DO NOT generate Sunday".
-                    // So if Sunday is in the future, but Saturday passed/posted, we lock.
-                    console.log(`[Autopilot] LOCK: Week ${wk} has started at ${firstSlotDate.toISOString()}. Skipping remainder.`);
-                    isWeekLocked = true;
-                }
-            }
-        }
-
-        if (isWeekLocked) continue;
-
         const occupied = postsByWeek.get(wk) || new Set();
 
-        let allowed = frequency - occupied.size;
-        if (allowed <= 0) {
-            console.log(`[Autopilot] WEEK ${wk} FULL: ${occupied.size}/${frequency}`);
+        // ✅ ONLY LOCK BASED ON PUBLISHED POSTS
+        const isLocked = existingPosts.some(
+            p =>
+                p.status === "PUBLISHED" &&
+                p.scheduledFor &&
+                getWeekKey(p.scheduledFor) === wk
+        );
+
+        if (isLocked) {
+            console.log(`[Autopilot] LOCKED week ${wk} (published exists)`);
             continue;
         }
 
-        console.log(`[Autopilot] WEEK ${wk}: ${occupied.size}/${frequency} (Allowed: ${allowed})`);
+        let allowed = frequency - occupied.size;
+
+        if (allowed <= 0) {
+            console.log(`[Autopilot] WEEK FULL ${wk}`);
+            continue;
+        }
+
+        console.log(`[Autopilot] WEEK ${wk}: ${occupied.size}/${frequency}`);
 
         for (const slot of slots) {
             if (selectedSlots.length >= maxToGenerate) break;
