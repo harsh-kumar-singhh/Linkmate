@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 
 import { generateAutopilotPosts } from "@/lib/autopilot/generator"
+import { reconcileAutopilotSchedule } from "@/lib/autopilot/maintenance"
 
 export async function saveAutopilotSettings(data: {
     topics: string[]
@@ -55,10 +56,11 @@ export async function saveAutopilotSettings(data: {
             },
         })
 
-        // Immediate generation for the upcoming week/days
-        console.log("[Autopilot] Calling generator...");
+        // Immediate reconciliation and generation for the upcoming week/days
+        console.log("[Autopilot] Reconciling and generating posts...");
+        await reconcileAutopilotSchedule(session.user.id, data.days);
         await generateAutopilotPosts(session.user.id);
-        console.log("[Autopilot] Generator finished");
+        console.log("[Autopilot] Sync finished");
 
         revalidatePath("/calendar")
         return { success: true }

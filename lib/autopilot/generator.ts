@@ -4,6 +4,36 @@ import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { getCurrentTime } from "@/lib/utils/time";
 import { generatePost } from "@/lib/gemini";
 
+const HOOK_STYLES = [
+    "a thought-provoking question",
+    "a short, powerful story",
+    "a bold, contrarian statement",
+    "a surprising statistic or fact",
+    "a relatable professional struggle",
+    "a direct, no-nonsense practical tip"
+];
+
+function calculateSimilarity(str1: string, str2: string): number {
+    const s1 = str1.toLowerCase().replace(/[^\w\s]/g, '');
+    const s2 = str2.toLowerCase().replace(/[^\w\s]/g, '');
+    
+    const words1 = new Set(s1.split(/\s+/).slice(0, 40)); 
+    const words2 = new Set(s2.split(/\s+/).slice(0, 40));
+    
+    if (unionSize(words1, words2) === 0) return 0;
+    return intersectionSize(words1, words2) / unionSize(words1, words2);
+}
+
+function intersectionSize(s1: Set<string>, s2: Set<string>): number {
+    let count = 0;
+    for (const item of s1) if (s2.has(item)) count++;
+    return count;
+}
+
+function unionSize(s1: Set<string>, s2: Set<string>): number {
+    return new Set([...s1, ...s2]).size;
+}
+
 export async function generateAutopilotPosts(userId: string, testNow?: Date, maxToGenerate: number = 10) {
     // 0. Simulation & Timezone Setup
     const simulatedNow = getCurrentTime(testNow);
@@ -199,6 +229,29 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date, max
         console.log(`[Autopilot] No writing styles found. Using base tone: ${baseStyle}`);
     }
 
+    // ROUND-ROBIN TOPIC LOGIC
+    const lastAutopilotPost = await prisma.post.findFirst({
+        where: { userId, source: "autopilot" },
+        orderBy: { createdAt: "desc" },
+        select: { topic: true }
+    });
+
+    let nextTopicIndex = 0;
+    if (lastAutopilotPost?.topic) {
+        const lastIdx = topics.indexOf(lastAutopilotPost.topic);
+        if (lastIdx !== -1) {
+            nextTopicIndex = (lastIdx + 1) % topics.length;
+        }
+    }
+
+    // DUPLICATE PREVENTION - Fetch recent posts for similarity check
+    const recentAutopilotPosts = await prisma.post.findMany({
+        where: { userId, source: "autopilot" },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: { content: true }
+    });
+
     const generatedPostsList = [];
     const totalExistingCount = await prisma.post.count({
         where: { userId, source: "autopilot" }
@@ -206,27 +259,46 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date, max
 
     for (let i = 0; i < slotsToProcess.length; i++) {
         const slot = slotsToProcess[i];
-        const topicIndex = (totalExistingCount + i) % topics.length;
+        const topicIndex = (nextTopicIndex + i) % topics.length;
         const selectedTopic = topics[topicIndex];
+        const hookStyle = HOOK_STYLES[Math.floor(Math.random() * HOOK_STYLES.length)];
 
-        console.log(`[Autopilot] [LOOP] Generating slot ${i+1}/${slotsToProcess.length}: Topic=${selectedTopic}, Slot=${slot.toISOString()}, Style=${styleToUse}`);
+        console.log(`[Autopilot] [LOOP] Generating slot ${i+1}/${slotsToProcess.length}: Topic=${selectedTopic}, Slot=${slot.toISOString()}, Style=${styleToUse}, Hook=${hookStyle}`);
 
         let content = null;
-        try {
-            content = await generatePost({
-                topic: selectedTopic,
-                style: styleToUse,
-                userWritingSample,
-                context: userContext || undefined,
-                targetLength: 1000,
-            });
-            
-            if (!content || content.trim().length === 0) {
-                throw new Error("Empty content returned");
+        let retryCount = 0;
+        const MAX_RETRIES = 2;
+
+        while (retryCount <= MAX_RETRIES) {
+            try {
+                content = await generatePost({
+                    topic: selectedTopic,
+                    style: styleToUse,
+                    userWritingSample,
+                    context: `${userContext}\n\nSTYLE TASK: Start with ${hookStyle}. Ensure this content feels unique and distinct from previous posts. Avoid typical LinkedIn cliches.`,
+                    targetLength: 1000,
+                });
+                
+                if (!content || content.trim().length === 0) {
+                    throw new Error("Empty content returned");
+                }
+
+                // Check for similarity with recent posts
+                const isDuplicate = recentAutopilotPosts.some(p => calculateSimilarity(p.content, content!) > 0.7);
+                if (isDuplicate) {
+                    console.warn(`[Autopilot] [SIMILARITY] Detected high similarity with recent post. Retrying (${retryCount + 1}/${MAX_RETRIES})...`);
+                    retryCount++;
+                    continue;
+                }
+
+                break; // Content is good
+            } catch (error) {
+                console.error(`[Autopilot] AI Failure/Similarity Issue:`, error);
+                retryCount++;
+                if (retryCount > MAX_RETRIES) {
+                    content = `Focusing on ${selectedTopic} today. It's essential for anyone looking to make a real impact in their field.\n\n#${selectedTopic.replace(/\s+/g, '')} #Insights #Professional`;
+                }
             }
-        } catch (error) {
-            console.error(`[Autopilot] AI Failure:`, error);
-            content = `Focusing on ${selectedTopic} today. It's essential for anyone looking to make a real impact in their field.\n\n#${selectedTopic.replace(/\s+/g, '')} #Insights #Professional`;
         }
 
         try {

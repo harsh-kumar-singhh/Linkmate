@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { generateAutopilotPosts } from "./generator";
+import { toZonedTime } from "date-fns-tz";
+import { format } from "date-fns";
 
 /**
  * Main logic for maintaining the rolling autopilot pipeline.
@@ -88,5 +90,80 @@ export async function maintainAutopilotPipeline() {
         console.log("[Autopilot-Maintenance] Pipeline maintenance completed.");
     } catch (error) {
         console.error("[Autopilot-Maintenance] FATAL ERROR:", error);
+    }
+}
+
+/**
+ * Reconciles existing scheduled posts with new autopilot settings.
+ * Deletes posts that are scheduled for days no longer in the user's selection.
+ */
+export async function reconcileAutopilotSchedule(userId: string, newDays: string[]) {
+    const now = new Date();
+    console.log(`[Autopilot-Reconcile] Starting reconciliation for user ${userId}`);
+
+    try {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                schedule: {
+                    select: { timezone: true }
+                }
+            }
+        });
+
+        const userTimezone = user?.schedule?.timezone || "UTC";
+        const normalizedNewDays = newDays.map(d => d.toUpperCase());
+
+        // 1. Fetch all upcoming scheduled autopilot posts
+        const upcomingPosts = await prisma.post.findMany({
+            where: {
+                userId,
+                status: "SCHEDULED",
+                source: "autopilot",
+                scheduledFor: {
+                    gte: now
+                }
+            },
+            select: {
+                id: true,
+                scheduledFor: true
+            }
+        });
+
+        if (upcomingPosts.length === 0) {
+            console.log(`[Autopilot-Reconcile] No upcoming posts to reconcile for user ${userId}`);
+            return { deletedCount: 0 };
+        }
+
+        const postsToDelete: string[] = [];
+
+        for (const post of upcomingPosts) {
+            if (!post.scheduledFor) continue;
+
+            // Determine the day of the week in user's timezone
+            const zonedDate = toZonedTime(post.scheduledFor, userTimezone);
+            const dayOfWeek = format(zonedDate, "EEEE").toUpperCase(); // e.g. "MONDAY"
+
+            if (!normalizedNewDays.includes(dayOfWeek)) {
+                console.log(`[Autopilot-Reconcile] Post ${post.id} scheduled for ${dayOfWeek} is no longer in selected days. Adding to delete list.`);
+                postsToDelete.push(post.id);
+            }
+        }
+
+        if (postsToDelete.length > 0) {
+            const deleteResult = await prisma.post.deleteMany({
+                where: {
+                    id: { in: postsToDelete }
+                }
+            });
+            console.log(`[Autopilot-Reconcile] Deleted ${deleteResult.count} invalid posts for user ${userId}`);
+            return { deletedCount: deleteResult.count };
+        }
+
+        console.log(`[Autopilot-Reconcile] All ${upcomingPosts.length} posts are still valid for user ${userId}`);
+        return { deletedCount: 0 };
+    } catch (error) {
+        console.error(`[Autopilot-Reconcile] Error reconciling schedule for user ${userId}:`, error);
+        throw error;
     }
 }
