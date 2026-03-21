@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 
-import { generateAutopilotPosts } from "@/lib/autopilot/generator"
+import { maintainAutopilotPipeline } from "@/lib/autopilot/maintenance"
 import { reconcileAutopilotSchedule } from "@/lib/autopilot/maintenance"
 
 export async function saveAutopilotSettings(data: {
@@ -56,10 +56,10 @@ export async function saveAutopilotSettings(data: {
             },
         })
 
-        // Immediate reconciliation and generation for the upcoming week/days
-        console.log("[Autopilot] Reconciling and generating posts...");
+        // Use unified maintenance pipeline as the single source of truth for generation
+        console.log(`[Autopilot] Triggering maintenance for user ${session.user.id}`);
         await reconcileAutopilotSchedule(session.user.id, data.days);
-        await generateAutopilotPosts(session.user.id);
+        await maintainAutopilotPipeline(session.user.id);
         console.log("[Autopilot] Sync finished");
 
         revalidatePath("/calendar")
@@ -100,9 +100,9 @@ export async function toggleAutopilot(enabled: boolean) {
         ]);
 
         if (enabled) {
-            // If resuming, ensure we have posts for the next 7 days
-            await generateAutopilotPosts(session.user.id).catch(err => {
-                console.error("Delayed Autopilot generation failed:", err)
+            // If resuming, trigger maintenance pipeline
+            await maintainAutopilotPipeline(session.user.id).catch(err => {
+                console.error("Delayed Autopilot maintenance failed:", err)
             });
         }
 

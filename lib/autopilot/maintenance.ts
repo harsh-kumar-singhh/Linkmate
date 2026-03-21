@@ -3,17 +3,32 @@ import { generateAutopilotPosts } from "./generator";
 import { addDays, format, isAfter, startOfISOWeek } from "date-fns";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
 
+const ACTIVE_RUNS = new Map<string, number>();
+const RUN_THROTTLE_MS = 30000; // 30 seconds
+
 /**
  * Main logic for maintaining the rolling autopilot pipeline.
+ * Can be called globally (cron) or for a specific user (on save/trigger).
  */
-export async function maintainAutopilotPipeline() {
+export async function maintainAutopilotPipeline(specificUserId?: string) {
     const now = new Date();
-    console.log(`[Autopilot-Maintenance] Starting pipeline maintenance at ${now.toISOString()}`);
+    
+    if (specificUserId) {
+        const lastRun = ACTIVE_RUNS.get(specificUserId);
+        if (lastRun && (now.getTime() - lastRun) < RUN_THROTTLE_MS) {
+            console.log(`[Autopilot-Maintenance] Skipping run for user ${specificUserId} - Throttled (last run < 30s ago)`);
+            return;
+        }
+        ACTIVE_RUNS.set(specificUserId, now.getTime());
+    }
+
+    console.log(`[Autopilot-Maintenance] Starting pipeline maintenance at ${now.toISOString()} ${specificUserId ? `for user ${specificUserId}` : '(Full Batch)'}`);
 
     try {
         // 1. Fetch active users
         const activeUsers = await prisma.user.findMany({
             where: {
+                id: specificUserId || undefined,
                 autopilotEnabled: true,
                 linkedinConnected: true,
                 NOT: [
@@ -34,7 +49,7 @@ export async function maintainAutopilotPipeline() {
                     select: { timezone: true }
                 }
             },
-            take: 10
+            take: specificUserId ? 1 : 10
         });
 
         if (activeUsers.length === 0) {
