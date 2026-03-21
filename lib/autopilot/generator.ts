@@ -32,43 +32,33 @@ export async function generateAutopilotPosts(
     testNow?: Date,
     maxToGenerate: number = 2
 ) {
-    const simulatedNow = getCurrentTime(testNow);
-    console.log(`[Autopilot] START → ${simulatedNow.toISOString()}`);
+    const now = getCurrentTime(testNow);
+    console.log(`[Autopilot] START → ${now.toISOString()}`);
 
     const user = await prisma.user.findUnique({
         where: { id: userId },
         select: {
-            email: true,
             autopilotEnabled: true,
             autopilotTopics: true,
             autopilotDays: true,
             autopilotTime: true,
             autopilotFrequency: true,
             autopilotAboutYou: true,
-            autopilotCurrentFocus: true,
-            schedule: { select: { timezone: true } }
+            autopilotCurrentFocus: true
         }
     });
 
-    if (!user || !user.autopilotEnabled) {
-        console.log(`[Autopilot] EXIT → invalid user/config`);
-        return [];
-    }
+    if (!user || !user.autopilotEnabled) return [];
 
-    const timezone = user.schedule?.timezone || "UTC";
     const topics = user.autopilotTopics as string[];
     const days = user.autopilotDays as string[];
     const timeStr = user.autopilotTime;
 
-    if (!topics?.length || !days?.length || !timeStr) {
-        console.log(`[Autopilot] EXIT → incomplete config`);
-        return [];
-    }
+    if (!topics?.length || !days?.length || !timeStr) return [];
 
     const frequency = parseInt(user.autopilotFrequency || "0");
     if (frequency <= 0) return [];
 
-    // ---------------- DAY MAP ----------------
     const dayMap: Record<string, number> = {
         SUNDAY: 0,
         MONDAY: 1,
@@ -85,31 +75,27 @@ export async function generateAutopilotPosts(
 
     const getWeekKey = (date: Date) => format(date, "yyyy-'W'II");
 
-    // ---------------- TIMEZONE FIX ----------------
-    const userNow = new Date(
-        new Date(simulatedNow).toLocaleString("en-US", { timeZone: timezone })
-    );
-
     const [hours, minutes] = timeStr.split(":").map(Number);
 
     // ---------------- BUILD SLOTS ----------------
     const slotsByWeek = new Map<string, Date[]>();
 
     for (let i = 0; i < 21; i++) {
-        const d = addDays(userNow, i);
-        const dow = d.getDay();
+        const d = addDays(now, i);
+        const dow = d.getUTCDay();
 
         if (!enabledDays.includes(dow)) continue;
 
         const slot = new Date(Date.UTC(
-            d.getFullYear(),
-            d.getMonth(),
-            d.getDate(),
+            d.getUTCFullYear(),
+            d.getUTCMonth(),
+            d.getUTCDate(),
             hours,
             minutes
         ));
 
-        if (!isAfter(slot, simulatedNow)) continue;
+        // ONLY SKIP IF TIME ALREADY PASSED
+        if (!isAfter(slot, now)) continue;
 
         const weekKey = getWeekKey(slot);
 
@@ -118,13 +104,13 @@ export async function generateAutopilotPosts(
     }
 
     // ---------------- EXISTING POSTS ----------------
-    const windowEnd = addDays(simulatedNow, 21);
+    const windowEnd = addDays(now, 21);
 
     const existing = await prisma.post.findMany({
         where: {
             userId,
             status: { in: ["SCHEDULED", "PUBLISHED", "PENDING"] },
-            scheduledFor: { gte: simulatedNow, lte: windowEnd }
+            scheduledFor: { gte: now, lte: windowEnd }
         },
         select: { scheduledFor: true }
     });
@@ -143,34 +129,23 @@ export async function generateAutopilotPosts(
     const selectedSlots: Date[] = [];
     const weekKeys = Array.from(slotsByWeek.keys()).sort();
 
-    const MIN_HOURS_BUFFER = 12;
-
     for (const wk of weekKeys) {
         if (selectedSlots.length >= maxToGenerate) break;
 
-        let slots = slotsByWeek.get(wk) || [];
+        const slots = (slotsByWeek.get(wk) || []).sort(
+            (a, b) => a.getTime() - b.getTime()
+        );
+
         const occupied = postsByWeek.get(wk) || new Set();
 
-        slots = slots.sort((a, b) => a.getTime() - b.getTime());
-
-        const current = occupied.size;
-        let allowed = frequency - current;
-
+        let allowed = frequency - occupied.size;
         if (allowed <= 0) continue;
 
-        console.log(`[Autopilot] WEEK ${wk}: ${current}/${frequency}`);
+        console.log(`[Autopilot] WEEK ${wk}: ${occupied.size}/${frequency}`);
 
         for (const slot of slots) {
             if (selectedSlots.length >= maxToGenerate) break;
             if (allowed <= 0) break;
-
-            const hoursDiff =
-                (slot.getTime() - simulatedNow.getTime()) / (1000 * 60 * 60);
-
-            if (hoursDiff < MIN_HOURS_BUFFER) {
-                console.log(`[Autopilot] SKIP (too soon): ${slot.toISOString()}`);
-                continue;
-            }
 
             if (!occupied.has(slot.getTime())) {
                 console.log(`[Autopilot] SELECT: ${slot.toISOString()}`);
@@ -179,17 +154,11 @@ export async function generateAutopilotPosts(
             }
         }
 
-        // 🔥 ONLY FIRST INCOMPLETE WEEK
+        // ONLY FIRST INCOMPLETE WEEK
         if (selectedSlots.length > 0) break;
     }
 
-    // ✅ FINAL SAFETY GUARD (CRITICAL)
-    const slotsToProcess = selectedSlots.slice(0, maxToGenerate);
-
-    if (slotsToProcess.length === 0) {
-        console.log(`[Autopilot] EXIT → nothing to generate`);
-        return [];
-    }
+    if (selectedSlots.length === 0) return [];
 
     // ---------------- CONTEXT ----------------
     const context = [
@@ -204,7 +173,6 @@ export async function generateAutopilotPosts(
         select: { content: true }
     });
 
-    // ---------------- TOPIC ROTATION ----------------
     const last = await prisma.post.findFirst({
         where: { userId, source: "autopilot" },
         orderBy: { createdAt: "desc" },
@@ -220,8 +188,8 @@ export async function generateAutopilotPosts(
     // ---------------- GENERATION ----------------
     const results = [];
 
-    for (let i = 0; i < slotsToProcess.length; i++) {
-        const slot = slotsToProcess[i];
+    for (let i = 0; i < selectedSlots.length; i++) {
+        const slot = selectedSlots[i];
         const topic = topics[(topicIndex + i) % topics.length];
         const hook = HOOK_STYLES[Math.floor(Math.random() * HOOK_STYLES.length)];
 
@@ -243,7 +211,6 @@ export async function generateAutopilotPosts(
             tries++;
         }
 
-        // idempotency check
         const exists = await prisma.post.findFirst({
             where: {
                 userId,
@@ -252,10 +219,7 @@ export async function generateAutopilotPosts(
             }
         });
 
-        if (exists) {
-            console.log(`[Autopilot] SKIP duplicate slot`);
-            continue;
-        }
+        if (exists) continue;
 
         const post = await prisma.post.create({
             data: {
