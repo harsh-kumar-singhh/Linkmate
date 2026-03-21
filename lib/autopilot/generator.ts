@@ -97,14 +97,14 @@ export async function generateAutopilotPosts(
         slotsByWeek.get(weekKey)!.push(slot);
     }
 
-    // ---------------- EXISTING POSTS ----------------
+    // ---------------- EXISTING POSTS (FIXED) ----------------
     const windowEnd = addDays(now, 21);
 
     const existing = await prisma.post.findMany({
         where: {
             userId,
             status: { in: ["SCHEDULED", "PUBLISHED", "PENDING"] },
-            scheduledFor: { gte: now, lte: windowEnd }
+            scheduledFor: { lte: windowEnd } // ✅ FIX: include past posts
         },
         select: { scheduledFor: true }
     });
@@ -123,8 +123,6 @@ export async function generateAutopilotPosts(
     const selectedSlots: Date[] = [];
     const weekKeys = Array.from(slotsByWeek.keys()).sort();
 
-    const currentWeekKey = getWeekKey(now);
-
     for (const wk of weekKeys) {
         if (selectedSlots.length >= maxToGenerate) break;
 
@@ -132,19 +130,15 @@ export async function generateAutopilotPosts(
             (a, b) => a.getTime() - b.getTime()
         );
 
-        // 🚨 FIX: Skip current week if all slots are already passed
-        if (wk === currentWeekKey) {
-            const allSlotsPassed = slots.every(slot => !isAfter(slot, now));
-            if (allSlotsPassed) {
-                console.log(`[Autopilot] SKIP current week (completed)`);
-                continue;
-            }
-        }
-
         const occupied = postsByWeek.get(wk) || new Set();
 
         let allowed = frequency - occupied.size;
-        if (allowed <= 0) continue;
+
+        // ✅ CORE LOGIC: skip full week
+        if (allowed <= 0) {
+            console.log(`[Autopilot] WEEK FULL ${wk}: ${occupied.size}/${frequency}`);
+            continue;
+        }
 
         console.log(`[Autopilot] WEEK ${wk}: ${occupied.size}/${frequency}`);
 

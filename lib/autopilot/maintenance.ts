@@ -27,8 +27,7 @@ export async function maintainAutopilotPipeline() {
             },
             select: {
                 id: true,
-                autopilotFrequency: true,
-                autopilotDays: true,
+                autopilotFrequency: true
             },
             take: 10
         });
@@ -40,17 +39,17 @@ export async function maintainAutopilotPipeline() {
 
         console.log(`[Autopilot-Maintenance] Processing ${activeUsers.length} users.`);
 
-        // 2. Fetch upcoming posts (single query → low DB load)
+        // 🔥 FIXED WINDOW
         const userIds = activeUsers.map(u => u.id);
         const windowEnd = addDays(now, 21);
 
-        const upcomingPosts = await prisma.post.findMany({
+        // 🔥 FIXED QUERY (NO gte: now)
+        const allPosts = await prisma.post.findMany({
             where: {
                 userId: { in: userIds },
-                status: "SCHEDULED",
                 source: "autopilot",
+                status: { in: ["SCHEDULED", "PUBLISHED", "PENDING"] },
                 scheduledFor: {
-                    gte: now,
                     lte: windowEnd
                 }
             },
@@ -62,7 +61,7 @@ export async function maintainAutopilotPipeline() {
 
         // 3. Map posts to users
         const userPostsMap: Record<string, Date[]> = {};
-        upcomingPosts.forEach(p => {
+        allPosts.forEach(p => {
             if (p.scheduledFor) {
                 if (!userPostsMap[p.userId]) userPostsMap[p.userId] = [];
                 userPostsMap[p.userId].push(p.scheduledFor);
@@ -86,9 +85,9 @@ export async function maintainAutopilotPipeline() {
                     weeklyCounts[weekKey] = (weeklyCounts[weekKey] || 0) + 1;
                 });
 
-                // 🔥 Only fix FIRST incomplete week
                 let missingForEarliestWeek = 0;
 
+                // 🔥 Check weeks sequentially
                 for (let i = 0; i < 21; i += 7) {
                     const weekDate = addDays(now, i);
                     const weekKey = getWeekKey(weekDate);
@@ -101,7 +100,7 @@ export async function maintainAutopilotPipeline() {
                             `[Autopilot-Maintenance] User ${user.id}: Gap in ${weekKey} (${count}/${frequency}). Need ${missingForEarliestWeek}.`
                         );
 
-                        break; // 🚨 CRITICAL
+                        break;
                     }
                 }
 
