@@ -80,11 +80,11 @@ export async function maintainAutopilotPipeline(specificUserId?: string) {
         });
 
         // 3. Map posts to users
-        const userPostsMap: Record<string, Date[]> = {};
+        const userPostsMap: Record<string, any[]> = {};
         allPosts.forEach(p => {
             if (p.scheduledFor) {
                 if (!userPostsMap[p.userId]) userPostsMap[p.userId] = [];
-                userPostsMap[p.userId].push(p.scheduledFor);
+                userPostsMap[p.userId].push(p);
             }
         });
 
@@ -101,7 +101,7 @@ export async function maintainAutopilotPipeline(specificUserId?: string) {
                 // Group by week
                 const weeklyCounts: Record<string, number> = {};
                 userPosts.forEach(p => {
-                    const weekKey = getWeekKey(p);
+                    const weekKey = getWeekKey(p.scheduledFor);
                     weeklyCounts[weekKey] = (weeklyCounts[weekKey] || 0) + 1;
                 });
 
@@ -115,8 +115,20 @@ export async function maintainAutopilotPipeline(specificUserId?: string) {
                     const weekKey = getWeekKey(weekDate);
                     const count = weeklyCounts[weekKey] || 0;
 
-                    // 🚨 Alignment with Generator: Skip current week if it has started
-                    if (weekKey === currentWeekKey) {
+                    // 🚨 PRINCIPAL ALIGNMENT: Lock current week if started or published
+                    let isWeekLocked = false;
+
+                    // Condition 1: Case-specific published check
+                    const publishedInWeek = (userPosts as any[]).some(p => 
+                        p.status === "PUBLISHED" && format(p.scheduledFor, "yyyy-'W'II") === weekKey
+                    );
+                    if (publishedInWeek) {
+                        console.log(`[Autopilot-Maintenance] User ${user.id}: LOCK Week ${weekKey} (has published posts).`);
+                        isWeekLocked = true;
+                    }
+
+                    // Condition 2: Started check
+                    if (weekKey === currentWeekKey && !isWeekLocked) {
                         const days = user.autopilotDays as string[];
                         const timeStr = user.autopilotTime;
                         const timezone = (user.schedule as any)?.timezone || "UTC";
@@ -126,7 +138,6 @@ export async function maintainAutopilotPipeline(specificUserId?: string) {
                                 SUNDAY: 0, MONDAY: 1, TUESDAY: 2, WEDNESDAY: 3, THURSDAY: 4, FRIDAY: 5, SATURDAY: 6
                             };
                             
-                            // Sort days according to ISO week (Monday=1...Sunday=0/7)
                             const isoEnabledDays = days
                                 .map(d => dayMap[d.toUpperCase()])
                                 .filter((d): d is number => d !== undefined)
@@ -147,12 +158,14 @@ export async function maintainAutopilotPipeline(specificUserId?: string) {
                                 const firstSlotDate = fromZonedTime(`${firstDayStr}T${timeStr}:00`, timezone);
 
                                 if (!isAfter(firstSlotDate, now)) {
-                                    console.log(`[Autopilot-Maintenance] User ${user.id}: Skipping current week ${weekKey} (already started at ${firstSlotDate.toISOString()}).`);
-                                    continue;
+                                    console.log(`[Autopilot-Maintenance] User ${user.id}: LOCK Week ${weekKey} (started at ${firstSlotDate.toISOString()}).`);
+                                    isWeekLocked = true;
                                 }
                             }
                         }
                     }
+
+                    if (isWeekLocked) continue;
 
                     if (count < frequency) {
                         missingForEarliestWeek = frequency - count;
