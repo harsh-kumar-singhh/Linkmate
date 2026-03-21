@@ -46,12 +46,10 @@ export async function maintainAutopilotPipeline() {
 
         console.log(`[Autopilot-Maintenance] Processing ${activeUsers.length} users.`);
 
-        // 2. Optimized Batch Count: Fetch upcoming post counts for all users in one query
+        // 2. Optimized Batch Fetch: Fetch all upcoming posts for these users
         const userIds = activeUsers.map(u => u.id);
         const windowEnd = addDays(now, 21);
-        
-        const postCounts = await prisma.post.groupBy({
-            by: ['userId'],
+        const upcomingPosts = await prisma.post.findMany({
             where: {
                 userId: { in: userIds },
                 status: "SCHEDULED",
@@ -61,14 +59,23 @@ export async function maintainAutopilotPipeline() {
                     lte: windowEnd 
                 }
             },
-            _count: { id: true }
+            select: {
+                userId: true,
+                scheduledFor: true
+            }
         });
 
-        // Map counts to user IDs for easy access
-        const countMap: Record<string, number> = {};
-        postCounts.forEach(c => {
-            countMap[c.userId] = c._count.id;
+        // Map posts to users for easy weekly grouping
+        const userPostsMap: Record<string, Date[]> = {};
+        upcomingPosts.forEach(p => {
+            if (p.scheduledFor) {
+                if (!userPostsMap[p.userId]) userPostsMap[p.userId] = [];
+                userPostsMap[p.userId].push(p.scheduledFor);
+            }
         });
+
+        // Helper to get ISO week key
+        const getWeekKey = (date: Date) => format(date, "yyyy-'W'II");
 
         for (const user of activeUsers) {
             try {
@@ -78,22 +85,35 @@ export async function maintainAutopilotPipeline() {
                     continue;
                 }
 
-                // Get count from our pre-fetched map
-                const upcomingPostsCount = countMap[user.id] || 0;
+                // 3. Weekly Gap Detection & Generation
+                const userPosts = userPostsMap[user.id] || [];
+                
+                // Group existing posts by week
+                const weeklyCounts: Record<string, number> = {};
+                userPosts.forEach(p => {
+                    const weekKey = getWeekKey(p);
+                    weeklyCounts[weekKey] = (weeklyCounts[weekKey] || 0) + 1;
+                });
 
-                console.log(`[Autopilot-Maintenance] User ${user.id}: Scheduled=${upcomingPostsCount}, Target=${frequency}`);
+                // Check all weeks in the 21-day window
+                let totalMissing = 0;
+                for (let i = 0; i < 21; i += 7) {
+                    const weekDate = addDays(now, i);
+                    const weekKey = getWeekKey(weekDate);
+                    const count = weeklyCounts[weekKey] || 0;
+                    if (count < frequency) {
+                        totalMissing += (frequency - count);
+                    }
+                }
 
-                // 3. Gap Detection & Generation (Strict)
-                if (upcomingPostsCount < frequency) {
-                    const missing = frequency - upcomingPostsCount;
-                    console.log(`[Autopilot-Maintenance] User ${user.id}: ${missing} posts missing (Target=${frequency}, Current=${upcomingPostsCount}). Triggering generation.`);
+                if (totalMissing > 0) {
+                    console.log(`[Autopilot-Maintenance] User ${user.id}: ${totalMissing} posts missing across weekly pipeline (Target=${frequency}/week). Triggering generation.`);
                     
-                    // Generate EXACTLY what is missing up to a safety cap (3 per run)
-                    const toGenerate = Math.min(missing, 3);
-                    
+                    // Generate up to a safety cap (3 per run)
+                    const toGenerate = Math.min(totalMissing, 3);
                     await generateAutopilotPosts(user.id, undefined, toGenerate);
                 } else {
-                    console.log(`[Autopilot-Maintenance] User ${user.id}: Pipeline is full (${upcomingPostsCount}/${frequency} within 21 days).`);
+                    console.log(`[Autopilot-Maintenance] User ${user.id}: All weeks in the 21-day window are full (${userPosts.length} posts total).`);
                 }
             } catch (userError) {
                 console.error(`[Autopilot-Maintenance] Error processing user ${user.id}:`, userError);

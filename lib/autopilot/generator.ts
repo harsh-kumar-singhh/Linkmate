@@ -105,22 +105,21 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date, max
     };
     const dayIndexes = daysEnabledStr.map(d => dayMap[d.toUpperCase()]).filter(idx => idx !== undefined);
 
-    // 2. Build Rolling 21-Day Window (Part 1 - Accuracy & Expansion)
-    const validSlots: Date[] = [];
+    // Helper for ISO week key (e.g., 2026-W12)
+    const getWeekKey = (date: Date) => format(date, "yyyy-'W'II");
+
+    // 2. Build Rolling 21-Day Window (Weekly Grouped)
+    const slotsByWeek = new Map<string, Date[]>();
     const [utcHours, utcMinutes] = timeStr.split(":").map(Number);
     const userNow = toZonedTime(simulatedNow, userTimezone);
     
-    console.log(`[Autopilot] Building 21-day window starting from ${userNow.toISOString()} (${userTimezone})`);
+    console.log(`[Autopilot] Building weekly slots starting from ${userNow.toISOString()} (${userTimezone})`);
 
-    // We look 21 days ahead to ensure we always find the next available slots across weeks
     for (let i = 0; i < 21; i++) {
-        // Calculate the target day in user's timezone
         const targetDay = addDays(userNow, i);
-        const dayOfWeek = targetDay.getDay(); // 0-6
-        const dayName = format(targetDay, "EEEE").toUpperCase();
+        const dayOfWeek = targetDay.getDay();
 
         if (dayIndexes.includes(dayOfWeek)) {
-            // Create the slot time as a UTC date for the specific day
             const scheduledForUtc = new Date(Date.UTC(
                 targetDay.getFullYear(),
                 targetDay.getMonth(),
@@ -131,17 +130,15 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date, max
                 0
             ));
 
-            // Only add if it's in the future
             if (isAfter(scheduledForUtc, simulatedNow)) {
-                validSlots.push(scheduledForUtc);
-                // console.log(`[Autopilot] Potential slot found: ${scheduledForUtc.toISOString()} (${dayName})`);
+                const weekKey = getWeekKey(scheduledForUtc);
+                if (!slotsByWeek.has(weekKey)) slotsByWeek.set(weekKey, []);
+                slotsByWeek.get(weekKey)!.push(scheduledForUtc);
             }
         }
     }
 
-    console.log(`[Autopilot] Identified ${validSlots.length} potential valid slots in 21-day window.`);
-
-    // 3. Fetch Existing Posts (In-Memory Optimization)
+    // 3. Fetch Existing Posts (Weekly Grouped)
     const windowEnd = addDays(simulatedNow, 21);
     const existingPosts = await prisma.post.findMany({
         where: {
@@ -157,39 +154,61 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date, max
         }
     });
 
-    // Use a Set of timestamps for O(1) in-memory lookup
-    const occupiedTimestamps = new Set(
-        existingPosts
-            .map(p => p.scheduledFor?.getTime())
-            .filter((t): t is number => t !== undefined && t !== null)
-    );
+    const postsByWeek = new Map<string, Set<number>>();
+    existingPosts.forEach(p => {
+        if (p.scheduledFor) {
+            const weekKey = getWeekKey(p.scheduledFor);
+            if (!postsByWeek.has(weekKey)) postsByWeek.set(weekKey, new Set());
+            postsByWeek.get(weekKey)!.add(p.scheduledFor.getTime());
+        }
+    });
 
-    console.log(`[Autopilot] Currently occupied slots in next 21 days: ${occupiedTimestamps.size}`);
+    // 4. Per-Week Slot Selection (Main Logic)
+    const frequency = parseInt(user.autopilotFrequency || "0");
+    const selectedSlots: Date[] = [];
+    
+    // Sort week keys to ensure chronological processing
+    const weekKeys = Array.from(slotsByWeek.keys()).sort();
 
-    // 4. Detect Missing Slots (Part 2 - Exact Datetime Validation)
-    const missingSlots: Date[] = [];
-    for (const slot of validSlots) {
-        const slotTime = slot.getTime();
+    for (const weekKey of weekKeys) {
+        if (selectedSlots.length >= maxToGenerate) break;
+
+        const weekSlots = slotsByWeek.get(weekKey) || [];
+        const occupiedInWeek = postsByWeek.get(weekKey) || new Set<number>();
+        const currentCountInWeek = occupiedInWeek.size;
         
-        if (!occupiedTimestamps.has(slotTime)) {
-            console.log(`[Autopilot] [SLOT-FREE] ${slot.toISOString()} is available.`);
-            missingSlots.push(slot);
-        } else {
-            console.log(`[Autopilot] [SLOT-OCCUPIED] ${slot.toISOString()} already has a post.`);
+        let allowedInWeek = frequency - currentCountInWeek;
+        
+        if (allowedInWeek <= 0) {
+            console.log(`[Autopilot] [WEEK-FULL] ${weekKey}: Already has ${currentCountInWeek}/${frequency} posts.`);
+            continue;
+        }
+
+        console.log(`[Autopilot] [WEEK-GAP] ${weekKey}: ${currentCountInWeek}/${frequency} posts. Can add ${allowedInWeek}.`);
+
+        // Find earliest free slots in this week
+        for (const slot of weekSlots) {
+            if (selectedSlots.length >= maxToGenerate) break;
+            if (allowedInWeek <= 0) break;
+
+            if (!occupiedInWeek.has(slot.getTime())) {
+                console.log(`[Autopilot] [SLOT-SELECT] ${slot.toISOString()} picked for ${weekKey}.`);
+                selectedSlots.push(slot);
+                allowedInWeek--;
+            } else {
+                console.log(`[Autopilot] [SLOT-SKIP] ${slot.toISOString()} occupied.`);
+            }
         }
     }
 
-    console.log(`[Autopilot] Total missing slots identified: ${missingSlots.length}`);
-
-    // Apply strict limit - only generate exactly what is requested (minimized and precise)
-    const slotsToProcess = missingSlots.slice(0, maxToGenerate);
+    const slotsToProcess = selectedSlots;
     
     if (slotsToProcess.length === 0) {
-        console.log(`[Autopilot] [EXIT] No missing slots found in the 21-day window. Pipeline is correct.`);
+        console.log(`[Autopilot] [EXIT] All weeks satisfied according to frequency (${frequency}/week).`);
         return [];
     }
 
-    console.log(`[Autopilot] Will generate ${slotsToProcess.length} posts for the earliest available slots.`);
+    console.log(`[Autopilot] Will generate total ${slotsToProcess.length} posts across all weeks.`);
 
     // 5. Generate and Save Posts
     // Prioritize Weekly Focus in the context to ensure it influences the AI meaningfully
