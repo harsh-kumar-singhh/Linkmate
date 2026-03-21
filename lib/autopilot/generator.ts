@@ -105,19 +105,19 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date, max
     };
     const dayIndexes = daysEnabledStr.map(d => dayMap[d.toUpperCase()]).filter(idx => idx !== undefined);
 
-    // 2. Build Rolling 7-Day Window (Part 1 - Accuracy)
+    // 2. Build Rolling 21-Day Window (Part 1 - Accuracy & Expansion)
     const validSlots: Date[] = [];
     const [utcHours, utcMinutes] = timeStr.split(":").map(Number);
     const userNow = toZonedTime(simulatedNow, userTimezone);
     
-    for (let i = 0; i < 7; i++) {
+    // We look 21 days ahead to ensure we always find the next available slots across weeks
+    for (let i = 0; i < 21; i++) {
         // Calculate the target day in user's timezone
         const targetDay = addDays(userNow, i);
         const dayOfWeek = targetDay.getDay(); // 0-6
 
         if (dayIndexes.includes(dayOfWeek)) {
             // Create the slot time as a UTC date for the specific day
-            // We use the UTC time stored in settings, and the day derived from the user's timezone today.
             const scheduledForUtc = new Date(Date.UTC(
                 targetDay.getFullYear(),
                 targetDay.getMonth(),
@@ -135,38 +135,41 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date, max
         }
     }
 
-    console.log(`[Autopilot] validSlots identified: ${validSlots.length}`);
+    console.log(`[Autopilot] Identified ${validSlots.length} potential valid slots in 21-day window.`);
 
-    // If no slots found even with strict indexes, log warning but do NOT force random days
-    if (validSlots.length === 0) {
-        console.warn(`[Autopilot] [WAIT] No future slots found in 7-day window for selected days.`);
-    }
-
-    // 3. Fetch Existing Posts
-    const windowEnd = addDays(simulatedNow, 7);
+    // 3. Fetch Existing Posts (In-Memory Optimization)
+    const windowEnd = addDays(simulatedNow, 21);
     const existingPosts = await prisma.post.findMany({
         where: {
             userId,
-            source: "autopilot",
+            status: { in: ["SCHEDULED", "PENDING", "PUBLISHED"] },
             scheduledFor: {
                 gte: simulatedNow,
                 lte: windowEnd
             }
+        },
+        select: {
+            scheduledFor: true
         }
     });
 
-    // 4. Detect Missing Slots (Part 2 - Ensure ALL valid slots are filled)
+    // Use a Set of timestamps for O(1) in-memory lookup
+    const occupiedTimestamps = new Set(
+        existingPosts
+            .map(p => p.scheduledFor?.getTime())
+            .filter((t): t is number => t !== undefined && t !== null)
+    );
+
+    // 4. Detect Missing Slots (Part 2 - Exact Datetime Validation)
     const missingSlots: Date[] = [];
     for (const slot of validSlots) {
-        const slotDayStr = format(toZonedTime(slot, userTimezone), "yyyy-MM-dd");
-        const alreadyExistsOnDay = existingPosts.some(post => {
-            if (!post.scheduledFor) return false;
-            const postDayStr = format(toZonedTime(post.scheduledFor, userTimezone), "yyyy-MM-dd");
-            return postDayStr === slotDayStr;
-        });
-
-        if (!alreadyExistsOnDay) {
+        const slotTime = slot.getTime();
+        
+        if (!occupiedTimestamps.has(slotTime)) {
+            console.log(`[Autopilot] [SLOT-FOUND] ${slot.toISOString()} is free.`);
             missingSlots.push(slot);
+        } else {
+            console.log(`[Autopilot] [SLOT-SKIP] ${slot.toISOString()} is already occupied.`);
         }
     }
 
@@ -179,7 +182,7 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date, max
     }
 
     // Part 3 Force: If absolutely no posts exist, ensure we do something (but still respect days if possible)
-    if (slotsToProcess.length === 0 && existingPosts.length === 0 && validSlots.length > 0) {
+    if (slotsToProcess.length === 0 && occupiedTimestamps.size === 0 && validSlots.length > 0) {
         console.log(`[Autopilot] [FORCE] 0 missing slots but 0 posts exist. Creating absolute first post.`);
         slotsToProcess.push(validSlots[0]);
     }
