@@ -77,22 +77,19 @@ export async function generateAutopilotPosts(
 
     const [hours, minutes] = timeStr.split(":").map(Number);
 
-    // ---------------- BUILD SLOTS ----------------
+    // ---------------- BUILD SLOTS (FIXED: LOCAL TIME) ----------------
     const slotsByWeek = new Map<string, Date[]>();
 
     for (let i = 0; i < 21; i++) {
         const d = addDays(now, i);
-        const dow = d.getUTCDay();
+
+        const dow = d.getDay(); // ✅ FIXED (LOCAL DAY, NOT UTC)
 
         if (!enabledDays.includes(dow)) continue;
 
-        const slot = new Date(Date.UTC(
-            d.getUTCFullYear(),
-            d.getUTCMonth(),
-            d.getUTCDate(),
-            hours,
-            minutes
-        ));
+        // ✅ FIXED: LOCAL TIME SLOT (no UTC conversion)
+        const slot = new Date(d);
+        slot.setHours(hours, minutes, 0, 0);
 
         if (!isAfter(slot, now)) continue;
 
@@ -109,8 +106,7 @@ export async function generateAutopilotPosts(
         where: {
             userId,
             status: { in: ["SCHEDULED", "PUBLISHED", "PENDING"] },
-            // ✅ FIXED: removed gte: now
-            scheduledFor: { lte: windowEnd }
+            scheduledFor: { gte: now, lte: windowEnd }
         },
         select: { scheduledFor: true }
     });
@@ -154,6 +150,7 @@ export async function generateAutopilotPosts(
             }
         }
 
+        // ONLY FIRST INCOMPLETE WEEK
         if (selectedSlots.length > 0) break;
     }
 
