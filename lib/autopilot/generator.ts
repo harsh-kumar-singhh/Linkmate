@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { addDays, format, isAfter } from "date-fns";
+import { addDays, format, isAfter, startOfISOWeek } from "date-fns";
 import { getCurrentTime } from "@/lib/utils/time";
 import { generatePost } from "@/lib/gemini";
 
@@ -98,13 +98,21 @@ export async function generateAutopilotPosts(
     }
 
     // ---------------- EXISTING POSTS ----------------
+    // We need to count posts from the START of the current week to verify frequency accurately
+    const startOfCurrentWeek = new Date(now);
+    const dayOfWeek = startOfCurrentWeek.getDay(); // 0 (Sun) to 6 (Sat)
+    // ISO week starts on Monday (1). Adjust accordingly if needed, but getWeekKey uses ISO week.
+    // For simplicity, let's just go back 7 days to cover the current ISO week fully.
+    startOfCurrentWeek.setDate(startOfCurrentWeek.getDate() - 7);
+    startOfCurrentWeek.setHours(0, 0, 0, 0);
+
     const windowEnd = addDays(now, 21);
 
     const existing = await prisma.post.findMany({
         where: {
             userId,
             status: { in: ["SCHEDULED", "PUBLISHED", "PENDING"] },
-            scheduledFor: { gte: now, lte: windowEnd }
+            scheduledFor: { gte: startOfCurrentWeek, lte: windowEnd }
         },
         select: { scheduledFor: true }
     });
@@ -132,21 +140,40 @@ export async function generateAutopilotPosts(
             (a, b) => a.getTime() - b.getTime()
         );
 
-        // 🚨 FIX: Skip current week if all slots are already passed
+        // 🚨 STRICT LOCK: If any valid slot for this week has already passed,
+        // we skip the remaining slots of this week to maintain strict distribution.
         if (wk === currentWeekKey) {
-            const allSlotsPassed = slots.every(slot => !isAfter(slot, now));
-            if (allSlotsPassed) {
-                console.log(`[Autopilot] SKIP current week (completed)`);
-                continue;
+            const weekStart = startOfISOWeek(now);
+            const isoEnabledDays = enabledDays
+                .sort((a, b) => {
+                    const valA = a === 0 ? 7 : a;
+                    const valB = b === 0 ? 7 : b;
+                    return valA - valB;
+                });
+
+            if (isoEnabledDays.length > 0) {
+                const firstDay = isoEnabledDays[0];
+                const firstSlotDate = new Date(weekStart);
+                const daysToAdd = firstDay === 0 ? 6 : firstDay - 1;
+                firstSlotDate.setDate(weekStart.getDate() + daysToAdd);
+                firstSlotDate.setHours(hours, minutes, 0, 0);
+
+                if (!isAfter(firstSlotDate, now)) {
+                    console.log(`[Autopilot] SKIP current week (already started at ${firstSlotDate.toISOString()})`);
+                    continue;
+                }
             }
         }
 
         const occupied = postsByWeek.get(wk) || new Set();
 
         let allowed = frequency - occupied.size;
-        if (allowed <= 0) continue;
+        if (allowed <= 0) {
+            console.log(`[Autopilot] WEEK ${wk} FULL: ${occupied.size}/${frequency}`);
+            continue;
+        }
 
-        console.log(`[Autopilot] WEEK ${wk}: ${occupied.size}/${frequency}`);
+        console.log(`[Autopilot] WEEK ${wk}: ${occupied.size}/${frequency} (Allowed: ${allowed})`);
 
         for (const slot of slots) {
             if (selectedSlots.length >= maxToGenerate) break;

@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { generateAutopilotPosts } from "./generator";
 import { toZonedTime } from "date-fns-tz";
-import { addDays, format } from "date-fns";
+import { addDays, format, isAfter, startOfISOWeek } from "date-fns";
 
 /**
  * Main logic for maintaining the rolling autopilot pipeline.
@@ -27,7 +27,9 @@ export async function maintainAutopilotPipeline() {
             },
             select: {
                 id: true,
-                autopilotFrequency: true
+                autopilotFrequency: true,
+                autopilotDays: true,
+                autopilotTime: true
             },
             take: 10
         });
@@ -88,10 +90,51 @@ export async function maintainAutopilotPipeline() {
                 let missingForEarliestWeek = 0;
 
                 // 🔥 Check weeks sequentially
+                const currentWeekKey = getWeekKey(now);
+
                 for (let i = 0; i < 21; i += 7) {
                     const weekDate = addDays(now, i);
                     const weekKey = getWeekKey(weekDate);
                     const count = weeklyCounts[weekKey] || 0;
+
+                    // 🚨 Alignment with Generator: Skip current week if it has started
+                    if (weekKey === currentWeekKey) {
+                        const days = user.autopilotDays as string[];
+                        const timeStr = user.autopilotTime;
+                        if (days?.length && timeStr) {
+                            const [hours, minutes] = timeStr.split(":").map(Number);
+                            const dayMap: Record<string, number> = {
+                                SUNDAY: 0, MONDAY: 1, TUESDAY: 2, WEDNESDAY: 3, THURSDAY: 4, FRIDAY: 5, SATURDAY: 6
+                            };
+                            // Sort days according to ISO week (Monday=1...Sunday=0/7)
+                            const isoEnabledDays = days
+                                .map(d => dayMap[d.toUpperCase()])
+                                .filter((d): d is number => d !== undefined)
+                                .sort((a, b) => {
+                                    const valA = a === 0 ? 7 : a;
+                                    const valB = b === 0 ? 7 : b;
+                                    return valA - valB;
+                                });
+                            
+                            if (isoEnabledDays.length > 0) {
+                                const firstDay = isoEnabledDays[0];
+                                const weekStart = startOfISOWeek(weekDate);
+                                
+                                const firstSlotDate = new Date(weekStart);
+                                // If firstDay is 0 (Sunday), it should be 6 days after Monday (1)
+                                // Since weekStart is Monday, we add (firstDay - 1) if firstDay is 1..6
+                                // If firstDay is 0, we add 6 days.
+                                const daysToAdd = firstDay === 0 ? 6 : firstDay - 1;
+                                firstSlotDate.setDate(weekStart.getDate() + daysToAdd);
+                                firstSlotDate.setHours(hours, minutes, 0, 0);
+
+                                if (!isAfter(firstSlotDate, now)) {
+                                    console.log(`[Autopilot-Maintenance] User ${user.id}: Skipping current week ${weekKey} (already started at ${firstSlotDate.toISOString()}).`);
+                                    continue;
+                                }
+                            }
+                        }
+                    }
 
                     if (count < frequency) {
                         missingForEarliestWeek = frequency - count;
