@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { addDays, format, isAfter, startOfISOWeek } from "date-fns";
+import { toZonedTime, fromZonedTime } from "date-fns-tz";
 import { getCurrentTime } from "@/lib/utils/time";
 import { generatePost } from "@/lib/gemini";
 
@@ -44,11 +45,16 @@ export async function generateAutopilotPosts(
             autopilotTime: true,
             autopilotFrequency: true,
             autopilotAboutYou: true,
-            autopilotCurrentFocus: true
+            autopilotCurrentFocus: true,
+            schedule: {
+                select: { timezone: true }
+            }
         }
     });
 
     if (!user || !user.autopilotEnabled) return [];
+
+    const timezone = (user.schedule as any)?.timezone || "UTC";
 
     const topics = user.autopilotTopics as string[];
     const days = user.autopilotDays as string[];
@@ -73,21 +79,25 @@ export async function generateAutopilotPosts(
         .map(d => dayMap[d.toUpperCase()])
         .filter((d): d is number => d !== undefined);
 
-    const getWeekKey = (date: Date) => format(date, "yyyy-'W'II");
+    const loggedNow = toZonedTime(now, timezone);
+    console.log(`[Autopilot] START → ${loggedNow.toISOString()} (${timezone})`);
 
-    const [hours, minutes] = timeStr.split(":").map(Number);
+    const getWeekKey = (date: Date) => format(date, "yyyy-'W'II");
 
     // ---------------- BUILD SLOTS ----------------
     const slotsByWeek = new Map<string, Date[]>();
 
     for (let i = 0; i < 21; i++) {
         const d = addDays(now, i);
-        const dow = d.getDay();
+        const zonedD = toZonedTime(d, timezone);
+        const dow = zonedD.getDay();
 
         if (!enabledDays.includes(dow)) continue;
 
-        const slot = new Date(d);
-        slot.setHours(hours, minutes, 0, 0);
+        // Create slot at the specified hours/minutes in user's timezone
+        const slotDateStr = format(zonedD, "yyyy-MM-dd");
+        const slotLocalStr = `${slotDateStr}T${timeStr}:00`;
+        const slot = fromZonedTime(slotLocalStr, timezone);
 
         if (!isAfter(slot, now)) continue;
 
@@ -144,22 +154,23 @@ export async function generateAutopilotPosts(
         // we skip the remaining slots of this week to maintain strict distribution.
         if (wk === currentWeekKey) {
             const weekStart = startOfISOWeek(now);
-            const isoEnabledDays = enabledDays
-                .sort((a, b) => {
-                    const valA = a === 0 ? 7 : a;
-                    const valB = b === 0 ? 7 : b;
-                    return valA - valB;
-                });
+            const isoEnabledDays = [...enabledDays].sort((a, b) => {
+                const valA = a === 0 ? 7 : a;
+                const valB = b === 0 ? 7 : b;
+                return valA - valB;
+            });
 
             if (isoEnabledDays.length > 0) {
                 const firstDay = isoEnabledDays[0];
-                const firstSlotDate = new Date(weekStart);
                 const daysToAdd = firstDay === 0 ? 6 : firstDay - 1;
-                firstSlotDate.setDate(weekStart.getDate() + daysToAdd);
-                firstSlotDate.setHours(hours, minutes, 0, 0);
+                
+                const firstDayDate = addDays(weekStart, daysToAdd);
+                const firstDayZoned = toZonedTime(firstDayDate, timezone);
+                const firstDayStr = format(firstDayZoned, "yyyy-MM-dd");
+                const firstSlotDate = fromZonedTime(`${firstDayStr}T${timeStr}:00`, timezone);
 
                 if (!isAfter(firstSlotDate, now)) {
-                    console.log(`[Autopilot] SKIP current week (already started at ${firstSlotDate.toISOString()})`);
+                    console.log(`[Autopilot] SKIP current week ${wk} (started at ${firstSlotDate.toISOString()})`);
                     continue;
                 }
             }

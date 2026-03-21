@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { generateAutopilotPosts } from "./generator";
-import { toZonedTime } from "date-fns-tz";
 import { addDays, format, isAfter, startOfISOWeek } from "date-fns";
+import { toZonedTime, fromZonedTime } from "date-fns-tz";
 
 /**
  * Main logic for maintaining the rolling autopilot pipeline.
@@ -29,7 +29,10 @@ export async function maintainAutopilotPipeline() {
                 id: true,
                 autopilotFrequency: true,
                 autopilotDays: true,
-                autopilotTime: true
+                autopilotTime: true,
+                schedule: {
+                    select: { timezone: true }
+                }
             },
             take: 10
         });
@@ -101,11 +104,13 @@ export async function maintainAutopilotPipeline() {
                     if (weekKey === currentWeekKey) {
                         const days = user.autopilotDays as string[];
                         const timeStr = user.autopilotTime;
+                        const timezone = (user.schedule as any)?.timezone || "UTC";
+
                         if (days?.length && timeStr) {
-                            const [hours, minutes] = timeStr.split(":").map(Number);
                             const dayMap: Record<string, number> = {
                                 SUNDAY: 0, MONDAY: 1, TUESDAY: 2, WEDNESDAY: 3, THURSDAY: 4, FRIDAY: 5, SATURDAY: 6
                             };
+                            
                             // Sort days according to ISO week (Monday=1...Sunday=0/7)
                             const isoEnabledDays = days
                                 .map(d => dayMap[d.toUpperCase()])
@@ -118,15 +123,13 @@ export async function maintainAutopilotPipeline() {
                             
                             if (isoEnabledDays.length > 0) {
                                 const firstDay = isoEnabledDays[0];
-                                const weekStart = startOfISOWeek(weekDate);
-                                
-                                const firstSlotDate = new Date(weekStart);
-                                // If firstDay is 0 (Sunday), it should be 6 days after Monday (1)
-                                // Since weekStart is Monday, we add (firstDay - 1) if firstDay is 1..6
-                                // If firstDay is 0, we add 6 days.
+                                const weekStart = startOfISOWeek(now);
                                 const daysToAdd = firstDay === 0 ? 6 : firstDay - 1;
-                                firstSlotDate.setDate(weekStart.getDate() + daysToAdd);
-                                firstSlotDate.setHours(hours, minutes, 0, 0);
+                                
+                                const firstDayDate = addDays(weekStart, daysToAdd);
+                                const firstDayZoned = toZonedTime(firstDayDate, timezone);
+                                const firstDayStr = format(firstDayZoned, "yyyy-MM-dd");
+                                const firstSlotDate = fromZonedTime(`${firstDayStr}T${timeStr}:00`, timezone);
 
                                 if (!isAfter(firstSlotDate, now)) {
                                     console.log(`[Autopilot-Maintenance] User ${user.id}: Skipping current week ${weekKey} (already started at ${firstSlotDate.toISOString()}).`);
