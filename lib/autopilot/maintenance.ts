@@ -36,7 +36,7 @@ export async function maintainAutopilotPipeline() {
                 autopilotFrequency: true,
                 autopilotDays: true,
             },
-            take: 20 // Process 20 users per run to respect serverless limits
+            take: 10 // Process 10 users per run to minimize DB load and respect serverless limits
         });
 
         if (activeUsers.length === 0) {
@@ -46,6 +46,25 @@ export async function maintainAutopilotPipeline() {
 
         console.log(`[Autopilot-Maintenance] Processing ${activeUsers.length} users.`);
 
+        // 2. Optimized Batch Count: Fetch upcoming post counts for all users in one query
+        const userIds = activeUsers.map(u => u.id);
+        const postCounts = await prisma.post.groupBy({
+            by: ['userId'],
+            where: {
+                userId: { in: userIds },
+                status: "SCHEDULED",
+                source: "autopilot",
+                scheduledFor: { gte: now }
+            },
+            _count: { id: true }
+        });
+
+        // Map counts to user IDs for easy access
+        const countMap: Record<string, number> = {};
+        postCounts.forEach(c => {
+            countMap[c.userId] = c._count.id;
+        });
+
         for (const user of activeUsers) {
             try {
                 const frequency = parseInt(user.autopilotFrequency || "0");
@@ -54,17 +73,8 @@ export async function maintainAutopilotPipeline() {
                     continue;
                 }
 
-                // 2. Count current scheduled autopilot posts
-                const upcomingPostsCount = await prisma.post.count({
-                    where: {
-                        userId: user.id,
-                        status: "SCHEDULED",
-                        source: "autopilot",
-                        scheduledFor: {
-                            gte: now
-                        }
-                    }
-                });
+                // Get count from our pre-fetched map
+                const upcomingPostsCount = countMap[user.id] || 0;
 
                 console.log(`[Autopilot-Maintenance] User ${user.id}: Scheduled=${upcomingPostsCount}, Target=${frequency}`);
 

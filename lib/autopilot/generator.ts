@@ -302,6 +302,20 @@ export async function generateAutopilotPosts(userId: string, testNow?: Date, max
         }
 
         try {
+            // IDEMPOTENCY GUARD: Final check before creation to prevent duplicates in high-concurrency or race conditions
+            const finalCheck = await prisma.post.findFirst({
+                where: {
+                    userId,
+                    scheduledFor: slot,
+                    status: { in: ["SCHEDULED", "PUBLISHED", "PENDING"] }
+                }
+            });
+
+            if (finalCheck) {
+                console.warn(`[Autopilot] [IDEMPOTENCY] Slot ${slot.toISOString()} was filled by another process. Skipping.`);
+                continue;
+            }
+
             const post = await prisma.post.create({
                 data: {
                     userId,

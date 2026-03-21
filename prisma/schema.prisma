@@ -121,6 +121,7 @@ model Post {
   @@index([userId, status])
   @@index([scheduledFor])
   @@index([status, scheduledFor])
+  @@index([userId, status, scheduledFor])
 }
 
 
