@@ -77,17 +77,15 @@ export async function generateAutopilotPosts(
 
     const [hours, minutes] = timeStr.split(":").map(Number);
 
-    // ---------------- BUILD SLOTS (FIXED: LOCAL TIME) ----------------
+    // ---------------- BUILD SLOTS ----------------
     const slotsByWeek = new Map<string, Date[]>();
 
     for (let i = 0; i < 21; i++) {
         const d = addDays(now, i);
-
-        const dow = d.getDay(); // ✅ FIXED (LOCAL DAY, NOT UTC)
+        const dow = d.getDay();
 
         if (!enabledDays.includes(dow)) continue;
 
-        // ✅ FIXED: LOCAL TIME SLOT (no UTC conversion)
         const slot = new Date(d);
         slot.setHours(hours, minutes, 0, 0);
 
@@ -125,12 +123,23 @@ export async function generateAutopilotPosts(
     const selectedSlots: Date[] = [];
     const weekKeys = Array.from(slotsByWeek.keys()).sort();
 
+    const currentWeekKey = getWeekKey(now);
+
     for (const wk of weekKeys) {
         if (selectedSlots.length >= maxToGenerate) break;
 
         const slots = (slotsByWeek.get(wk) || []).sort(
             (a, b) => a.getTime() - b.getTime()
         );
+
+        // 🚨 FIX: Skip current week if all slots are already passed
+        if (wk === currentWeekKey) {
+            const allSlotsPassed = slots.every(slot => !isAfter(slot, now));
+            if (allSlotsPassed) {
+                console.log(`[Autopilot] SKIP current week (completed)`);
+                continue;
+            }
+        }
 
         const occupied = postsByWeek.get(wk) || new Set();
 
