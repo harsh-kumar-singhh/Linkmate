@@ -39,6 +39,7 @@ export async function maintainAutopilotPipeline(specificUserId?: string) {
                 id: true,
                 autopilotFrequency: true,
                 autopilotDays: true,
+                autopilotTime: true,
                 schedule: { select: { timezone: true } }
             },
             take: specificUserId ? 1 : 10
@@ -96,73 +97,47 @@ export async function maintainAutopilotPipeline(specificUserId?: string) {
 
                 console.log(`[Maintenance] 👤 User ${user.id}: ${userPosts.length} posts, frequency ${frequency}/week, timezone ${timezone}, days: ${selectedDays.join(', ')}`);
 
-                // ✅ CRITICAL FIX: Day name mapping
-                const dayMap: Record<string, string> = {
-                    SUNDAY: "SUNDAY",
-                    MONDAY: "MONDAY",
-                    TUESDAY: "TUESDAY",
-                    WEDNESDAY: "WEDNESDAY",
-                    THURSDAY: "THURSDAY",
-                    FRIDAY: "FRIDAY",
-                    SATURDAY: "SATURDAY"
-                };
-
-                // ✅ CRITICAL FIX: Only count posts on SELECTED days
-                const weeklyCounts: Record<string, number> = {};
+                // ✅ NEW: Track posts by DAY
+                const postsByDay: Record<string, { scheduled: number; published: number }> = {};
+                
+                selectedDays.forEach(day => {
+                    postsByDay[day] = { scheduled: 0, published: 0 };
+                });
 
                 userPosts.forEach(p => {
                     if (!p.scheduledFor) return;
 
-                    // Convert to user's timezone to get correct day
                     const zoned = toZonedTime(p.scheduledFor, timezone);
                     const dayName = format(zoned, "EEEE").toUpperCase();
 
-                    // ✅ ONLY count if day matches user's selected days
-                    if (!selectedDays.includes(dayName)) {
-                        console.log(`[Maintenance] Ignoring post on ${dayName} (not in selected days)`);
-                        return;
+                    if (!selectedDays.includes(dayName)) return;
+
+                    if (p.status === "PUBLISHED") {
+                        postsByDay[dayName].published++;
+                    } else {
+                        postsByDay[dayName].scheduled++;
                     }
-
-                    const wk = getWeekKey(p.scheduledFor);
-                    weeklyCounts[wk] = (weeklyCounts[wk] || 0) + 1;
-
-                    console.log(`[Maintenance] Counting post: ${format(zoned, "yyyy-MM-dd EEEE")} → week ${wk} (count now: ${weeklyCounts[wk]})`);
                 });
 
-                let missing = 0;
-                let targetWeek = "";
+                console.log(`[Maintenance] Posts by day:`, postsByDay);
 
-                // ---------------- CHECK WEEKS FOR GAPS ----------------
-                for (let i = 0; i < 21; i += 7) {
-                    const wkDate = addDays(now, i);
-                    const wk = getWeekKey(wkDate);
+                // ✅ NEW: Generate for each day that needs a post
+                for (const day of selectedDays) {
+                    const { scheduled, published } = postsByDay[day];
+                    const total = scheduled + published;
 
-                    const count = weeklyCounts[wk] || 0;
-
-                    // ✅ FIXED: Week is ONLY full when count >= frequency
-                    // DO NOT check published status - only check count
-                    if (count >= frequency) {
-                        console.log(`[Maintenance] ✅ Week ${wk}: FULL (${count}/${frequency})`);
-                        continue;
+                    // ✅ CRITICAL: Each day should have exactly 1 scheduled post at all times
+                    // If it's published, generate next occurrence
+                    // If it's scheduled, do nothing
+                    
+                    if (scheduled === 0) {
+                        // No scheduled post for this day → generate one
+                        console.log(`[Maintenance] 🎯 ${day}: No scheduled post, generating replacement`);
+                        
+                        await generateAutopilotPosts(user.id, undefined, 1, day);
+                    } else {
+                        console.log(`[Maintenance] ✅ ${day}: Already has scheduled post`);
                     }
-
-                    // Week has gaps
-                    missing = frequency - count;
-                    targetWeek = wk;
-
-                    console.log(`[Maintenance] 📊 Week ${wk}: GAP (${count}/${frequency}) → need ${missing} more`);
-                    break; // Only fill first incomplete week
-                }
-
-                // ---------------- TRIGGER GENERATION ----------------
-                if (missing > 0) {
-                    const toGenerate = Math.min(missing, 2); // Cap at 2 per run
-
-                    console.log(`[Maintenance] 🎯 User ${user.id}: Generating ${toGenerate} post(s) for week ${targetWeek}`);
-
-                    await generateAutopilotPosts(user.id, undefined, toGenerate);
-                } else {
-                    console.log(`[Maintenance] ✅ User ${user.id}: All weeks complete`);
                 }
 
             } catch (err) {

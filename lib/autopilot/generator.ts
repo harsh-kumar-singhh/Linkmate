@@ -38,10 +38,11 @@ function getSlotKey(date: Date, timezone: string): string {
 export async function generateAutopilotPosts(
     userId: string,
     testNow?: Date,
-    maxToGenerate: number = 2
+    maxToGenerate: number = 2,
+    specificDay?: string // ✅ NEW: Generate for specific day only
 ) {
     const now = getCurrentTime(testNow);
-    console.log(`[Autopilot] START → ${now.toISOString()}`);
+    console.log(`[Autopilot] START → ${now.toISOString()}${specificDay ? ` (specific day: ${specificDay})` : ''}`);
 
     const user = await prisma.user.findUnique({
         where: { id: userId },
@@ -93,6 +94,11 @@ export async function generateAutopilotPosts(
         .map(d => dayMap[d.toUpperCase()])
         .filter((d): d is number => d !== undefined);
 
+    // ✅ NEW: If specific day requested, only include that day
+    const targetDays = specificDay 
+        ? [dayMap[specificDay.toUpperCase()]].filter((d): d is number => d !== undefined)
+        : enabledDays;
+
     const getWeekKey = (date: Date) => format(date, "yyyy-'W'II");
 
     // ---------------- BUILD SLOTS ----------------
@@ -107,15 +113,14 @@ export async function generateAutopilotPosts(
         const zoned = toZonedTime(base, timezone);
         const dow = zoned.getDay();
 
-        if (!enabledDays.includes(dow)) continue;
+        // ✅ CHANGED: Use targetDays instead of enabledDays
+        if (!targetDays.includes(dow)) continue;
 
         const dateStr = format(zoned, "yyyy-MM-dd");
         const slot = fromZonedTime(`${dateStr}T${timeStr}:00`, timezone);
 
         const isToday = dateStr === todayDateStr;
 
-        // ✅ Allow TODAY even if time has passed
-        // ✅ For future days, only allow if slot time is after now
         if (!isToday && !isAfter(slot, now)) {
             continue;
         }
@@ -145,7 +150,6 @@ export async function generateAutopilotPosts(
 
     console.log(`[Autopilot] Found ${existingPosts.length} existing posts in window`);
 
-    // ✅ FIXED: Normalize existing posts to slot keys for accurate comparison
     const postsByWeek = new Map<string, Set<string>>();
 
     existingPosts.forEach(p => {
@@ -178,40 +182,22 @@ export async function generateAutopilotPosts(
 
         const occupied = postsByWeek.get(wk) || new Set();
 
-        // ✅ FIXED: Week is ONLY full when count >= frequency
-        // DO NOT lock based on published status alone
-        const count = occupied.size;
-
-        if (count >= frequency) {
-            console.log(`[Autopilot] ⛔ WEEK ${wk} FULL (${count}/${frequency})`);
-            continue;
-        }
-
-        let allowed = frequency - count;
-
-        console.log(`[Autopilot] ✅ WEEK ${wk}: ${count}/${frequency} posts, ${allowed} slots available`);
-
-        // ✅ Fill ALL available slots in current week
+        // ✅ Fill slots until we hit maxToGenerate
         for (const slot of slots) {
             if (selectedSlots.length >= maxToGenerate) break;
-            if (allowed <= 0) break;
 
             const slotKey = getSlotKey(slot, timezone);
 
             if (!occupied.has(slotKey)) {
                 console.log(`[Autopilot] 🎯 SELECT: ${slotKey} (${slot.toISOString()})`);
                 selectedSlots.push(slot);
-                allowed--;
             } else {
                 console.log(`[Autopilot] ⏭️  SKIP: ${slotKey} (already occupied)`);
             }
         }
 
-        // ✅ ONLY process first incomplete week (don't jump to next week if current has gaps)
-        if (selectedSlots.length > 0) {
-            console.log(`[Autopilot] Stopping after first incomplete week`);
-            break;
-        }
+        // Stop after finding first available slot
+        if (selectedSlots.length > 0) break;
     }
 
     if (selectedSlots.length === 0) {
@@ -276,7 +262,6 @@ export async function generateAutopilotPosts(
             tries++;
         }
 
-        // ✅ Double-check slot isn't occupied (race condition protection)
         const slotKey = getSlotKey(slot, timezone);
         const exists = await prisma.post.findFirst({
             where: {
