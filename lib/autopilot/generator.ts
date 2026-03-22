@@ -71,12 +71,22 @@ export async function generateAutopilotPosts(
 
     // ✅ CRITICAL FIX: Start from TODAY (i = 0)
     for (let i = 0; i <= 14; i++) {
-        const candidate = addDays(nowZoned, i);
+    const candidate = addDays(nowZoned, i);
 
-        if (candidate.getDay() !== targetDay) continue;
+    if (candidate.getDay() !== targetDay) continue;
 
-        const dateStr = format(candidate, "yyyy-MM-dd");
-        const slot = fromZonedTime(`${dateStr}T${timeStr}:00`, timezone);
+    const [hours, minutes] = timeStr.split(":").map(Number);
+
+    const zonedDate = new Date(
+        candidate.getFullYear(),
+        candidate.getMonth(),
+        candidate.getDate(),
+        hours,
+        minutes,
+        0
+    );
+
+    const slot = fromZonedTime(zonedDate, timezone);
 
         // ✅ Allow TODAY even if time passed
         if (!isAfter(slot, now) && i > 0) continue;
