@@ -1,6 +1,6 @@
 // generator.ts
 import { prisma } from "@/lib/prisma";
-import { addDays, format, isAfter, startOfDay } from "date-fns";
+import { addDays, format, isAfter } from "date-fns";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
 import { getCurrentTime } from "@/lib/utils/time";
 import { generatePost } from "@/lib/gemini";
@@ -178,29 +178,20 @@ export async function generateAutopilotPosts(
 
         const occupied = postsByWeek.get(wk) || new Set();
 
-        // ✅ ONLY LOCK WEEK IF A PUBLISHED POST EXISTS
-        const hasPublished = existingPosts.some(
-            p =>
-                p.status === "PUBLISHED" &&
-                p.scheduledFor &&
-                getWeekKey(p.scheduledFor) === wk
-        );
+        // ✅ FIXED: Week is ONLY full when count >= frequency
+        // DO NOT lock based on published status alone
+        const count = occupied.size;
 
-        if (hasPublished) {
-            console.log(`[Autopilot] ⛔ WEEK ${wk} LOCKED (published post exists)`);
+        if (count >= frequency) {
+            console.log(`[Autopilot] ⛔ WEEK ${wk} FULL (${count}/${frequency})`);
             continue;
         }
 
-        let allowed = frequency - occupied.size;
+        let allowed = frequency - count;
 
-        if (allowed <= 0) {
-            console.log(`[Autopilot] ⚠️  WEEK ${wk} FULL (${occupied.size}/${frequency})`);
-            continue;
-        }
+        console.log(`[Autopilot] ✅ WEEK ${wk}: ${count}/${frequency} posts, ${allowed} slots available`);
 
-        console.log(`[Autopilot] ✅ WEEK ${wk}: ${occupied.size}/${frequency} posts, ${allowed} needed`);
-
-        // ✅ Fill ALL gaps in current week (not just first one)
+        // ✅ Fill ALL available slots in current week
         for (const slot of slots) {
             if (selectedSlots.length >= maxToGenerate) break;
             if (allowed <= 0) break;

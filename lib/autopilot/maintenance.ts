@@ -1,7 +1,8 @@
 // maintenance.ts
 import { prisma } from "@/lib/prisma";
 import { generateAutopilotPosts } from "./generator";
-import { addDays, format, startOfWeek } from "date-fns";
+import { addDays, format } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 
 const ACTIVE_RUNS = new Map<string, number>();
 const RUN_THROTTLE_MS = 30000; // 30s
@@ -37,6 +38,7 @@ export async function maintainAutopilotPipeline(specificUserId?: string) {
             select: {
                 id: true,
                 autopilotFrequency: true,
+                autopilotDays: true,
                 schedule: { select: { timezone: true } }
             },
             take: specificUserId ? 1 : 10
@@ -90,22 +92,41 @@ export async function maintainAutopilotPipeline(specificUserId?: string) {
 
                 const timezone = user.schedule?.timezone || "UTC";
                 const userPosts = userPostsMap[user.id] || [];
+                const selectedDays = (user.autopilotDays as string[]).map(d => d.toUpperCase());
 
-                console.log(`[Maintenance] 👤 User ${user.id}: ${userPosts.length} posts, frequency ${frequency}/week, timezone ${timezone}`);
+                console.log(`[Maintenance] 👤 User ${user.id}: ${userPosts.length} posts, frequency ${frequency}/week, timezone ${timezone}, days: ${selectedDays.join(', ')}`);
 
-                // Group posts by week
+                // ✅ CRITICAL FIX: Day name mapping
+                const dayMap: Record<string, string> = {
+                    SUNDAY: "SUNDAY",
+                    MONDAY: "MONDAY",
+                    TUESDAY: "TUESDAY",
+                    WEDNESDAY: "WEDNESDAY",
+                    THURSDAY: "THURSDAY",
+                    FRIDAY: "FRIDAY",
+                    SATURDAY: "SATURDAY"
+                };
+
+                // ✅ CRITICAL FIX: Only count posts on SELECTED days
                 const weeklyCounts: Record<string, number> = {};
-                const publishedWeeks = new Set<string>();
 
                 userPosts.forEach(p => {
                     if (!p.scheduledFor) return;
 
+                    // Convert to user's timezone to get correct day
+                    const zoned = toZonedTime(p.scheduledFor, timezone);
+                    const dayName = format(zoned, "EEEE").toUpperCase();
+
+                    // ✅ ONLY count if day matches user's selected days
+                    if (!selectedDays.includes(dayName)) {
+                        console.log(`[Maintenance] Ignoring post on ${dayName} (not in selected days)`);
+                        return;
+                    }
+
                     const wk = getWeekKey(p.scheduledFor);
                     weeklyCounts[wk] = (weeklyCounts[wk] || 0) + 1;
 
-                    if (p.status === "PUBLISHED") {
-                        publishedWeeks.add(wk);
-                    }
+                    console.log(`[Maintenance] Counting post: ${format(zoned, "yyyy-MM-dd EEEE")} → week ${wk} (count now: ${weeklyCounts[wk]})`);
                 });
 
                 let missing = 0;
@@ -116,23 +137,21 @@ export async function maintainAutopilotPipeline(specificUserId?: string) {
                     const wkDate = addDays(now, i);
                     const wk = getWeekKey(wkDate);
 
-                    // ✅ SKIP LOCKED WEEKS (published posts exist)
-                    if (publishedWeeks.has(wk)) {
-                        console.log(`[Maintenance] 🔒 Week ${wk} LOCKED (published)`);
+                    const count = weeklyCounts[wk] || 0;
+
+                    // ✅ FIXED: Week is ONLY full when count >= frequency
+                    // DO NOT check published status - only check count
+                    if (count >= frequency) {
+                        console.log(`[Maintenance] ✅ Week ${wk}: FULL (${count}/${frequency})`);
                         continue;
                     }
 
-                    const count = weeklyCounts[wk] || 0;
+                    // Week has gaps
+                    missing = frequency - count;
+                    targetWeek = wk;
 
-                    if (count < frequency) {
-                        missing = frequency - count;
-                        targetWeek = wk;
-
-                        console.log(`[Maintenance] 📊 Week ${wk}: ${count}/${frequency} posts → GAP of ${missing}`);
-                        break; // Only fill first incomplete week
-                    } else {
-                        console.log(`[Maintenance] ✅ Week ${wk}: ${count}/${frequency} posts (complete)`);
-                    }
+                    console.log(`[Maintenance] 📊 Week ${wk}: GAP (${count}/${frequency}) → need ${missing} more`);
+                    break; // Only fill first incomplete week
                 }
 
                 // ---------------- TRIGGER GENERATION ----------------
@@ -194,7 +213,8 @@ export async function reconcileAutopilotSchedule(userId: string, newDays: string
     for (const post of posts) {
         if (!post.scheduledFor) continue;
 
-        const day = format(post.scheduledFor, "EEEE").toUpperCase();
+        const zoned = toZonedTime(post.scheduledFor, timezone);
+        const day = format(zoned, "EEEE").toUpperCase();
 
         if (!normalizedDays.includes(day)) {
             console.log(`[Reconcile] ❌ Marking post ${post.id} for deletion (${day} not in new schedule)`);
