@@ -1,11 +1,11 @@
-// maintenance.ts
+// maintenance.ts (DEBUG VERSION)
 import { prisma } from "@/lib/prisma";
 import { generateAutopilotPosts } from "./generator";
 import { addDays, format } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 
 const ACTIVE_RUNS = new Map<string, number>();
-const RUN_THROTTLE_MS = 30000; // 30s
+const RUN_THROTTLE_MS = 30000;
 
 export async function maintainAutopilotPipeline(specificUserId?: string) {
     const now = new Date();
@@ -13,7 +13,7 @@ export async function maintainAutopilotPipeline(specificUserId?: string) {
     if (specificUserId) {
         const lastRun = ACTIVE_RUNS.get(specificUserId);
         if (lastRun && (now.getTime() - lastRun) < RUN_THROTTLE_MS) {
-            console.log(`[Maintenance] ⏭️  SKIP ${specificUserId} (throttled, last run ${Math.floor((now.getTime() - lastRun) / 1000)}s ago)`);
+            console.log(`[Maintenance] ⏭️  SKIP ${specificUserId} (throttled)`);
             return;
         }
         ACTIVE_RUNS.set(specificUserId, now.getTime());
@@ -22,7 +22,6 @@ export async function maintainAutopilotPipeline(specificUserId?: string) {
     console.log(`[Maintenance] 🚀 START → ${now.toISOString()}`);
 
     try {
-        // ---------------- USERS ----------------
         const users = await prisma.user.findMany({
             where: {
                 id: specificUserId || undefined,
@@ -55,7 +54,6 @@ export async function maintainAutopilotPipeline(specificUserId?: string) {
         const userIds = users.map(u => u.id);
         const windowEnd = addDays(now, 21);
 
-        // ---------------- FETCH POSTS ----------------
         const posts = await prisma.post.findMany({
             where: {
                 userId: { in: userIds },
@@ -70,99 +68,92 @@ export async function maintainAutopilotPipeline(specificUserId?: string) {
             }
         });
 
-        console.log(`[Maintenance] Found ${posts.length} existing posts across all users`);
+        console.log(`[Maintenance] Found ${posts.length} existing posts`);
 
-        const getWeekKey = (d: Date) => format(d, "yyyy-'W'II");
-
-        // ---------------- MAP POSTS BY USER ----------------
         const userPostsMap: Record<string, typeof posts> = {};
-
         posts.forEach(p => {
             if (!userPostsMap[p.userId]) userPostsMap[p.userId] = [];
             userPostsMap[p.userId].push(p);
         });
 
-        // ---------------- PROCESS EACH USER ----------------
         for (const user of users) {
             try {
                 const frequency = parseInt(user.autopilotFrequency || "0");
-                if (frequency <= 0) {
-                    console.log(`[Maintenance] ⚠️  User ${user.id}: Invalid frequency`);
-                    continue;
-                }
+                if (frequency <= 0) continue;
 
                 const timezone = user.schedule?.timezone || "UTC";
                 const userPosts = userPostsMap[user.id] || [];
-                const selectedDays = (user.autopilotDays as string[]).map(d => d.toUpperCase());
-
-                console.log(`[Maintenance] 👤 User ${user.id}: ${userPosts.length} posts, frequency ${frequency}/week, timezone ${timezone}, days: ${selectedDays.join(', ')}`);
-
-                // ✅ NEW: Track posts by DAY
-                const postsByDay: Record<string, { scheduled: number; published: number }> = {};
                 
+                // ✅ CRITICAL: Get days from database and normalize
+                const rawDays = user.autopilotDays as string[];
+                const selectedDays = rawDays.map(d => d.toUpperCase());
+
+                console.log(`\n[Maintenance] 👤 User ${user.id}`);
+                console.log(`  Frequency: ${frequency}/week`);
+                console.log(`  Timezone: ${timezone}`);
+                console.log(`  Raw days from DB: ${JSON.stringify(rawDays)}`);
+                console.log(`  Normalized days: ${JSON.stringify(selectedDays)}`);
+                console.log(`  Existing posts: ${userPosts.length}`);
+
+                // ✅ Track posts by day
+                const postsByDay: Record<string, number> = {};
                 selectedDays.forEach(day => {
-                    postsByDay[day] = { scheduled: 0, published: 0 };
+                    postsByDay[day] = 0;
                 });
 
+                // ✅ Count scheduled posts per day
                 userPosts.forEach(p => {
                     if (!p.scheduledFor) return;
+                    if (p.status === "PUBLISHED") return; // Skip published
 
+                    // Convert to user timezone
                     const zoned = toZonedTime(p.scheduledFor, timezone);
                     const dayName = format(zoned, "EEEE").toUpperCase();
 
-                    if (!selectedDays.includes(dayName)) return;
+                    console.log(`  Post: ${format(zoned, "yyyy-MM-dd EEEE HH:mm")} → ${dayName} (${p.status})`);
 
-                    if (p.status === "PUBLISHED") {
-                        postsByDay[dayName].published++;
+                    if (selectedDays.includes(dayName)) {
+                        postsByDay[dayName]++;
+                        console.log(`    ✅ Counted for ${dayName} (now: ${postsByDay[dayName]})`);
                     } else {
-                        postsByDay[dayName].scheduled++;
+                        console.log(`    ⏭️  Skipped (${dayName} not in ${selectedDays.join(', ')})`);
                     }
                 });
 
-                console.log(`[Maintenance] Posts by day:`, postsByDay);
+                console.log(`  Posts by day:`, postsByDay);
 
-                // ✅ NEW: Generate for each day that needs a post
+                // ✅ Generate for days with 0 scheduled posts
                 for (const day of selectedDays) {
-                    const { scheduled, published } = postsByDay[day];
-                    const total = scheduled + published;
+                    const count = postsByDay[day];
 
-                    // ✅ CRITICAL: Each day should have exactly 1 scheduled post at all times
-                    // If it's published, generate next occurrence
-                    // If it's scheduled, do nothing
-                    
-                    if (scheduled === 0) {
-                        // No scheduled post for this day → generate one
-                        console.log(`[Maintenance] 🎯 ${day}: No scheduled post, generating replacement`);
-                        
+                    if (count === 0) {
+                        console.log(`  🎯 ${day}: Needs post, generating...`);
                         await generateAutopilotPosts(user.id, undefined, 1, day);
                     } else {
-                        console.log(`[Maintenance] ✅ ${day}: Already has scheduled post`);
+                        console.log(`  ✅ ${day}: Has ${count} scheduled post(s)`);
                     }
                 }
 
             } catch (err) {
-                console.error(`[Maintenance] ❌ ERROR processing user ${user.id}:`, err);
+                console.error(`[Maintenance] ❌ ERROR user ${user.id}:`, err);
             }
         }
 
-        console.log(`[Maintenance] ✅ COMPLETE`);
+        console.log(`\n[Maintenance] ✅ COMPLETE`);
 
     } catch (err) {
-        console.error(`[Maintenance] ❌ FATAL ERROR:`, err);
+        console.error(`[Maintenance] ❌ FATAL:`, err);
     }
 }
 
-// ---------------- RECONCILE ----------------
 export async function reconcileAutopilotSchedule(userId: string, newDays: string[]) {
     const now = new Date();
 
-    console.log(`[Reconcile] 🔄 User ${userId}: Reconciling schedule with new days: ${newDays.join(', ')}`);
+    console.log(`[Reconcile] 🔄 User ${userId}: New days: ${newDays.join(', ')}`);
 
     const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: {
-            schedule: { select: { timezone: true } }
-        }
+        select: { schedule: { select: { timezone: true } } }
     });
 
     const timezone = user?.schedule?.timezone || "UTC";
@@ -191,11 +182,13 @@ export async function reconcileAutopilotSchedule(userId: string, newDays: string
         const zoned = toZonedTime(post.scheduledFor, timezone);
         const day = format(zoned, "EEEE").toUpperCase();
 
+        console.log(`[Reconcile] Post: ${format(zoned, "yyyy-MM-dd EEEE")} → ${day}`);
+
         if (!normalizedDays.includes(day)) {
-            console.log(`[Reconcile] ❌ Marking post ${post.id} for deletion (${day} not in new schedule)`);
+            console.log(`[Reconcile]   ❌ Delete (not in ${normalizedDays.join(', ')})`);
             toDelete.push(post.id);
         } else {
-            console.log(`[Reconcile] ✅ Keeping post ${post.id} (${day} matches new schedule)`);
+            console.log(`[Reconcile]   ✅ Keep`);
         }
     }
 
@@ -203,7 +196,6 @@ export async function reconcileAutopilotSchedule(userId: string, newDays: string
         await prisma.post.deleteMany({
             where: { id: { in: toDelete } }
         });
-
         console.log(`[Reconcile] 🗑️  Deleted ${toDelete.length} post(s)`);
     } else {
         console.log(`[Reconcile] ✅ No changes needed`);
