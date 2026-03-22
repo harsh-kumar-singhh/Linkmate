@@ -1,4 +1,4 @@
-// autopilot.ts
+// autopilot.ts - NO CHANGES NEEDED
 "use server"
 
 import { auth } from "@/lib/auth"
@@ -7,7 +7,6 @@ import { revalidatePath } from "next/cache"
 
 import { maintainAutopilotPipeline, reconcileAutopilotSchedule } from "@/lib/autopilot/maintenance"
 
-// ---------------- SAVE SETTINGS ----------------
 export async function saveAutopilotSettings(data: {
     topics: string[]
     frequency: string
@@ -34,7 +33,6 @@ export async function saveAutopilotSettings(data: {
         throw new Error("Pro plan required for Autopilot")
     }
 
-    // ---------------- VALIDATION ----------------
     if (data.topics.length < 1) {
         throw new Error("Please select at least one topic")
     }
@@ -45,17 +43,14 @@ export async function saveAutopilotSettings(data: {
 
     const frequencyNum = parseInt(data.frequency);
     if (frequencyNum < 1 || frequencyNum > data.days.length) {
-        throw new Error(`Frequency must be between 1 and ${data.days.length} (number of selected days)`)
+        throw new Error(`Frequency must be between 1 and ${data.days.length}`)
     }
 
     try {
-        console.log(`[Autopilot-Settings] 💾 Saving config for user ${session.user.id}`)
-        console.log(`[Autopilot-Settings] Topics: ${data.topics.join(', ')}`)
-        console.log(`[Autopilot-Settings] Days: ${data.days.join(', ')}`)
-        console.log(`[Autopilot-Settings] Time: ${data.time}`)
-        console.log(`[Autopilot-Settings] Frequency: ${data.frequency}/week`)
+        console.log(`[Autopilot-Settings] Saving for ${session.user.id}`);
+        console.log(`  Days: ${data.days.join(', ')}`);
+        console.log(`  Time: ${data.time}`);
 
-        // ---------------- SAVE CONFIG ----------------
         await prisma.user.update({
             where: { id: session.user.id },
             data: {
@@ -70,28 +65,24 @@ export async function saveAutopilotSettings(data: {
             },
         })
 
-        console.log(`[Autopilot-Settings] ✅ Config saved`)
-
-        // ---------------- PIPELINE FLOW ----------------
-        console.log(`[Autopilot-Settings] 🔄 Step 1: Reconciling existing posts`)
+        console.log(`[Autopilot-Settings] Reconciling...`);
         await reconcileAutopilotSchedule(session.user.id, data.days)
 
-        console.log(`[Autopilot-Settings] 🚀 Step 2: Triggering maintenance pipeline`)
+        console.log(`[Autopilot-Settings] Running maintenance...`);
         await maintainAutopilotPipeline(session.user.id)
 
-        console.log(`[Autopilot-Settings] ✅ SYNC COMPLETE`)
+        console.log(`[Autopilot-Settings] Done`);
 
         revalidatePath("/calendar")
 
         return { success: true }
 
     } catch (error) {
-        console.error("[Autopilot-Settings] ❌ ERROR:", error)
+        console.error("[Autopilot-Settings] Error:", error)
         throw new Error("Failed to save autopilot settings")
     }
 }
 
-// ---------------- TOGGLE AUTOPILOT ----------------
 export async function toggleAutopilot(enabled: boolean) {
     const session = await auth()
 
@@ -99,19 +90,14 @@ export async function toggleAutopilot(enabled: boolean) {
         throw new Error("Unauthorized")
     }
 
-    console.log(`[Autopilot-Toggle] ${enabled ? '▶️  ENABLING' : '⏸️  PAUSING'} for user ${session.user.id}`)
-
     try {
         const now = new Date()
 
         await prisma.$transaction([
-            // Update user flag
             prisma.user.update({
                 where: { id: session.user.id },
                 data: { autopilotEnabled: enabled },
             }),
-
-            // Update future posts
             prisma.post.updateMany({
                 where: {
                     userId: session.user.id,
@@ -124,14 +110,9 @@ export async function toggleAutopilot(enabled: boolean) {
             })
         ])
 
-        console.log(`[Autopilot-Toggle] ✅ Status updated`)
-
-        // ---------------- RESUME FLOW ----------------
         if (enabled) {
-            console.log(`[Autopilot-Toggle] 🚀 Triggering maintenance to fill gaps`)
-
             await maintainAutopilotPipeline(session.user.id).catch(err => {
-                console.error("[Autopilot-Toggle] ⚠️  Maintenance failed:", err)
+                console.error("[Autopilot-Toggle] Maintenance failed:", err)
             })
         }
 
@@ -140,7 +121,7 @@ export async function toggleAutopilot(enabled: boolean) {
         return { success: true }
 
     } catch (error) {
-        console.error("[Autopilot-Toggle] ❌ ERROR:", error)
+        console.error("[Autopilot-Toggle] Error:", error)
         throw new Error("Failed to toggle autopilot")
     }
 }
