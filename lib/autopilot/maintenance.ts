@@ -1,6 +1,7 @@
+// maintenance.ts
 import { prisma } from "@/lib/prisma";
 import { generateAutopilotPosts } from "./generator";
-import { addDays, format } from "date-fns";
+import { addDays, format, startOfWeek } from "date-fns";
 
 const ACTIVE_RUNS = new Map<string, number>();
 const RUN_THROTTLE_MS = 30000; // 30s
@@ -11,13 +12,13 @@ export async function maintainAutopilotPipeline(specificUserId?: string) {
     if (specificUserId) {
         const lastRun = ACTIVE_RUNS.get(specificUserId);
         if (lastRun && (now.getTime() - lastRun) < RUN_THROTTLE_MS) {
-            console.log(`[Autopilot-Maintenance] SKIP (throttled) ${specificUserId}`);
+            console.log(`[Maintenance] ⏭️  SKIP ${specificUserId} (throttled, last run ${Math.floor((now.getTime() - lastRun) / 1000)}s ago)`);
             return;
         }
         ACTIVE_RUNS.set(specificUserId, now.getTime());
     }
 
-    console.log(`[Autopilot-Maintenance] START → ${now.toISOString()}`);
+    console.log(`[Maintenance] 🚀 START → ${now.toISOString()}`);
 
     try {
         // ---------------- USERS ----------------
@@ -35,12 +36,18 @@ export async function maintainAutopilotPipeline(specificUserId?: string) {
             },
             select: {
                 id: true,
-                autopilotFrequency: true
+                autopilotFrequency: true,
+                schedule: { select: { timezone: true } }
             },
             take: specificUserId ? 1 : 10
         });
 
-        if (!users.length) return;
+        if (!users.length) {
+            console.log(`[Maintenance] No eligible users found`);
+            return;
+        }
+
+        console.log(`[Maintenance] Processing ${users.length} user(s)`);
 
         const userIds = users.map(u => u.id);
         const windowEnd = addDays(now, 21);
@@ -60,9 +67,11 @@ export async function maintainAutopilotPipeline(specificUserId?: string) {
             }
         });
 
+        console.log(`[Maintenance] Found ${posts.length} existing posts across all users`);
+
         const getWeekKey = (d: Date) => format(d, "yyyy-'W'II");
 
-        // ---------------- MAP POSTS ----------------
+        // ---------------- MAP POSTS BY USER ----------------
         const userPostsMap: Record<string, typeof posts> = {};
 
         posts.forEach(p => {
@@ -70,15 +79,21 @@ export async function maintainAutopilotPipeline(specificUserId?: string) {
             userPostsMap[p.userId].push(p);
         });
 
-        // ---------------- PROCESS USERS ----------------
+        // ---------------- PROCESS EACH USER ----------------
         for (const user of users) {
             try {
                 const frequency = parseInt(user.autopilotFrequency || "0");
-                if (frequency <= 0) continue;
+                if (frequency <= 0) {
+                    console.log(`[Maintenance] ⚠️  User ${user.id}: Invalid frequency`);
+                    continue;
+                }
 
+                const timezone = user.schedule?.timezone || "UTC";
                 const userPosts = userPostsMap[user.id] || [];
 
-                // Group by week
+                console.log(`[Maintenance] 👤 User ${user.id}: ${userPosts.length} posts, frequency ${frequency}/week, timezone ${timezone}`);
+
+                // Group posts by week
                 const weeklyCounts: Record<string, number> = {};
                 const publishedWeeks = new Set<string>();
 
@@ -86,7 +101,6 @@ export async function maintainAutopilotPipeline(specificUserId?: string) {
                     if (!p.scheduledFor) return;
 
                     const wk = getWeekKey(p.scheduledFor);
-
                     weeklyCounts[wk] = (weeklyCounts[wk] || 0) + 1;
 
                     if (p.status === "PUBLISHED") {
@@ -95,15 +109,16 @@ export async function maintainAutopilotPipeline(specificUserId?: string) {
                 });
 
                 let missing = 0;
+                let targetWeek = "";
 
-                // ---------------- WEEK LOOP ----------------
+                // ---------------- CHECK WEEKS FOR GAPS ----------------
                 for (let i = 0; i < 21; i += 7) {
                     const wkDate = addDays(now, i);
                     const wk = getWeekKey(wkDate);
 
-                    // ✅ LOCK ONLY IF PUBLISHED
+                    // ✅ SKIP LOCKED WEEKS (published posts exist)
                     if (publishedWeeks.has(wk)) {
-                        console.log(`[Autopilot-Maintenance] LOCKED ${wk}`);
+                        console.log(`[Maintenance] 🔒 Week ${wk} LOCKED (published)`);
                         continue;
                     }
 
@@ -111,43 +126,43 @@ export async function maintainAutopilotPipeline(specificUserId?: string) {
 
                     if (count < frequency) {
                         missing = frequency - count;
+                        targetWeek = wk;
 
-                        console.log(
-                            `[Autopilot-Maintenance] GAP ${wk}: ${count}/${frequency} → need ${missing}`
-                        );
-
-                        break;
+                        console.log(`[Maintenance] 📊 Week ${wk}: ${count}/${frequency} posts → GAP of ${missing}`);
+                        break; // Only fill first incomplete week
+                    } else {
+                        console.log(`[Maintenance] ✅ Week ${wk}: ${count}/${frequency} posts (complete)`);
                     }
                 }
 
-                // ---------------- GENERATE ----------------
+                // ---------------- TRIGGER GENERATION ----------------
                 if (missing > 0) {
-                    const toGenerate = Math.min(missing, 2);
+                    const toGenerate = Math.min(missing, 2); // Cap at 2 per run
 
-                    console.log(
-                        `[Autopilot-Maintenance] GENERATE ${toGenerate} for ${user.id}`
-                    );
+                    console.log(`[Maintenance] 🎯 User ${user.id}: Generating ${toGenerate} post(s) for week ${targetWeek}`);
 
                     await generateAutopilotPosts(user.id, undefined, toGenerate);
                 } else {
-                    console.log(`[Autopilot-Maintenance] OK ${user.id}`);
+                    console.log(`[Maintenance] ✅ User ${user.id}: All weeks complete`);
                 }
 
             } catch (err) {
-                console.error(`[Autopilot-Maintenance] ERROR ${user.id}`, err);
+                console.error(`[Maintenance] ❌ ERROR processing user ${user.id}:`, err);
             }
         }
 
-        console.log(`[Autopilot-Maintenance] DONE`);
+        console.log(`[Maintenance] ✅ COMPLETE`);
 
     } catch (err) {
-        console.error(`[Autopilot-Maintenance] FATAL`, err);
+        console.error(`[Maintenance] ❌ FATAL ERROR:`, err);
     }
 }
 
 // ---------------- RECONCILE ----------------
 export async function reconcileAutopilotSchedule(userId: string, newDays: string[]) {
     const now = new Date();
+
+    console.log(`[Reconcile] 🔄 User ${userId}: Reconciling schedule with new days: ${newDays.join(', ')}`);
 
     const user = await prisma.user.findUnique({
         where: { id: userId },
@@ -172,6 +187,8 @@ export async function reconcileAutopilotSchedule(userId: string, newDays: string
         }
     });
 
+    console.log(`[Reconcile] Found ${posts.length} scheduled posts`);
+
     const toDelete: string[] = [];
 
     for (const post of posts) {
@@ -180,7 +197,10 @@ export async function reconcileAutopilotSchedule(userId: string, newDays: string
         const day = format(post.scheduledFor, "EEEE").toUpperCase();
 
         if (!normalizedDays.includes(day)) {
+            console.log(`[Reconcile] ❌ Marking post ${post.id} for deletion (${day} not in new schedule)`);
             toDelete.push(post.id);
+        } else {
+            console.log(`[Reconcile] ✅ Keeping post ${post.id} (${day} matches new schedule)`);
         }
     }
 
@@ -189,8 +209,8 @@ export async function reconcileAutopilotSchedule(userId: string, newDays: string
             where: { id: { in: toDelete } }
         });
 
-        console.log(`[Autopilot-Reconcile] Deleted ${toDelete.length}`);
+        console.log(`[Reconcile] 🗑️  Deleted ${toDelete.length} post(s)`);
     } else {
-        console.log(`[Autopilot-Reconcile] No changes`);
+        console.log(`[Reconcile] ✅ No changes needed`);
     }
 }
