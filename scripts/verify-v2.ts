@@ -1,6 +1,5 @@
 import { PrismaClient } from "@prisma/client";
 import { generateAutopilotPosts } from "../lib/autopilot/generator";
-import { startOfDay, addDays } from "date-fns";
 
 const prisma = new PrismaClient();
 
@@ -19,53 +18,92 @@ async function main() {
     }
 
     const userId = user.id;
+    const days = (user.autopilotDays as string[]) || [];
+
     console.log(`Testing with User: ${user.email} (${userId})`);
     console.log(`User Timezone: ${user.schedule?.timezone || "UTC"}`);
+    console.log(`User Days: ${days.join(", ")}`);
 
-    // 2. Initial Generation (Simulated Time: Monday Morning)
-    // Assuming user has MON, WED, FRI
-    const testNow = new Date("2026-03-23T08:00:00Z"); // Monday 8 AM UTC
+    if (days.length === 0) {
+        console.log("No autopilot days configured.");
+        return;
+    }
+
+    // 2. Initial Generation (Simulated Time)
+    const testNow = new Date("2026-03-23T08:00:00Z");
     console.log(`\nTEST 1: Initial Generation (Simulated: ${testNow.toISOString()})`);
-    
-    // Mock the AI by setting an env var if we had one, but here we'll just run it.
-    // To avoid hitting real AI 100 times, I'll just check the pipeline logic.
-    
-    const results1 = await generateAutopilotPosts(userId, testNow);
-    console.log(`Generated ${results1?.length || 0} posts.`);
+
+    let results1Count = 0;
+
+    for (const day of days) {
+        const post = await generateAutopilotPosts(
+            userId,
+            day,          // ✅ REQUIRED
+            undefined,    // afterDate
+            testNow       // simulated time
+        );
+
+        if (post) results1Count++;
+    }
+
+    console.log(`Generated ${results1Count} posts.`);
 
     // 3. Duplicate Protection / Guard (Run again same time)
     console.log(`\nTEST 2: Re-run (Guard Check)`);
-    const results2 = await generateAutopilotPosts(userId, testNow);
-    console.log(`Generated ${results2?.length || 0} posts. (Expected 0)`);
+
+    let results2Count = 0;
+
+    for (const day of days) {
+        const post = await generateAutopilotPosts(
+            userId,
+            day,
+            undefined,
+            testNow
+        );
+
+        if (post) results2Count++;
+    }
+
+    console.log(`Generated ${results2Count} posts. (Expected 0)`);
 
     // 4. Delete 1 post & Regenerate
     console.log(`\nTEST 3: Deleting 1 post & Regenerating`);
+
     const posts = await prisma.post.findMany({
         where: { userId, source: "autopilot" },
-        orderBy: { scheduledFor: 'asc' },
+        orderBy: { scheduledFor: "asc" },
         take: 1
     });
 
     if (posts.length > 0) {
         await prisma.post.delete({ where: { id: posts[0].id } });
-        console.log(`Deleted post for ${posts[0].scheduledFor?.toISOString()}`);
-        
-        const results3 = await generateAutopilotPosts(userId, testNow);
-        console.log(`Generated ${results3?.length || 0} posts. (Expected 1)`);
-    }
 
-    // 5. Simulate AI Failure (Requires manual code edit or env var)
-    // Since I can't easily mock the module in a script without heavy setup, 
-    // I'll trust the logic if the previous tests pass.
+        console.log(`Deleted post for ${posts[0].scheduledFor?.toISOString()}`);
+
+        let results3Count = 0;
+
+        for (const day of days) {
+            const post = await generateAutopilotPosts(
+                userId,
+                day,
+                undefined,
+                testNow
+            );
+
+            if (post) results3Count++;
+        }
+
+        console.log(`Generated ${results3Count} posts. (Expected 1)`);
+    }
 
     console.log("\n--- VERIFICATION COMPLETE ---");
 }
 
 main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+    .catch((e) => {
+        console.error(e);
+        process.exit(1);
+    })
+    .finally(async () => {
+        await prisma.$disconnect();
+    });
