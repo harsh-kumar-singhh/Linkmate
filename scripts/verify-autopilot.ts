@@ -7,8 +7,6 @@ import { generateAutopilotPosts } from "../lib/autopilot/generator";
 import { format } from "date-fns";
 
 async function main() {
-    // No local prisma assignment needed
-    
     // 1. Find a Pro user with Autopilot setup
     const user = await prisma.user.findFirst({
         where: {
@@ -17,6 +15,11 @@ async function main() {
                 mode: "insensitive"
             },
             autopilotEnabled: true
+        },
+        select: {
+            id: true,
+            email: true,
+            autopilotDays: true
         }
     });
 
@@ -27,22 +30,50 @@ async function main() {
 
     console.log(`Verifying Autopilot for user: ${user.email} (${user.id})`);
 
-    // 2. Trigger Generation
-    console.log("\nTriggering generation...");
-    const posts = await generateAutopilotPosts(user.id);
+    const days = (user.autopilotDays as string[]) || [];
 
-    if (posts && posts.length > 0) {
-        console.log(`✅ Success! Generated ${posts.length} posts.`);
-        posts.forEach(p => {
-            console.log(`- [${format(p.scheduledFor!, "yyyy-MM-dd HH:mm")}] ${p.content.substring(0, 50)}...`);
+    if (days.length === 0) {
+        console.log("User has no autopilot days configured.");
+        return;
+    }
+
+    // 2. Trigger Generation for ALL selected days
+    console.log("\nTriggering generation...");
+
+    let allPosts: any[] = [];
+
+    for (const day of days) {
+        console.log(`\n→ Generating for ${day}`);
+
+        const post = await generateAutopilotPosts(
+            user.id,
+            day // ✅ REQUIRED param
+        );
+
+        if (post) {
+            allPosts.push(post);
+        }
+    }
+
+    // 3. Results
+    if (allPosts.length > 0) {
+        console.log(`\n✅ Success! Generated ${allPosts.length} posts.`);
+
+        allPosts.forEach((p) => {
+            console.log(
+                `- [${format(p.scheduledFor!, "yyyy-MM-dd HH:mm")}] ${p.content.substring(0, 50)}...`
+            );
         });
     } else {
-        console.log("No new posts were generated.");
+        console.log("\nNo new posts were generated.");
     }
 }
 
 main()
-    .catch(err => {
+    .catch((err) => {
         console.error("Verification failed:", err);
     })
-    .finally(() => process.exit());
+    .finally(async () => {
+        await prisma.$disconnect();
+        process.exit();
+    });
