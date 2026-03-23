@@ -146,7 +146,7 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                 topics,
                 frequency,
                 days,
-                time: utcTime,
+                time: time,
                 aboutYou,
                 currentFocus,
                 writingStyleId: selectionMode === "automatic" ? "default" : writingStyleId,
