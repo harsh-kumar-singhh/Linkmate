@@ -21,6 +21,9 @@ export async function saveAutopilotSettings(data: {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
+  // ✅ DEBUG LOG (DO NOT REMOVE YET)
+  console.log("[Autopilot-Settings] Raw time received:", data.time);
+
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: { id: true, plan: true },
@@ -29,8 +32,14 @@ export async function saveAutopilotSettings(data: {
   if (user?.plan?.toUpperCase() !== "PRO") {
     throw new Error("Pro plan required for Autopilot");
   }
-  if (data.topics.length < 1) throw new Error("Please select at least one topic");
-  if (data.days.length === 0) throw new Error("Please select at least one posting day");
+
+  if (data.topics.length < 1) {
+    throw new Error("Please select at least one topic");
+  }
+
+  if (data.days.length === 0) {
+    throw new Error("Please select at least one posting day");
+  }
 
   const frequencyNum = parseInt(data.frequency);
   if (frequencyNum < 1 || frequencyNum > data.days.length) {
@@ -55,6 +64,7 @@ export async function saveAutopilotSettings(data: {
   await maintainAutopilotPipeline(session.user.id);
 
   revalidatePath("/calendar");
+
   return { success: true };
 }
 
@@ -86,6 +96,7 @@ export async function toggleAutopilot(enabled: boolean) {
   }
 
   revalidatePath("/calendar");
+
   return { success: true };
 }
 
@@ -104,14 +115,18 @@ export async function markPostPublished(postId: string) {
 
   await prisma.post.update({
     where: { id: postId },
-    data: { status: "PUBLISHED", publishedAt: new Date() },
+    data: {
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+    },
   });
 
-  // Refill the pipeline for autopilot posts
+  // ✅ Refill pipeline
   if (post.source === "autopilot" && post.scheduledFor) {
     await refillAfterPublish(post.userId, post.scheduledFor);
   }
 
   revalidatePath("/calendar");
+
   return { success: true };
 }

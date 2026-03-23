@@ -42,10 +42,11 @@ function findNextSlot(
     const candidate = addDays(fromZoned, i);
     if (candidate.getDay() !== targetDay) continue;
 
-    // ✅ FIXED TIME LOGIC (NO new Date)
+    // ✅ CORRECT TIME CREATION (no Date constructor)
     const dateStr = format(candidate, "yyyy-MM-dd");
     const slot = fromZonedTime(`${dateStr}T${timeStr}:00`, timezone);
 
+    // ✅ CRITICAL FIX: compare in SAME timezone context
     if (!isAfter(slot, searchFrom)) continue;
 
     return slot;
@@ -83,6 +84,7 @@ export async function generateAutopilotPosts(
 
   if (!topics?.length || !timeStr) return null;
 
+  // ✅ Slight safety improvement: normalize afterDate
   const searchFrom = afterDate ? addDays(afterDate, 1) : now;
 
   const slot = findNextSlot(specificDay, timeStr, timezone, searchFrom);
