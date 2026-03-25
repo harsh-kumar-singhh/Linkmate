@@ -26,6 +26,7 @@ import {
 } from "lucide-react"
 import { cn, formatTimeAMPM } from "@/lib/utils"
 import { format } from "date-fns"
+import { toZonedTime } from "date-fns-tz"
 import { AICoach } from "@/components/ai/AICoach"
 
 interface Post {
@@ -354,14 +355,22 @@ function PostCard({ post, index }: { post: Post, index: number }) {
                 {isScheduled && post.scheduledFor && (
                   <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-primary/5 text-primary text-[11px] font-bold border border-primary/10">
                     <Clock className="w-3 h-3" />
-                    {format(new Date(post.scheduledFor), "MMM d")} • {formatTimeAMPM(post.scheduledFor)}
+                    {(() => {
+                      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                      const zonedDate = toZonedTime(post.scheduledFor, userTimezone);
+                      return `${format(zonedDate, "MMM d")} • ${formatTimeAMPM(zonedDate)}`;
+                    })()}
                   </div>
                 )}
 
                 {isPublished && post.publishedAt && (
                   <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-500/5 text-emerald-600 text-[11px] font-bold border border-emerald-500/10">
                     <CheckCircle2 className="w-3 h-3" />
-                    Published {format(new Date(post.publishedAt), "MMM d")}
+                    Published {(() => {
+                      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                      const zonedDate = toZonedTime(post.publishedAt!, userTimezone);
+                      return format(zonedDate, "MMM d");
+                    })()}
                   </div>
                 )}
 

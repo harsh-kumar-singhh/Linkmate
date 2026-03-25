@@ -31,6 +31,8 @@ import { LinkedInPreview } from "@/components/posts/LinkedInPreview"
 import { AICoach } from "@/components/ai/AICoach"
 import { StyleSelector } from "@/components/posts/style-selector"
 import { useUser } from "@/context/UserContext"
+import { format } from "date-fns"
+import { toZonedTime } from "date-fns-tz"
 
 function EditorContent() {
     const { user, isPro, isLoading } = useUser()
@@ -98,9 +100,10 @@ function EditorContent() {
                     setImageData(data.imageData || null)
 
                     if (data.scheduledFor) {
-                        const date = new Date(data.scheduledFor);
-                        const localYMDHM = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-                        setScheduledFor(localYMDHM);
+                        const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                        const zonedDate = toZonedTime(data.scheduledFor, userTimezone);
+                        // Format specifically for datetime-local input (YYYY-MM-DDTHH:mm)
+                        setScheduledFor(format(zonedDate, "yyyy-MM-dd'T'HH:mm"));
                     }
                 }
             } catch (error) {
@@ -119,8 +122,9 @@ function EditorContent() {
             if (date < new Date()) {
                 date.setDate(date.getDate() + 1)
             }
-            const localYMDHM = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-            setScheduledFor(localYMDHM);
+            const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            const zonedDate = toZonedTime(date, userTimezone);
+            setScheduledFor(format(zonedDate, "yyyy-MM-dd'T'HH:mm"));
         }
     }, [postId, dateParam, user])
 

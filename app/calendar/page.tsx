@@ -19,6 +19,8 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn, formatTimeAMPM } from "@/lib/utils"
+import { format } from "date-fns"
+import { toZonedTime } from "date-fns-tz"
 import { UpgradeModal } from "@/components/calendar/UpgradeModal"
 import { AutopilotSetupWizard } from "@/components/calendar/AutopilotSetupWizard"
 import { toggleAutopilot } from "@/lib/actions/autopilot"
@@ -195,7 +197,10 @@ export default function CalendarPage() {
                                             const [h, m] = user.autopilotTime.split(':').map(Number);
                                             const d = new Date();
                                             d.setUTCHours(h, m, 0, 0);
-                                            return formatTimeAMPM(d);
+                                            // Ensure conversion to user's timezone via toZonedTime
+                                            const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                                            const zonedDate = toZonedTime(d, userTimezone);
+                                            return formatTimeAMPM(zonedDate);
                                         })()}
                                     </p>
                                     <div className="flex flex-wrap gap-1.5">
