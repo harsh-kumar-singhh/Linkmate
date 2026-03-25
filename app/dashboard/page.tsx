@@ -24,7 +24,7 @@ import {
   Zap,
   Sparkles
 } from "lucide-react"
-import { cn, formatTimeAMPM } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { toZonedTime } from "date-fns-tz"
 import { AICoach } from "@/components/ai/AICoach"
@@ -358,7 +358,11 @@ function PostCard({ post, index }: { post: Post, index: number }) {
                     {(() => {
                       const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                       const zonedDate = toZonedTime(post.scheduledFor, userTimezone);
-                      return `${format(zonedDate, "MMM d")} • ${formatTimeAMPM(zonedDate)}`;
+                      console.log('[UI DEBUG] Raw UTC:', post.scheduledFor);
+                      console.log('[UI DEBUG] Timezone:', userTimezone);
+                      console.log('[UI DEBUG] Zoned:', zonedDate);
+                      console.log('[UI DEBUG] Formatted:', format(zonedDate, 'hh:mm a'));
+                      return `${format(zonedDate, "MMM d")} • ${format(zonedDate, "hh:mm a")}`;
                     })()}
                   </div>
                 )}
@@ -369,6 +373,7 @@ function PostCard({ post, index }: { post: Post, index: number }) {
                     Published {(() => {
                       const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                       const zonedDate = toZonedTime(post.publishedAt!, userTimezone);
+                      // console.log('[UI DEBUG] Raw Published (UTC):', post.publishedAt);
                       return format(zonedDate, "MMM d");
                     })()}
                   </div>

@@ -102,8 +102,15 @@ function EditorContent() {
                     if (data.scheduledFor) {
                         const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                         const zonedDate = toZonedTime(data.scheduledFor, userTimezone);
+                        
+                        console.log('[UI DEBUG] Post Editor Load - Raw UTC:', data.scheduledFor);
+                        console.log('[UI DEBUG] Post Editor Load - Timezone:', userTimezone);
+                        console.log('[UI DEBUG] Post Editor Load - Zoned Date:', zonedDate);
+                        
                         // Format specifically for datetime-local input (YYYY-MM-DDTHH:mm)
-                        setScheduledFor(format(zonedDate, "yyyy-MM-dd'T'HH:mm"));
+                        const formatted = format(zonedDate, "yyyy-MM-dd'T'HH:mm");
+                        console.log('[UI DEBUG] Post Editor Load - Formatted:', formatted);
+                        setScheduledFor(formatted);
                     }
                 }
             } catch (error) {
@@ -124,7 +131,13 @@ function EditorContent() {
             }
             const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             const zonedDate = toZonedTime(date, userTimezone);
-            setScheduledFor(format(zonedDate, "yyyy-MM-dd'T'HH:mm"));
+            
+            console.log('[UI DEBUG] Post Editor Param - Raw Date:', date);
+            console.log('[UI DEBUG] Post Editor Param - Zoned Date:', zonedDate);
+            
+            const formatted = format(zonedDate, "yyyy-MM-dd'T'HH:mm");
+            console.log('[UI DEBUG] Post Editor Param - Formatted:', formatted);
+            setScheduledFor(formatted);
         }
     }, [postId, dateParam, user])
 

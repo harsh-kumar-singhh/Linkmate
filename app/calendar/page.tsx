@@ -18,7 +18,7 @@ import {
     Sparkles
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { cn, formatTimeAMPM } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { toZonedTime } from "date-fns-tz"
 import { UpgradeModal } from "@/components/calendar/UpgradeModal"
@@ -150,7 +150,7 @@ export default function CalendarPage() {
                             <ChevronLeft className="w-4 h-4" />
                         </Button>
                         <span className="text-sm md:text-base font-bold tracking-tight text-foreground w-32 md:w-36 text-center">
-                            {viewDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                            {format(viewDate, 'MMMM yyyy')}
                         </span>
                         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-secondary" onClick={nextMonth}>
                             <ChevronRight className="w-4 h-4" />
@@ -197,10 +197,16 @@ export default function CalendarPage() {
                                             const [h, m] = user.autopilotTime.split(':').map(Number);
                                             const d = new Date();
                                             d.setUTCHours(h, m, 0, 0);
-                                            // Ensure conversion to user's timezone via toZonedTime
+                                            
                                             const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                                             const zonedDate = toZonedTime(d, userTimezone);
-                                            return formatTimeAMPM(zonedDate);
+
+                                            console.log('[UI DEBUG] Autopilot Raw Time:', user.autopilotTime);
+                                            console.log('[UI DEBUG] Autopilot Timezone:', userTimezone);
+                                            console.log('[UI DEBUG] Autopilot Zoned Date:', zonedDate);
+                                            console.log('[UI DEBUG] Autopilot Formatted:', format(zonedDate, 'hh:mm a'));
+
+                                            return format(zonedDate, 'hh:mm a');
                                         })()}
                                     </p>
                                     <div className="flex flex-wrap gap-1.5">
