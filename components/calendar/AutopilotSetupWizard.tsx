@@ -44,18 +44,8 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
     const [frequency, setFrequency] = useState(initialData?.frequency || "3");
     const [days, setDays] = useState<string[]>(initialData?.days || []);
     
-    // Convert initial UTC time to Local Time for the input
-    const [time, setTime] = useState(() => {
-        if (!initialData?.time) return "10:00";
-        try {
-            const [hours, minutes] = initialData.time.split(":").map(Number);
-            const d = new Date();
-            d.setUTCHours(hours, minutes, 0, 0);
-            return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-        } catch {
-            return "10:00";
-        }
-    });
+    // autopilotTime is already local HH:mm
+    const [time, setTime] = useState(initialData?.time || "10:00");
 
     const [aboutYou, setAboutYou] = useState(initialData?.aboutYou || "");
     const [currentFocus, setCurrentFocus] = useState(initialData?.currentFocus || "");
@@ -91,14 +81,7 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
             }
             
             if (initialData.time) {
-                try {
-                    const [hours, minutes] = initialData.time.split(":").map(Number);
-                    const d = new Date();
-                    d.setUTCHours(hours, minutes, 0, 0);
-                    setTime(`${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`);
-                } catch (e) {
-                    console.error("[Autopilot] Failed to parse initial time:", initialData.time);
-                }
+                setTime(initialData.time);
             }
         }
     }, [isOpen, initialData]);
@@ -136,11 +119,8 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
     const handleActivate = async () => {
         setIsSaving(true);
         try {
-            // Convert selected Local Time to UTC string
-            const [hours, minutes] = time.split(":").map(Number);
-            const d = new Date();
-            d.setHours(hours, minutes, 0, 0);
-            const utcTime = `${d.getUTCHours().toString().padStart(2, '0')}:${d.getUTCMinutes().toString().padStart(2, '0')}`;
+            // autopilotTime is saved as a local HH:mm string. 
+            // The backend handles conversion for scheduling.
 
             const payload = {
                 topics,

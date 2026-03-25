@@ -194,19 +194,13 @@ export default function CalendarPage() {
                                     <p className="text-sm text-muted-foreground">
                                         {user.autopilotFrequency} posts/week • {user.autopilotDays.length} days active • Posting at {(() => {
                                             if (!user.autopilotTime) return "10:00 AM";
-                                            const [h, m] = user.autopilotTime.split(':').map(Number);
-                                            const d = new Date();
-                                            d.setUTCHours(h, m, 0, 0);
+                                            const localDate = new Date(`1970-01-01T${user.autopilotTime}:00`);
                                             
-                                            const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                                            const zonedDate = toZonedTime(d, userTimezone);
+                                            console.log('[UI DEBUG FINAL] Raw Time:', user.autopilotTime);
+                                            console.log('[UI DEBUG FINAL] Local Date:', localDate);
+                                            console.log('[UI DEBUG FINAL] Formatted:', format(localDate, 'hh:mm a'));
 
-                                            console.log('[UI DEBUG] Autopilot Raw Time:', user.autopilotTime);
-                                            console.log('[UI DEBUG] Autopilot Timezone:', userTimezone);
-                                            console.log('[UI DEBUG] Autopilot Zoned Date:', zonedDate);
-                                            console.log('[UI DEBUG] Autopilot Formatted:', format(zonedDate, 'hh:mm a'));
-
-                                            return format(zonedDate, 'hh:mm a');
+                                            return format(localDate, 'hh:mm a');
                                         })()}
                                     </p>
                                     <div className="flex flex-wrap gap-1.5">
