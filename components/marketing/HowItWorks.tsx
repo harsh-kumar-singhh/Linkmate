@@ -55,24 +55,8 @@ export function HowItWorks() {
             </Flex>
           </SmoothTransition>
 
-          {/* Right Column: 3D Scene */}
-          <SmoothTransition delay={0.3} direction="up" distance={60}>
-            <TiltReveal depth={20} className="relative">
-              <div className="relative w-full h-[400px] md:h-[500px] rounded-2xl bg-white/80 dark:bg-zinc-900/40 backdrop-blur-xl shadow-2xl border border-white/20 overflow-hidden ring-1 ring-black/5">
-                <SplineScene 
-                  scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
-                  className="w-full h-full"
-                />
-                
-                {/* Subtle Overlay to ensure branding consistency */}
-                <div className="absolute inset-0 pointer-events-none bg-gradient-to-tr from-primary/5 to-transparent opacity-30" />
-              </div>
-              
-              {/* Decorative elements */}
-              <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-primary/10 rounded-full blur-2xl -z-10" />
-              <div className="absolute -top-6 -left-6 w-32 h-32 bg-secondary/10 rounded-full blur-3xl -z-10" />
-            </TiltReveal>
-          </SmoothTransition>
+          {/* Right Column: Empty (allowing background 3D to show through) */}
+          <div className="hidden md:block h-[400px] md:h-[500px]" />
         </Grid>
       </Container>
     </Section>

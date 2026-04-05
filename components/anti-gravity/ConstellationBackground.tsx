@@ -3,7 +3,7 @@ import { FloatingShape } from "./FloatingShape"
 
 export function ConstellationBackground() {
   return (
-    <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+    <div className="fixed inset-0 pointer-events-none overflow-hidden z-[1]">
       {/* 1. Sphere (Very Large) - Top Right */}
       <FloatingShape
         type="sphere"

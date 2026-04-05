@@ -18,10 +18,12 @@ import { DepthContainer, DepthLayer } from "@/components/anti-gravity/DepthConta
 import { FloatingCard } from "@/components/anti-gravity/FloatingCard"
 import { ConstellationBackground } from "@/components/anti-gravity/ConstellationBackground"
 import { HowItWorks } from "@/components/marketing/HowItWorks"
+import { SplineBackground } from "@/components/marketing/SplineBackground"
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-site-bg selection:bg-primary/10 transition-colors duration-500 overflow-x-hidden">
+    <main className="min-h-screen bg-site-bg selection:bg-primary/10 transition-colors duration-500 overflow-x-hidden relative z-10">
+      <SplineBackground />
       <ConstellationBackground />
       
       {/* 1. Hero Section */}
