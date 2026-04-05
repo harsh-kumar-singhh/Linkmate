@@ -16,10 +16,12 @@ import { ParallaxLayer } from "@/components/anti-gravity/ParallaxLayer"
 import { TiltReveal } from "@/components/anti-gravity/TiltReveal"
 import { DepthContainer, DepthLayer } from "@/components/anti-gravity/DepthContainer"
 import { FloatingCard } from "@/components/anti-gravity/FloatingCard"
+import { ConstellationBackground } from "@/components/anti-gravity/ConstellationBackground"
 
 export default function Home() {
   return (
     <main className="min-h-screen bg-site-bg selection:bg-primary/10 transition-colors duration-500 overflow-x-hidden">
+      <ConstellationBackground />
       
       {/* 1. Hero Section */}
       <Section padding="xl" className="pt-32 md:pt-48 pb-32 relative">
