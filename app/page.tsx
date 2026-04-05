@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowRight, CheckCircle2, Clock, Sparkles } from "lucide-react"
+import { ArrowRight, Bot, Calendar, Sparkles, Send, MoveRight, PenTool, BarChart3, Activity } from "lucide-react"
 
 // Stitch Components
 import { Section } from "@/components/stitch/Section"
@@ -15,196 +15,246 @@ import { SmoothTransition } from "@/components/anti-gravity/SmoothTransition"
 import { ParallaxLayer } from "@/components/anti-gravity/ParallaxLayer"
 import { TiltReveal } from "@/components/anti-gravity/TiltReveal"
 import { DepthContainer, DepthLayer } from "@/components/anti-gravity/DepthContainer"
+import { FloatingCard } from "@/components/anti-gravity/FloatingCard"
 
 export default function Home() {
   return (
     <main className="min-h-screen bg-site-bg selection:bg-primary/10 transition-colors duration-500 overflow-x-hidden">
       
-      {/* Hero Section */}
-      <Section padding="xl" className="pt-32 md:pt-48 pb-20 md:pb-32 relative">
-        <DepthContainer className="w-full h-full">
-          <DepthLayer z={-100} className="opacity-40">
-             <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[100px]" />
+      {/* 1. Hero Section */}
+      <Section padding="xl" className="pt-32 md:pt-48 pb-32 relative">
+        <DepthContainer className="w-full h-full min-h-[70vh]">
+          <DepthLayer z={-150} className="opacity-30">
+             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/20 rounded-full blur-[150px]" />
+             <div className="absolute top-1/3 left-1/3 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-secondary/20 rounded-full blur-[120px]" />
           </DepthLayer>
           
           <Container className="relative z-10 w-full h-full">
-            <SmoothTransition direction="up" distance={40}>
-              <CtaBlock
-                title={
-                  <Flex direction="col" gap="md">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/5 border border-primary/10 text-primary text-xs font-semibold tracking-wider uppercase">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      Founder Built • No Hype
-                    </div>
-                    <Heading level={1}>
-                      Calm <br />
-                      <span className="text-primary italic">Consistency.</span>
-                    </Heading>
-                  </Flex>
-                }
-                description={
-                  <Text variant="lead">
-                    The professional scheduler for people who value focus over noise. Show up on LinkedIn every day, without being on LinkedIn every day.
-                  </Text>
-                }
-                actions={
-                  <SmoothTransition delay={0.2} distance={20} className="flex justify-center w-full">
-                    <TiltReveal>
-                      <Link href="/signup">
-                        <Button size="lg" className="h-16 px-10 text-lg rounded-full shadow-premium hover:shadow-premium-dark transition-all duration-300">
-                          Start for free <ArrowRight className="ml-2 w-5 h-5" />
-                        </Button>
-                      </Link>
+            <Grid cols={2} gap="xl" className="items-center">
+              <SmoothTransition direction="up" distance={40} className="w-full">
+                <CtaBlock
+                  align="left"
+                  title={
+                    <Flex direction="col" align="start" gap="md">
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/5 border border-border text-primary text-xs font-semibold tracking-wider uppercase">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        LinkMate Autopilot
+                      </div>
+                      <Heading level={1} className="leading-[0.85]">
+                        Your <br/> LinkedIn <br/>
+                        <span className="text-primary italic">runs itself.</span>
+                      </Heading>
+                    </Flex>
+                  }
+                  description={
+                    <Text variant="lead" className="max-w-md mt-4">
+                      The calmest way to build your personal monopoly. Set the trajectory, we handle the daily execution.
+                    </Text>
+                  }
+                  actions={
+                    <SmoothTransition delay={0.2} distance={20} className="w-full mt-4 flex items-center justify-start">
+                      <TiltReveal>
+                        <Link href="/signup">
+                          <Button size="lg" className="h-16 px-10 text-lg rounded-full shadow-premium hover:shadow-premium-dark transition-all duration-300">
+                            Start autopilot <ArrowRight className="ml-2 w-5 h-5" />
+                          </Button>
+                        </Link>
+                      </TiltReveal>
+                    </SmoothTransition>
+                  }
+                />
+              </SmoothTransition>
+
+              {/* 3D Floating Cards representing posts */}
+              <div className="relative hidden md:block h-[500px] w-full perspective-[1000px]">
+                <SmoothTransition delay={0.3} className="absolute inset-0">
+                  {/* Card 1: Idea */}
+                  <ParallaxLayer offset={30} className="absolute top-10 left-10 z-10">
+                    <TiltReveal depth={15} scale={1.05}>
+                      <FloatingCard yOffset={10} duration={5} className="w-64 p-6 bg-site-bg/80 dark:bg-black/60 rounded-2xl shadow-premium border border-white/5">
+                         <div className="flex items-center gap-3 mb-3">
+                           <div className="p-2 bg-primary/10 rounded-lg"><Sparkles className="w-4 h-4 text-primary" /></div>
+                           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Generated</span>
+                         </div>
+                         <div className="space-y-2">
+                           <div className="h-2 bg-secondary rounded-full w-full opacity-50"></div>
+                           <div className="h-2 bg-secondary rounded-full w-5/6 opacity-50"></div>
+                           <div className="h-2 bg-secondary rounded-full w-4/6 opacity-50"></div>
+                         </div>
+                      </FloatingCard>
                     </TiltReveal>
-                  </SmoothTransition>
-                }
-              />
-            </SmoothTransition>
+                  </ParallaxLayer>
+
+                  {/* Card 2: Schedule */}
+                  <ParallaxLayer offset={-20} className="absolute top-48 right-0 z-20">
+                    <TiltReveal depth={20} scale={1.05}>
+                      <FloatingCard delay={1.5} yOffset={15} duration={6} className="w-72 p-6 bg-site-bg/90 dark:bg-black/80 rounded-2xl shadow-premium border border-white/10 backdrop-blur-2xl">
+                         <div className="flex items-center justify-between gap-3 mb-4">
+                           <div className="flex items-center gap-2">
+                             <div className="p-2 bg-blue-500/10 rounded-lg"><Calendar className="w-4 h-4 text-blue-500" /></div>
+                             <span className="text-xs font-semibold uppercase tracking-wider">Scheduled</span>
+                           </div>
+                           <span className="text-xs text-muted-foreground font-mono">Tomorrow 9:00 AM</span>
+                         </div>
+                         <div className="space-y-2">
+                           <div className="h-3 bg-primary/20 rounded-full w-full"></div>
+                           <div className="h-3 bg-primary/20 rounded-full w-3/4"></div>
+                         </div>
+                      </FloatingCard>
+                    </TiltReveal>
+                  </ParallaxLayer>
+
+                  {/* Card 3: Publish */}
+                  <ParallaxLayer offset={15} className="absolute bottom-10 left-20 z-0 opacity-60 blur-[1px]">
+                    <TiltReveal depth={10}>
+                      <FloatingCard delay={0.8} yOffset={8} duration={4.5} className="w-56 p-5 bg-site-bg/40 dark:bg-black/40 rounded-2xl border border-white/5">
+                         <div className="flex items-center gap-3 mb-3">
+                           <div className="p-1.5 bg-green-500/10 rounded-lg"><Send className="w-3 h-3 text-green-500" /></div>
+                           <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Live</span>
+                         </div>
+                         <div className="h-8 bg-secondary/50 rounded-lg w-full"></div>
+                      </FloatingCard>
+                    </TiltReveal>
+                  </ParallaxLayer>
+
+                </SmoothTransition>
+              </div>
+            </Grid>
           </Container>
         </DepthContainer>
       </Section>
 
-      {/* Value Prop Section */}
-      <Section variant="subtle" padding="lg">
-        <Container>
-          <Grid cols={3} gap="lg">
-            <SmoothTransition delay={0.1}>
-              <Flex direction="col" align="start" gap="sm">
-                <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-2">
-                  <Clock className="w-6 h-6" />
-                </div>
-                <Heading level={4}>Time Recovery</Heading>
-                <Text variant="muted">
-                  LinkedIn shouldn&apos;t be a daily chore. Batch your thoughts once, let us handle the delivery.
-                </Text>
-              </Flex>
-            </SmoothTransition>
-
-            <SmoothTransition delay={0.2}>
-              <Flex direction="col" align="start" gap="sm">
-                <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-2">
-                  <CheckCircle2 className="w-6 h-6" />
-                </div>
-                <Heading level={4}>Pure Reliability</Heading>
-                <Text variant="muted">
-                  No complex workflows. Just a clean calendar and a dependable publishing engine that never misses.
-                </Text>
-              </Flex>
-            </SmoothTransition>
-
-            <SmoothTransition delay={0.3}>
-              <Flex direction="col" align="start" gap="sm">
-                <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-2">
-                  <Sparkles className="w-6 h-6" />
-                </div>
-                <Heading level={4}>Pure Intelligence</Heading>
-                <Text variant="muted">
-                  AI that learns your signature, not one that shouts over it. Refine your thoughts with a partner that understands professional nuance.
-                </Text>
-              </Flex>
-            </SmoothTransition>
-          </Grid>
-        </Container>
-      </Section>
-
-      {/* How it Works */}
-      <Section padding="xl">
-        <Container size="sm">
-          <SmoothTransition className="text-center mb-24">
-            <Heading level={2} className="mb-4">How it works.</Heading>
-            <Text variant="muted">Three steps to professional consistency.</Text>
-          </SmoothTransition>
-
-          <Flex direction="col" gap="xl">
-            {[
-              { step: "01", title: "Connect", desc: "Link your LinkedIn account securely via OAuth in seconds." },
-              { step: "02", title: "Create", desc: "Write your posts or use AI to draft content that sounds like you." },
-              { step: "03", title: "Schedule", desc: "Drop posts into your calendar and focus on your actual work." }
-            ].map((item, i) => (
-              <SmoothTransition key={i} direction="up" delay={i * 0.1} className="w-full">
-                <ParallaxLayer offset={20 + (i * 10)} className="w-full">
-                  <Flex direction="col" align="start" gap="lg" className="md:flex-row md:items-center w-full">
-                    <div className="text-6xl md:text-8xl font-bold text-primary/10 tabular-nums shrink-0">
-                      {item.step}
-                    </div>
-                    <Flex direction="col" align="start" gap="sm">
-                      <Heading level={3}>{item.title}</Heading>
-                      <Text variant="muted" className="text-xl max-w-sm">
-                        {item.desc}
-                      </Text>
-                    </Flex>
-                  </Flex>
-                </ParallaxLayer>
-              </SmoothTransition>
-            ))}
-          </Flex>
-        </Container>
-      </Section>
-
-      {/* Why built different */}
+      {/* 2. Problem Section */}
       <Section variant="dark" padding="xl">
         <ParallaxLayer offset={-30}>
-          <Container size="sm" className="text-center space-y-12">
+          <Container size="sm" className="text-center">
             <SmoothTransition>
-              <Heading level={2} className="uppercase opacity-90 mx-auto max-w-2xl text-balance">
-                Built for focus, not for engagement hacks.
+              <Heading level={2} className="mx-auto text-balance leading-tight tracking-tighter opacity-90 max-w-2xl font-light italic">
+                “Consistency is a trap if you have to log in every single day.”
               </Heading>
             </SmoothTransition>
-            <SmoothTransition delay={0.2}>
-              <Text variant="lead" className="opacity-70 mx-auto text-balance">
-                 We don&apos;t use hype. We don&apos;t use gamification. We build tools for founders and builders who have better things to do than refresh their feed.
+            <SmoothTransition delay={0.2} className="mt-12">
+              <Text variant="lead" className="mx-auto text-balance opacity-60">
+                You have real work to do. Let the system handle the distribution.
               </Text>
             </SmoothTransition>
           </Container>
         </ParallaxLayer>
       </Section>
 
-      {/* Who it's for */}
-      <Section padding="xl">
-        <Container size="sm" className="text-center space-y-16">
-          <SmoothTransition>
-            <Heading level={3} className="italic font-bold">Perfect for...</Heading>
-          </SmoothTransition>
-          <SmoothTransition delay={0.2}>
-            <Flex className="flex-wrap justify-center w-full" gap="sm">
-              {["Solofounders", "Technical Architects", "Quiet Builders", "Executive Leaders", "Digital Gardeners"].map((tag, i) => (
-                <ParallaxLayer key={i} offset={Math.random() * 20 - 10} className="inline-block">
-                  <span className="px-6 py-3 rounded-full border border-border text-lg font-medium hover:bg-secondary/50 transition-colors cursor-default inline-block">
-                    {tag}
-                  </span>
-                </ParallaxLayer>
-              ))}
-            </Flex>
-          </SmoothTransition>
+      {/* 3. System Section (Pipeline) */}
+      <Section padding="xl" className="relative">
+        <DepthContainer className="w-full">
+          <Container size="lg">
+            <SmoothTransition className="text-center mb-24">
+              <Heading level={3} className="text-primary mb-2">The Autopilot Pipeline</Heading>
+              <Heading level={2}>Idea to impact. Zero friction.</Heading>
+            </SmoothTransition>
+
+            <div className="relative">
+              {/* Connecting Line */}
+              <div className="absolute top-1/2 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-border to-transparent -translate-y-1/2 hidden lg:block" />
+
+              <Grid cols={4} gap="sm" className="relative z-10">
+                {[
+                  { icon: PenTool, title: "1. Brainstorm", desc: "Drop messy ideas into your vault." },
+                  { icon: Bot, title: "2. Polish", desc: "AI structures it into your voice." },
+                  { icon: Calendar, title: "3. Schedule", desc: "Auto-slots into your best times." },
+                  { icon: Send, title: "4. Publish", desc: "Goes live while you sleep." }
+                ].map((node, i) => (
+                  <ParallaxLayer key={i} offset={Math.random() * 40 - 20} className="w-full">
+                    <SmoothTransition delay={i * 0.15} direction="up" className="h-full">
+                      <TiltReveal scale={1.02} depth={12} className="h-full">
+                        <div className="h-full flex flex-col items-center text-center p-8 bg-site-bg border border-border shadow-premium rounded-2xl hover:bg-secondary/10 transition-colors">
+                          <div className="w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mb-6 text-primary">
+                            <node.icon className="w-7 h-7" />
+                          </div>
+                          <Heading level={5} className="mb-3">{node.title}</Heading>
+                          <Text variant="small" className="opacity-80 leading-relaxed text-balance">{node.desc}</Text>
+                        </div>
+                      </TiltReveal>
+                    </SmoothTransition>
+                  </ParallaxLayer>
+                ))}
+              </Grid>
+            </div>
+          </Container>
+        </DepthContainer>
+      </Section>
+
+      {/* 4. Proof / Trust Section */}
+      <Section variant="subtle" padding="xl" className="relative overflow-hidden">
+        <div className="absolute right-0 top-0 w-1/2 h-full bg-gradient-to-l from-primary/5 to-transparent pointer-events-none" />
+        <Container size="lg">
+          <Grid cols={2} gap="xl" className="items-center">
+            <SmoothTransition>
+              <Flex direction="col" align="start" gap="lg" className="max-w-md">
+                <Heading level={2}>Built for founders who value depth.</Heading>
+                <Text variant="lead" className="opacity-80">
+                  Stop playing the engagement game. Start building a compounding asset of your best thoughts.
+                </Text>
+                <Grid cols={2} gap="sm" className="mt-4 w-full">
+                  <div className="p-4 bg-site-bg rounded-xl border border-border">
+                    <Activity className="w-5 h-5 text-green-500 mb-2" />
+                    <div className="text-2xl font-bold">100%</div>
+                    <Text variant="small">Uptime delivery</Text>
+                  </div>
+                  <div className="p-4 bg-site-bg rounded-xl border border-border">
+                    <BarChart3 className="w-5 h-5 text-blue-500 mb-2" />
+                    <div className="text-2xl font-bold">0 hrs</div>
+                    <Text variant="small">Wasted on scrolling</Text>
+                  </div>
+                </Grid>
+              </Flex>
+            </SmoothTransition>
+
+            <ParallaxLayer offset={-30} className="relative h-[400px]">
+               <DepthContainer className="w-full h-full">
+                 <DepthLayer z={-50}>
+                   <div className="absolute inset-0 bg-primary/5 rounded-[3rem] rotate-3 blur-sm" />
+                 </DepthLayer>
+                 <DepthLayer z={0}>
+                    <div className="absolute inset-0 bg-site-bg/40 backdrop-blur-3xl rounded-3xl border border-white/10 shadow-premium-dark p-8 flex flex-col justify-center gap-6">
+                       <TitlePlaceholder title="CEO, Tech Startup" />
+                       <TitlePlaceholder title="Lead Architect" />
+                       <TitlePlaceholder title="Indie Maker" width="w-2/3" />
+                       <TitlePlaceholder title="Growth Advisor" width="w-3/4" />
+                    </div>
+                 </DepthLayer>
+               </DepthContainer>
+            </ParallaxLayer>
+          </Grid>
         </Container>
       </Section>
 
-      {/* Final CTA */}
+      {/* 5. Final CTA */}
       <Section padding="xl" className="relative">
         <DepthContainer className="w-full h-full">
           <DepthLayer z={-50} className="pointer-events-none opacity-50">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/5 rounded-full blur-[120px]"></div>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/10 rounded-full blur-[150px]"></div>
           </DepthLayer>
 
           <Container size="sm" className="relative z-10 w-full h-full">
             <SmoothTransition>
               <CtaBlock
-                title={<Heading level={2}>Ready to build your presence, calmly?</Heading>}
-                description={<Text variant="small">No credit card required. Connect in 2 minutes.</Text>}
+                title={<Heading level={2} className="text-5xl">Reclaim your calendar.</Heading>}
+                description={<Text variant="lead">Join builders who automate their authority. No credit card required.</Text>}
                 actions={
                   <>
-                    <TiltReveal>
+                    <TiltReveal scale={1.05} depth={10}>
                       <Link href="/signup">
-                        <Button size="lg" className="h-16 px-12 text-lg rounded-full w-full">
-                          Get started free
+                        <Button size="lg" className="h-16 px-12 text-lg rounded-full w-full shadow-premium hover:shadow-premium-dark transition-all">
+                          Start Engine
                         </Button>
                       </Link>
                     </TiltReveal>
-                    <Link href="/login">
-                      <Button size="lg" variant="ghost" className="h-16 px-12 text-lg rounded-full font-medium">
-                        Sign in
-                      </Button>
-                    </Link>
+                    <TiltReveal>
+                      <Link href="/login">
+                        <Button size="lg" variant="ghost" className="h-16 px-12 text-lg rounded-full font-medium border border-border bg-secondary/20 hover:bg-secondary/40">
+                          Sign in
+                        </Button>
+                      </Link>
+                    </TiltReveal>
                   </>
                 }
               />
@@ -213,13 +263,28 @@ export default function Home() {
         </DepthContainer>
       </Section>
 
-      <footer className="py-12 px-6 border-t border-border">
+      <footer className="py-12 px-6 border-t border-border bg-site-bg">
         <Container className="flex flex-col md:flex-row justify-between items-center gap-8 text-center md:text-left">
-          <div className="font-bold text-xl tracking-tight uppercase">Linkmate</div>
+          <div className="font-bold text-xl tracking-tight uppercase flex items-center gap-2 justify-center md:justify-start">
+            <div className="w-2 h-2 rounded-full bg-primary" />
+            Linkmate
+          </div>
           <Text variant="small">© 2026 Built for builders.</Text>
         </Container>
       </footer>
     </main>
+  )
+}
+
+function TitlePlaceholder({ title, width = "w-full" }: { title: string, width?: string }) {
+  return (
+    <div className={`flex items-center gap-4 p-4 rounded-xl border border-white/5 bg-secondary/5 ${width}`}>
+      <div className="w-10 h-10 rounded-full bg-primary/10 flex-shrink-0" />
+      <div className="flex-1 space-y-2">
+        <div className="h-2 bg-site-fg/20 rounded-full w-1/3" />
+        <div className="text-xs font-semibold tracking-wider uppercase opacity-60">{title}</div>
+      </div>
+    </div>
   )
 }
 
