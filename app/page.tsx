@@ -22,7 +22,7 @@ import { SplineBackground } from "@/components/marketing/SplineBackground"
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-site-bg selection:bg-primary/10 transition-colors duration-500 overflow-x-hidden relative z-10">
+    <main className="dark min-h-screen bg-site-bg selection:bg-primary/10 transition-colors duration-500 overflow-x-hidden relative z-10">
       <SplineBackground />
       <ConstellationBackground />
       
