@@ -17,6 +17,7 @@ import { TiltReveal } from "@/components/anti-gravity/TiltReveal"
 import { DepthContainer, DepthLayer } from "@/components/anti-gravity/DepthContainer"
 import { FloatingCard } from "@/components/anti-gravity/FloatingCard"
 import { ConstellationBackground } from "@/components/anti-gravity/ConstellationBackground"
+import { HowItWorks } from "@/components/marketing/HowItWorks"
 
 export default function Home() {
   return (
@@ -126,6 +127,7 @@ export default function Home() {
         </DepthContainer>
       </Section>
 
+
       {/* 2. Problem Section */}
       <Section variant="dark" padding="xl">
         <ParallaxLayer offset={-30}>
@@ -144,45 +146,8 @@ export default function Home() {
         </ParallaxLayer>
       </Section>
 
-      {/* 3. System Section (Pipeline) */}
-      <Section padding="xl" className="relative">
-        <DepthContainer className="w-full">
-          <Container size="lg">
-            <SmoothTransition className="text-center mb-24">
-              <Heading level={3} className="text-primary mb-2">The Autopilot Pipeline</Heading>
-              <Heading level={2}>Idea to impact. Zero friction.</Heading>
-            </SmoothTransition>
-
-            <div className="relative">
-              {/* Connecting Line */}
-              <div className="absolute top-1/2 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-border to-transparent -translate-y-1/2 hidden lg:block" />
-
-              <Grid cols={4} gap="sm" className="relative z-10">
-                {[
-                  { icon: PenTool, title: "1. Brainstorm", desc: "Drop messy ideas into your vault." },
-                  { icon: Bot, title: "2. Polish", desc: "AI structures it into your voice." },
-                  { icon: Calendar, title: "3. Schedule", desc: "Auto-slots into your best times." },
-                  { icon: Send, title: "4. Publish", desc: "Goes live while you sleep." }
-                ].map((node, i) => (
-                  <ParallaxLayer key={i} offset={Math.random() * 40 - 20} className="w-full">
-                    <SmoothTransition delay={i * 0.15} direction="up" className="h-full">
-                      <TiltReveal scale={1.02} depth={12} className="h-full">
-                        <div className="h-full flex flex-col items-center text-center p-8 bg-site-bg border border-border shadow-premium rounded-2xl hover:bg-secondary/10 transition-colors">
-                          <div className="w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mb-6 text-primary">
-                            <node.icon className="w-7 h-7" />
-                          </div>
-                          <Heading level={5} className="mb-3">{node.title}</Heading>
-                          <Text variant="small" className="opacity-80 leading-relaxed text-balance">{node.desc}</Text>
-                        </div>
-                      </TiltReveal>
-                    </SmoothTransition>
-                  </ParallaxLayer>
-                ))}
-              </Grid>
-            </div>
-          </Container>
-        </DepthContainer>
-      </Section>
+      {/* 3. System Section (How It Works) */}
+      <HowItWorks />
 
       {/* 4. Proof / Trust Section */}
       <Section variant="subtle" padding="xl" className="relative overflow-hidden">
