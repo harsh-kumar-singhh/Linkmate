@@ -18,6 +18,65 @@ const DAY_MAP: Record<string, number> = {
   THURSDAY: 4, FRIDAY: 5, SATURDAY: 6,
 };
 
+const WEEK_ORDER: Record<string, number> = {
+  MONDAY: 0, TUESDAY: 1, WEDNESDAY: 2, THURSDAY: 3, FRIDAY: 4, SATURDAY: 5, SUNDAY: 6
+};
+
+type PlanItem = { source: "WEEKLY_FOCUS" | "CONTEXT" | "TOPIC", value?: string, variation?: boolean, angle?: string };
+const ANGLES = ["story", "lesson", "contrarian", "mistake", "insight"];
+
+export function createContentPlan(
+  weeklyFocus: string | undefined,
+  additionalContexts: string[],
+  topics: string[],
+  slots: number
+): PlanItem[] {
+  const plan: PlanItem[] = [];
+  
+  if (weeklyFocus) {
+    plan.push({ source: "WEEKLY_FOCUS", value: weeklyFocus, variation: false });
+  }
+
+  for (const ctx of additionalContexts) {
+    if (plan.length >= slots) break;
+    plan.push({ source: "CONTEXT", value: ctx, variation: false });
+  }
+
+  let topicIndex = 0;
+  while (plan.length < slots && topicIndex < topics.length) {
+    plan.push({ source: "TOPIC", value: topics[topicIndex], variation: false });
+    topicIndex++;
+  }
+
+  const availableAngles = [...ANGLES].sort(() => 0.5 - Math.random());
+  let angleIndex = 0;
+
+  while (plan.length < slots) {
+    if (weeklyFocus) {
+      plan.push({
+        source: "WEEKLY_FOCUS",
+        value: weeklyFocus,
+        variation: true,
+        angle: availableAngles[angleIndex % availableAngles.length]
+      });
+      angleIndex++;
+    } else if (topics.length > 0) {
+      plan.push({
+        source: "TOPIC",
+        value: topics[topicIndex % topics.length],
+        variation: true,
+        angle: availableAngles[angleIndex % availableAngles.length]
+      });
+      angleIndex++;
+      topicIndex++;
+    } else {
+       plan.push({ source: "TOPIC", value: "Networking & Growth", variation: false });
+    }
+  }
+
+  return plan.slice(0, slots);
+}
+
 function calculateSimilarity(str1: string, str2: string): number {
   const clean = (s: string) => s.toLowerCase().replace(/[^\w\s]/g, "");
   const words1 = new Set(clean(str1).split(/\s+/).slice(0, 40));
@@ -99,12 +158,43 @@ export async function generateAutopilotPosts(
   });
   if (existing) return null;
 
-  const context = [
-    user.autopilotCurrentFocus && `FOCUS: ${user.autopilotCurrentFocus}`,
-    user.autopilotAboutYou && `ABOUT: ${user.autopilotAboutYou}`,
-  ]
-    .filter(Boolean)
-    .join("\n\n");
+  const sortedDays = (user.autopilotDays as string[])
+    .map(d => d.toUpperCase())
+    .sort((a, b) => WEEK_ORDER[a] - WEEK_ORDER[b]);
+  
+  let slotIndex = sortedDays.indexOf(specificDay.toUpperCase());
+  if (slotIndex === -1) slotIndex = 0;
+
+  const additionalContexts = user.autopilotAboutYou ? [user.autopilotAboutYou] : [];
+  
+  const contentPlan = createContentPlan(
+    user.autopilotCurrentFocus || undefined,
+    additionalContexts,
+    topics,
+    sortedDays.length > 0 ? sortedDays.length : 1
+  );
+  
+  const currentPlan = contentPlan[slotIndex];
+
+  let promptTopic = topics[0];
+  let promptContext = "";
+
+  if (currentPlan.source === "WEEKLY_FOCUS") {
+    promptTopic = "Weekly Focus / Theme";
+    promptContext = `FOCUS: ${currentPlan.value}\nPlease tie the narrative deeply into this focus.`;
+  } else if (currentPlan.source === "CONTEXT") {
+    promptTopic = "Personal Insights";
+    promptContext = `CONTEXT/BACKGROUND: ${currentPlan.value}`;
+  } else if (currentPlan.source === "TOPIC") {
+    promptTopic = currentPlan.value || topics[0];
+    if (user.autopilotAboutYou) {
+      promptContext = `ABOUT ME: ${user.autopilotAboutYou}`;
+    }
+  }
+
+  if (currentPlan.variation && currentPlan.angle) {
+    promptContext += `\n\nVARIATION ANGLE: Twist the perspective to focus heavily on a ${currentPlan.angle}. Approach the writing from this specific angle.`;
+  }
 
   const recentPosts = await prisma.post.findMany({
     where: { userId, source: "autopilot" },
@@ -113,19 +203,18 @@ export async function generateAutopilotPosts(
     select: { content: true },
   });
 
-  const topic = topics[Math.floor(Math.random() * topics.length)];
   const hook = HOOK_STYLES[Math.floor(Math.random() * HOOK_STYLES.length)];
 
   let content = "";
   for (let attempt = 0; attempt <= 2; attempt++) {
     content = await generatePost({
-      topic,
+      topic: promptTopic,
       style: "Professional",
-      context: `${context}\n\nStart with ${hook}`,
+      context: `${promptContext}\n\nStart with ${hook}`,
     });
 
     const isDuplicate = recentPosts.some(
-      (p) => calculateSimilarity(p.content, content) > 0.7
+      (p: { content: string }) => calculateSimilarity(p.content, content) > 0.7
     );
     if (!isDuplicate) break;
   }
@@ -137,7 +226,7 @@ export async function generateAutopilotPosts(
       status: "SCHEDULED",
       scheduledFor: slot,
       source: "autopilot",
-      topic,
+      topic: promptTopic,
     },
   });
 
