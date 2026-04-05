@@ -29,10 +29,7 @@ export default function Home() {
       {/* 1. Hero Section */}
       <Section padding="xl" className="pt-32 md:pt-48 pb-32 relative">
         <DepthContainer className="w-full h-full min-h-[70vh]">
-          <DepthLayer z={-150} className="opacity-30">
-             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/20 rounded-full blur-[150px]" />
-             <div className="absolute top-1/3 left-1/3 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-secondary/20 rounded-full blur-[120px]" />
-          </DepthLayer>
+          {/* Circular glows removed for cleaner visual */}
           
           <Container className="relative z-10 w-full h-full">
             <Grid cols={2} gap="xl" className="items-center">
@@ -131,7 +128,7 @@ export default function Home() {
 
 
       {/* 2. Problem Section */}
-      <Section variant="dark" padding="xl">
+      <Section variant="default" padding="xl" className="bg-primary/10 backdrop-blur-md border-y border-primary/20">
         <ParallaxLayer offset={-30}>
           <Container size="sm" className="text-center">
             <SmoothTransition>
