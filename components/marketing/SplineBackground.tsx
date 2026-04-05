@@ -3,7 +3,7 @@
 import { Suspense, lazy, useEffect, useState } from 'react'
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion"
 
-// Core rule: Spline should be closer to the motion div for optimal transform performance
+// Core rule: Spline is static (z-index -20)
 const Spline = lazy(() => import('@splinetool/react-spline'))
 
 export function SplineBackground() {
@@ -15,13 +15,14 @@ export function SplineBackground() {
   const springX = useSpring(mouseX, { stiffness: 80, damping: 25 })
   const springY = useSpring(mouseY, { stiffness: 80, damping: 25 })
 
-  // Refined Perspective: Reduced to ±5 degrees for elite, subtle depth
-  const rotateX = useTransform(springY, [-0.5, 0.5], [5, -5])
-  const rotateY = useTransform(springX, [-0.5, 0.5], [-5, 5])
+  // PERCEPTION PARALLAX: Two layers shifting at different intensities
+  // Layer 1 (±40px) - Primary simulated depth
+  const parallax1X = useTransform(springX, [-0.5, 0.5], [-40, 40])
+  const parallax1Y = useTransform(springY, [-0.5, 0.5], [-40, 40])
 
-  // Fallback / Layered Parallax: Small translation added for additional depth
-  const translateX = useTransform(springX, [-0.5, 0.5], [-10, 10])
-  const translateY = useTransform(springY, [-0.5, 0.5], [-10, 10])
+  // Layer 2 (±20px) - Secondary subtle depth
+  const parallax2X = useTransform(springX, [-0.5, 0.5], [-20, 20])
+  const parallax2Y = useTransform(springY, [-0.5, 0.5], [-20, 20])
 
   useEffect(() => {
     const isTouch = window.matchMedia("(pointer: coarse)").matches
@@ -50,6 +51,28 @@ export function SplineBackground() {
 
   return (
     <>
+      {/* 1. Base Layer: Static Spline Scene */}
+      <div className="fixed inset-0 -z-20 pointer-events-none bg-site-bg">
+        <Suspense fallback={null}>
+          <Spline 
+            scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
+            className="w-full h-full"
+          />
+        </Suspense>
+      </div>
+
+      {/* 2. Parallax Layer 1: Foreground Simulation (±40px) */}
+      <motion.div 
+        style={{ 
+          x: isMobile ? 0 : parallax1X, 
+          y: isMobile ? 0 : parallax1Y 
+        }}
+        className="fixed inset-0 -z-10 pointer-events-none"
+      >
+        <div className="w-full h-full bg-gradient-to-tr from-black/40 via-transparent to-black/40 opacity-40 mix-blend-multiply" />
+      </motion.div>
+
+      {/* 3. Parallax Layer 2: Midground Depth (±20px) */}
       <motion.div 
         animate={isMobile ? {
           y: [0, -5, 0],
@@ -60,26 +83,18 @@ export function SplineBackground() {
           }
         } : {}}
         style={{ 
-          rotateX: isMobile ? 0 : rotateX, 
-          rotateY: isMobile ? 0 : rotateY,
-          x: isMobile ? 0 : translateX,
-          y: isMobile ? 0 : translateY,
-          transformPerspective: 1000,
-          transformStyle: "preserve-3d"
+          x: isMobile ? 0 : parallax2X, 
+          y: isMobile ? 0 : parallax2Y 
         }}
         className="fixed inset-0 -z-10 pointer-events-none"
       >
-        <Suspense fallback={null}>
-          <Spline 
-            scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
-            className="w-full h-full"
-          />
-        </Suspense>
+        {/* Subtle radial glow to enhance depth perception */}
+        <div className="w-full h-full bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.2)_100%)] opacity-30" />
+        <div className="w-full h-full backdrop-blur-[1px] opacity-20" />
       </motion.div>
 
-      {/* Global Environmental Overlay: Restored design consistency */}
-      <div className="fixed inset-0 bg-gradient-to-at from-black/40 via-transparent to-black/40 z-0 pointer-events-none opacity-60 mix-blend-multiply" />
-      <div className="fixed inset-0 bg-site-bg/20 backdrop-blur-[2px] z-0 pointer-events-none" />
+      {/* Atmospheric Global Layer: Restores aesthetics */}
+      <div className="fixed inset-0 bg-site-bg/10 backdrop-blur-[1px] -z-10 pointer-events-none" />
     </>
   )
 }
