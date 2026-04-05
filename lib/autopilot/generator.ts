@@ -131,6 +131,8 @@ export async function generateAutopilotPosts(
       autopilotTime: true,
       autopilotAboutYou: true,
       autopilotCurrentFocus: true,
+      autopilotWritingStyleId: true,
+      writingStyles: true,
       schedule: { select: { timezone: true } },
     },
   });
@@ -205,11 +207,25 @@ export async function generateAutopilotPosts(
 
   const hook = HOOK_STYLES[Math.floor(Math.random() * HOOK_STYLES.length)];
 
+  let selectedStyle = "Professional";
+  let userWritingSample: string | undefined = undefined;
+
+  const styleId = (user as any).autopilotWritingStyleId;
+  if (styleId && styleId !== "default") {
+    selectedStyle = `Write Like Me - ${styleId}`;
+    const styles = (user as any).writingStyles || [];
+    const matchedStyle = styles.find((s: any) => s.name === styleId);
+    if (matchedStyle?.sample) {
+       userWritingSample = matchedStyle.sample;
+    }
+  }
+
   let content = "";
   for (let attempt = 0; attempt <= 2; attempt++) {
     content = await generatePost({
       topic: promptTopic,
-      style: "Professional",
+      style: selectedStyle,
+      userWritingSample,
       context: `${promptContext}\n\nStart with ${hook}`,
     });
 

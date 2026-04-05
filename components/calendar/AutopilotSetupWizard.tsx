@@ -397,7 +397,7 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                                     </div>
 
                                                     <div className="space-y-1.5">
-                                                        <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Current Focus (Optional)</label>
+                                                        <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Weekly Focus (Optional)</label>
                                                         <textarea 
                                                             value={currentFocus}
                                                             onChange={(e) => setCurrentFocus(e.target.value)}
@@ -459,7 +459,7 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                                                             <span className="truncate">
                                                                                 {writingStyleId === "default" 
                                                                                     ? "Select a style..." 
-                                                                                    : initialData.writingStyles.find(s => s.id === writingStyleId)?.name || "Select a style..."
+                                                                                    : initialData.writingStyles.find(s => s.name === writingStyleId)?.name || "Select a style..."
                                                                                 }
                                                                             </span>
                                                                             <ChevronDown className={cn("w-4 h-4 transition-transform", isDropdownOpen && "rotate-180")} />
@@ -474,22 +474,22 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                                                                     className="absolute top-full left-0 right-0 z-50 bg-card border border-border rounded-2xl shadow-xl overflow-hidden"
                                                                                 >
                                                                                     <div className="max-h-[250px] overflow-y-auto p-1 custom-scrollbar">
-                                                                                        {initialData.writingStyles.map((style: any) => (
+                                                                                        {initialData.writingStyles.map((style: any, idx: number) => (
                                                                                             <button
-                                                                                                key={style.id}
+                                                                                                key={style.name || idx.toString()}
                                                                                                 onClick={() => {
-                                                                                                    setWritingStyleId(style.id);
+                                                                                                    setWritingStyleId(style.name);
                                                                                                     setIsDropdownOpen(false);
                                                                                                 }}
                                                                                                 className={cn(
                                                                                                     "w-full px-3 py-2.5 rounded-xl text-left text-sm flex items-center justify-between transition-all",
-                                                                                                    writingStyleId === style.id 
+                                                                                                    writingStyleId === style.name 
                                                                                                         ? "bg-blue-600/10 text-blue-600 font-bold" 
                                                                                                         : "hover:bg-secondary/50 text-muted-foreground"
                                                                                                 )}
                                                                                             >
                                                                                                 <span className="truncate">{style.name}</span>
-                                                                                                {writingStyleId === style.id && <Check className="w-3.5 h-3.5" />}
+                                                                                                {writingStyleId === style.name && <Check className="w-3.5 h-3.5" />}
                                                                                             </button>
                                                                                         ))}
                                                                                     </div>
