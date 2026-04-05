@@ -17,10 +17,10 @@ export function Section({
   const baseStyles = "relative w-full overflow-hidden"
   
   const variants = {
-    default: "bg-site-bg text-site-fg",
-    subtle: "bg-secondary/30 text-site-fg",
-    dark: "bg-primary text-primary-foreground",
-    gradient: "bg-gradient-to-b from-site-bg to-secondary/20",
+    default: "bg-transparent text-site-fg relative z-10",
+    subtle: "bg-secondary/30 text-site-fg relative z-10",
+    dark: "bg-primary text-primary-foreground relative z-10",
+    gradient: "bg-gradient-to-b from-transparent to-secondary/20 relative z-10",
   }
   
   const paddings = {
