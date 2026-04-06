@@ -1,72 +1,93 @@
 "use client";
 
+import { useRef, useMemo } from "react";
 import { motion } from "framer-motion";
 
-function FloatingPaths({ position, color = "white" }: { position: number, color?: string }) {
-    const paths = Array.from({ length: 36 }, (_, i) => ({
-        id: i,
-        d: `M-${380 - i * 5 * position} -${189 + i * 6}C-${
-            380 - i * 5 * position
-        } -${189 + i * 6} -${312 - i * 5 * position} ${216 - i * 6} ${
-            152 - i * 5 * position
-        } ${343 - i * 6}C${616 - i * 5 * position} ${470 - i * 6} ${
-            684 - i * 5 * position
-        } ${875 - i * 6} ${684 - i * 5 * position} ${875 - i * 6}`,
-        width: 0.8 + i * 0.05, // Slightly thicker paths
-    }));
+// Path geometry computed once — outside render, stable reference
+function buildPaths(position: number) {
+  return Array.from({ length: 36 }, (_, i) => {
+    const p = position;
+    return {
+      id: i,
+      d: `M-${380 - i * 5 * p} -${189 + i * 6}C-${380 - i * 5 * p} -${
+        189 + i * 6
+      } -${312 - i * 5 * p} ${216 - i * 6} ${152 - i * 5 * p} ${
+        343 - i * 6
+      }C${616 - i * 5 * p} ${470 - i * 6} ${684 - i * 5 * p} ${
+        875 - i * 6
+      } ${684 - i * 5 * p} ${875 - i * 6}`,
+      // Static stroke width — no runtime math in render
+      width: 0.5 + i * 0.03,
+      // Pre-compute duration with seeded values — no Math.random() in JSX
+      duration: 25 + (i % 7) * 3,
+      opacity: 0.08 + i * 0.005, // Max ~0.25 — keep it subtle
+    };
+  });
+}
 
-    return (
-        <div className="absolute inset-0 pointer-events-none">
-            <svg
-                className="w-full h-full"
-                viewBox="0 0 696 316"
-                fill="none"
-                preserveAspectRatio="xMidYMid slice"
-            >
-                <title>Background Paths</title>
-                <defs>
-                   <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                     <feGaussianBlur stdDeviation="3" result="blur" />
-                     <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                   </filter>
-                </defs>
-                {paths.map((path) => (
-                    <motion.path
-                        key={path.id}
-                        d={path.d}
-                        stroke={color === "blue" ? "#0A66C2" : "rgba(255, 255, 255, 0.8)"}
-                        strokeWidth={path.width}
-                        strokeOpacity={0.2 + path.id * 0.02} // Increased opacity (20% to 92%)
-                        filter="url(#glow)"
-                        initial={{ pathLength: 0.3, opacity: 0.6 }}
-                        animate={{
-                            pathLength: 1,
-                            opacity: [0.4, 0.8, 0.4],
-                            pathOffset: [0, 1, 0],
-                        }}
-                        transition={{
-                            duration: 25 + Math.random() * 10,
-                            repeat: Number.POSITIVE_INFINITY,
-                            ease: "linear",
-                        }}
-                    />
-                ))}
-            </svg>
-        </div>
-    );
+function FloatingPaths({
+  position,
+  color = "white",
+}: {
+  position: number;
+  color?: string;
+}) {
+  // useMemo so paths are computed once at mount, not on every render
+  const paths = useMemo(() => buildPaths(position), [position]);
+
+  const stroke =
+    color === "blue" ? "rgba(10,102,194,0.9)" : "rgba(255,255,255,0.9)";
+
+  return (
+    // KEY CHANGE: blur applied to the SVG wrapper, not per-path via filter=""
+    // This gives you ONE compositor layer instead of 36 separate raster ops
+    <div
+      className="absolute inset-0 pointer-events-none"
+      style={{ filter: "blur(0.6px)" }}
+    >
+      <svg
+        className="w-full h-full"
+        viewBox="0 0 696 316"
+        fill="none"
+        preserveAspectRatio="xMidYMid slice"
+      >
+        {paths.map((path) => (
+          <motion.path
+            key={path.id}
+            d={path.d}
+            stroke={stroke}
+            strokeWidth={path.width}
+            strokeOpacity={path.opacity}
+            // KEY CHANGE: only animating opacity (composited) — no pathLength, no pathOffset
+            // Opacity is GPU-composited. pathLength/pathOffset trigger layout recalc every frame.
+            animate={{
+              opacity: [path.opacity * 0.4, path.opacity, path.opacity * 0.4],
+            }}
+            transition={{
+              duration: path.duration,
+              repeat: Infinity,
+              ease: "easeInOut",
+              // Stagger start so paths don't all pulse in sync
+              delay: (path.id * 0.4) % path.duration,
+            }}
+          />
+        ))}
+      </svg>
+    </div>
+  );
 }
 
 export function BackgroundPathsLayer() {
-    return (
-        <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden bg-black">
-            {/* Subtle primary glow in the center */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(circle_at_50%_50%,rgba(10,102,194,0.15)_0%,transparent_70%)]" />
-            
-            <FloatingPaths position={1} color="white" />
-            <FloatingPaths position={-1} color="blue" />
-            
-            {/* Overlay to ensure text readability */}
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
-        </div>
-    );
+  return (
+    <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden bg-black">
+      {/* Radial glow — unchanged, cheap radial-gradient is fine */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(circle_at_50%_50%,rgba(10,102,194,0.15)_0%,transparent_70%)]" />
+
+      <FloatingPaths position={1} color="white" />
+      <FloatingPaths position={-1} color="blue" />
+
+      {/* Removed: backdrop-blur overlay — redundant compositing layer */}
+      {/* Removed: feGaussianBlur filter on paths — moved to wrapper above */}
+    </div>
+  );
 }
