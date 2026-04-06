@@ -18,7 +18,7 @@ const steps = [
 
 export function HowItWorks() {
   return (
-    <Section padding="xl" className="relative overflow-hidden bg-white/30 dark:bg-white/5">
+    <Section padding="xl" className="relative overflow-hidden bg-transparent">
       <Container size="lg">
         <Grid cols={2} gap="xl" className="items-center">
           {/* Left Column: Explanation & Steps */}
@@ -38,7 +38,7 @@ export function HowItWorks() {
               <div className="mt-8 space-y-6 w-full">
                 {steps.map((step, i) => (
                   <SmoothTransition key={i} delay={i * 0.1} direction="left" distance={20}>
-                    <div className="flex items-start gap-4 p-4 rounded-xl hover:bg-white/60 dark:hover:bg-white/10 transition-colors group">
+                    <div className="flex items-start gap-4 p-4 rounded-xl hover:bg-card/40 transition-colors group">
                       <div className="p-2.5 rounded-lg bg-primary/10 text-primary group-hover:scale-110 transition-transform">
                         <step.icon className="w-5 h-5" />
                       </div>

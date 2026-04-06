@@ -79,7 +79,7 @@ export function BackgroundPathsLayer() {
         zIndex: -10,
         pointerEvents: "none",
         overflow: "hidden",
-        background: "black",
+        background: "#0B0F14",
       }}
     >
       <style>{KEYFRAMES}</style>
@@ -97,15 +97,15 @@ export function BackgroundPathsLayer() {
       {/* White layer (forward flow) */}
       <SpiralLayer
         paths={WHITE_PATHS}
-        stroke="rgba(255,255,255,0.9)"
-        opacity={0.10}
+        stroke="rgba(255,255,255,0.12)"
+        opacity={1}
       />
 
       {/* Blue layer (reverse flow for depth) */}
       <SpiralLayer
         paths={BLUE_PATHS}
-        stroke="rgba(10,102,194,0.9)"
-        opacity={0.18}
+        stroke="rgba(10,102,194,0.25)"
+        opacity={1}
         reverse
       />
     </div>

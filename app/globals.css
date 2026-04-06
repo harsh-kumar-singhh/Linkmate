@@ -34,31 +34,31 @@
   }
 
   .dark {
-    /* Linkmate Dark: Refined, deep midnight */
-    --background: 220 30% 4%;
-    --foreground: 210 20% 98%;
-    --card: 220 30% 6%;
-    --card-foreground: 210 20% 98%;
-    --popover: 220 30% 4%;
-    --popover-foreground: 210 20% 98%;
-    --primary: 210 90% 45%;
-    --primary-foreground: 210 20% 98%;
-    --secondary: 220 20% 12%;
-    --secondary-foreground: 210 20% 98%;
-    --muted: 220 20% 10%;
-    --muted-foreground: 215 15% 65%;
-    --accent: 210 90% 45%;
-    --accent-foreground: 210 20% 98%;
+    /* Linkmate Dark: Intelligent Dark System */
+    --background: 214 27% 6%;      /* #0B0F14 */
+    --foreground: 0 0% 92%;        /* rgba(255,255,255,0.92) */
+    --card: 222 47% 11%;           /* #111827 */
+    --card-foreground: 0 0% 92%; 
+    --popover: 222 47% 11%;        /* #111827 */
+    --popover-foreground: 0 0% 92%;
+    --primary: 210 90% 40%;        /* #0A66C2 */
+    --primary-foreground: 0 0% 98%;
+    --secondary: 222 47% 13%;      /* #0F172A */
+    --secondary-foreground: 0 0% 92%;
+    --muted: 222 47% 11%;          /* #111827 */
+    --muted-foreground: 0 0% 65%;  /* rgba(255,255,255,0.65) */
+    --accent: 210 90% 40%;         /* #0A66C2 */
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 220 20% 15%;
-    --input: 220 20% 15%;
-    --ring: 210 90% 45%;
+    --border: 0 0% 100% / 0.06;    /* rgba(255,255,255,0.06) */
+    --input: 0 0% 100% / 0.06;
+    --ring: 210 90% 40%;
 
     /* LinkedIn Blue Ramp Dark */
     --blue-100: 210 50% 12%;
     --blue-300: 210 50% 35%;
-    --blue-600: 210 90% 45%;
+    --blue-600: 210 90% 40%;
   }
 
   * {
@@ -143,5 +143,9 @@
   .blue-gradient-divider {
     height: 1px;
     background: linear-gradient(90deg, transparent, hsla(var(--blue-300), 0.3), transparent);
+  }
+
+  .text-muted-custom {
+    color: rgba(255, 255, 255, 0.45);
   }
 }

@@ -71,7 +71,7 @@ export default function Home() {
                   {/* Card 1: Idea */}
                   <ParallaxLayer offset={30} className="absolute top-10 left-10 z-10">
                     <TiltReveal depth={15} scale={1.05}>
-                      <FloatingCard yOffset={10} duration={5} className="w-64 p-6 bg-site-bg/80 dark:bg-black/60 rounded-2xl shadow-premium border border-white/5">
+                      <FloatingCard yOffset={10} duration={5} className="w-64 p-6 bg-card/80 rounded-2xl shadow-premium border border-border">
                          <div className="flex items-center gap-3 mb-3">
                            <div className="p-2 bg-primary/10 rounded-lg"><Sparkles className="w-4 h-4 text-primary" /></div>
                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Generated</span>
@@ -88,7 +88,7 @@ export default function Home() {
                   {/* Card 2: Schedule */}
                   <ParallaxLayer offset={-20} className="absolute top-48 right-0 z-20">
                     <TiltReveal depth={20} scale={1.05}>
-                      <FloatingCard delay={1.5} yOffset={15} duration={6} className="w-72 p-6 bg-site-bg/90 dark:bg-black/80 rounded-2xl shadow-premium border border-white/10 backdrop-blur-2xl">
+                      <FloatingCard delay={1.5} yOffset={15} duration={6} className="w-72 p-6 bg-card/90 rounded-2xl shadow-premium border border-border/60">
                          <div className="flex items-center justify-between gap-3 mb-4">
                            <div className="flex items-center gap-2">
                              <div className="p-2 bg-blue-500/10 rounded-lg"><Calendar className="w-4 h-4 text-blue-500" /></div>
@@ -107,7 +107,7 @@ export default function Home() {
                   {/* Card 3: Publish */}
                   <ParallaxLayer offset={15} className="absolute bottom-10 left-20 z-0 opacity-60 blur-[1px]">
                     <TiltReveal depth={10}>
-                      <FloatingCard delay={0.8} yOffset={8} duration={4.5} className="w-56 p-5 bg-site-bg/40 dark:bg-black/40 rounded-2xl border border-white/5">
+                      <FloatingCard delay={0.8} yOffset={8} duration={4.5} className="w-56 p-5 bg-secondary/40 rounded-2xl border border-border/40">
                          <div className="flex items-center gap-3 mb-3">
                            <div className="p-1.5 bg-green-500/10 rounded-lg"><Send className="w-3 h-3 text-green-500" /></div>
                            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Live</span>
@@ -126,7 +126,7 @@ export default function Home() {
 
 
       {/* 2. Problem Section */}
-      <Section variant="default" padding="xl" className="bg-primary/10 backdrop-blur-md border-y border-primary/20">
+      <Section variant="default" padding="xl" className="bg-secondary/5 border-y border-border/40">
         <ParallaxLayer offset={-30}>
           <Container size="sm" className="text-center">
             <SmoothTransition>
@@ -148,7 +148,7 @@ export default function Home() {
 
       {/* 4. Proof / Trust Section */}
       <Section variant="subtle" padding="xl" className="relative overflow-hidden">
-        <div className="absolute right-0 top-0 w-1/2 h-full bg-gradient-to-l from-primary/5 to-transparent pointer-events-none" />
+        <div className="absolute right-0 top-0 w-1/2 h-full bg-primary/[0.02] pointer-events-none" />
         <Container size="lg">
           <Grid cols={2} gap="xl" className="items-center">
             <SmoothTransition>
@@ -158,12 +158,12 @@ export default function Home() {
                   Stop playing the engagement game. Start building a compounding asset of your best thoughts.
                 </Text>
                 <Grid cols={2} gap="sm" className="mt-4 w-full">
-                  <div className="p-4 bg-site-bg rounded-xl border border-border">
+                  <div className="p-4 bg-card rounded-xl border border-border">
                     <Activity className="w-5 h-5 text-green-500 mb-2" />
                     <div className="text-2xl font-bold">100%</div>
                     <Text variant="small">Uptime delivery</Text>
                   </div>
-                  <div className="p-4 bg-site-bg rounded-xl border border-border">
+                  <div className="p-4 bg-card rounded-xl border border-border">
                     <BarChart3 className="w-5 h-5 text-blue-500 mb-2" />
                     <div className="text-2xl font-bold">0 hrs</div>
                     <Text variant="small">Wasted on scrolling</Text>
@@ -174,11 +174,8 @@ export default function Home() {
 
             <ParallaxLayer offset={-30} className="relative h-[400px]">
                <DepthContainer className="w-full h-full">
-                 <DepthLayer z={-50}>
-                   <div className="absolute inset-0 bg-primary/5 rounded-[3rem] rotate-3 blur-sm" />
-                 </DepthLayer>
                  <DepthLayer z={0}>
-                    <div className="absolute inset-0 bg-site-bg/40 backdrop-blur-3xl rounded-3xl border border-white/10 shadow-premium-dark p-8 flex flex-col justify-center gap-6">
+                    <div className="absolute inset-0 bg-card/60 rounded-3xl border border-border shadow-premium-dark p-8 flex flex-col justify-center gap-6">
                        <TitlePlaceholder title="CEO, Tech Startup" />
                        <TitlePlaceholder title="Lead Architect" />
                        <TitlePlaceholder title="Indie Maker" width="w-2/3" />
@@ -194,10 +191,6 @@ export default function Home() {
       {/* 5. Final CTA */}
       <Section padding="xl" className="relative">
         <DepthContainer className="w-full h-full">
-          <DepthLayer z={-50} className="pointer-events-none opacity-50">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/10 rounded-full blur-[150px]"></div>
-          </DepthLayer>
-
           <Container size="sm" className="relative z-10 w-full h-full">
             <SmoothTransition>
               <CtaBlock
@@ -227,7 +220,7 @@ export default function Home() {
         </DepthContainer>
       </Section>
 
-      <footer className="py-12 px-6 border-t border-border bg-site-bg">
+      <footer className="py-12 px-6 border-t border-border bg-background">
         <Container className="flex flex-col md:flex-row justify-between items-center gap-8 text-center md:text-left">
           <div className="font-bold text-xl tracking-tight uppercase flex items-center gap-2 justify-center md:justify-start">
             <div className="w-2 h-2 rounded-full bg-primary" />
@@ -242,7 +235,7 @@ export default function Home() {
 
 function TitlePlaceholder({ title, width = "w-full" }: { title: string, width?: string }) {
   return (
-    <div className={`flex items-center gap-4 p-4 rounded-xl border border-white/5 bg-secondary/5 ${width}`}>
+    <div className={`flex items-center gap-4 p-4 rounded-xl border border-border/40 bg-secondary/10 ${width}`}>
       <div className="w-10 h-10 rounded-full bg-primary/10 flex-shrink-0" />
       <div className="flex-1 space-y-2">
         <div className="h-2 bg-site-fg/20 rounded-full w-1/3" />
