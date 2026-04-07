@@ -2,38 +2,47 @@
 
 const KEYFRAMES = `
 @keyframes dash-flow {
-  0% { stroke-dashoffset: 600; }
+  0% { stroke-dashoffset: 500; }
   100% { stroke-dashoffset: 0; }
+}
+
+@keyframes opacity-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
 }
 `;
 
-type PathDef = { d: string; dur: number; delay: number };
+type PathDef = {
+  d: string;
+  dur: number;
+  delay: number;
+  opacity: number;
+  width: number;
+};
 
-// 🔥 CORE: generate patterned curves instead of random ones
+// 🔥 Generate dense, layered flow (like source code)
 function generatePaths(direction: "down" | "up"): PathDef[] {
   const paths: PathDef[] = [];
 
-  for (let i = 0; i < 18; i++) {
-    const offset = i * 30;
+  for (let i = 0; i < 28; i++) {
+    const offset = i * 18;
 
-    const startX = -200 + offset;
-    const startY = direction === "down" ? 900 : -100;
-
-    const cp1X = 200 + offset;
-    const cp1Y = direction === "down" ? 600 : 200;
-
-    const cp2X = 600 + offset;
-    const cp2Y = direction === "down" ? 200 : 600;
-
-    const endX = 1200 + offset;
-    const endY = direction === "down" ? -200 : 900;
-
-    const d = `M${startX} ${startY} C${cp1X} ${cp1Y}, ${cp2X} ${cp2Y}, ${endX} ${endY}`;
+    const d = direction === "down"
+      ? `M${-300 + offset} ${900}
+         C${100 + offset} ${600},
+          ${500 + offset} ${300},
+          ${1200 + offset} ${-200}`
+      : `M${-300 + offset} ${-200}
+         C${100 + offset} ${200},
+          ${500 + offset} ${600},
+          ${1200 + offset} ${900}`;
 
     paths.push({
       d,
-      dur: 10 + (i % 5) * 2,     // 🔥 controlled variation
-      delay: -i * 1.5,           // 🔥 staggered flow
+      dur: 8 + (i % 6) * 2,              // 🔥 faster variation
+      delay: -i * 1.2,
+      opacity: 0.05 + i * 0.015,         // 🔥 gradual visibility layering
+      width: 0.4 + i * 0.015,            // 🔥 thickness variation
     });
   }
 
@@ -46,12 +55,10 @@ const BLUE_PATHS = generatePaths("up");
 function FlowLayer({
   paths,
   stroke,
-  opacity,
   reverse = false,
 }: {
   paths: PathDef[];
   stroke: string;
-  opacity: number;
   reverse?: boolean;
 }) {
   return (
@@ -71,11 +78,14 @@ function FlowLayer({
           key={i}
           d={p.d}
           stroke={stroke}
-          strokeWidth={0.6}
-          strokeOpacity={opacity}
-          strokeDasharray="140 500"
+          strokeWidth={p.width}
+          strokeOpacity={p.opacity}
+          strokeDasharray="100 400"
           style={{
-            animation: `dash-flow ${p.dur}s linear ${p.delay}s infinite`,
+            animation: `
+              dash-flow ${p.dur}s linear ${p.delay}s infinite,
+              opacity-pulse ${p.dur * 1.5}s ease-in-out ${p.delay}s infinite
+            `,
             animationDirection: reverse ? "reverse" : "normal",
           }}
         />
@@ -98,28 +108,26 @@ export function BackgroundPathsLayer() {
     >
       <style>{KEYFRAMES}</style>
 
-      {/* subtle glow */}
+      {/* subtle center glow */}
       <div
         style={{
           position: "absolute",
           inset: 0,
           background:
-            "radial-gradient(circle at 50% 50%, rgba(10,102,194,0.10) 0%, transparent 70%)",
+            "radial-gradient(circle at 50% 50%, rgba(10,102,194,0.12) 0%, transparent 70%)",
         }}
       />
 
-      {/* forward flow */}
+      {/* WHITE FLOW */}
       <FlowLayer
         paths={WHITE_PATHS}
-        stroke="rgba(255,255,255,0.12)"
-        opacity={1}
+        stroke="rgba(255,255,255,0.9)"
       />
 
-      {/* reverse flow */}
+      {/* BLUE FLOW (reverse) */}
       <FlowLayer
         paths={BLUE_PATHS}
-        stroke="rgba(10,102,194,0.22)"
-        opacity={1}
+        stroke="rgba(10,102,194,0.9)"
         reverse
       />
     </div>
