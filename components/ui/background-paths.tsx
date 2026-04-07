@@ -1,11 +1,5 @@
 "use client";
 
-// Zero Framer Motion. Zero JS animation.
-// pathLength="1" normalizes each path to unit length.
-// stroke-dasharray="0.15 0.85" = 15% dash, 85% gap (in normalized units).
-// Animating dashoffset 1 → -1 travels the dash exactly one full loop.
-// This is the CSS equivalent of Framer Motion's pathOffset: [0, 1, 0].
-
 const KEYFRAMES = `
   @keyframes travel {
     0%   { stroke-dashoffset: 1; }
@@ -13,9 +7,6 @@ const KEYFRAMES = `
   }
 `;
 
-// Exact same S-curve formula as the original source.
-// position=1 → white paths sweeping one direction
-// position=-1 → blue paths sweeping the mirror direction
 function buildPaths(position: number) {
   return Array.from({ length: 18 }, (_, i) => {
     const p = position;
@@ -29,14 +20,12 @@ function buildPaths(position: number) {
       } ${684 - i * 5 * p} ${875 - i * 6}`,
       width: 0.5 + i * 0.03,
       opacity: 0.1 + (i % 6) * 0.03,
-      // Staggered durations — no Math.random(), deterministic
       dur: 20 + (i % 8) * 2,
       delay: -(i * 2.5),
     };
   });
 }
 
-// Pre-built at module level — computed once, never on re-render
 const WHITE_PATHS = buildPaths(1);
 const BLUE_PATHS  = buildPaths(-1);
 
@@ -48,10 +37,9 @@ function SpiralLayer({
   stroke: string;
 }) {
   return (
-    // viewBox matches the original exactly — critical for path coords
     <svg
       style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
-      viewBox="0 0 696 316"
+      viewBox="-100 -400 896 1200"
       fill="none"
       preserveAspectRatio="xMidYMid slice"
     >
@@ -62,8 +50,6 @@ function SpiralLayer({
           stroke={stroke}
           strokeWidth={p.width}
           strokeOpacity={p.opacity}
-          // pathLength="1" normalizes this path to unit length.
-          // dasharray/dashoffset values are now in 0–1 space.
           pathLength="1"
           strokeDasharray="0.15 0.85"
           style={{
@@ -89,7 +75,6 @@ export function BackgroundPathsLayer() {
     >
       <style>{KEYFRAMES}</style>
 
-      {/* Static radial glow — zero animation cost */}
       <div
         style={{
           position: "absolute",
