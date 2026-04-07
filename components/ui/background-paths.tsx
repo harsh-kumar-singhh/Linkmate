@@ -1,68 +1,57 @@
 "use client";
 
-const KEYFRAMES = `
-@keyframes dash-flow {
-  0% { stroke-dashoffset: 400; }
-  100% { stroke-dashoffset: 0; }
-}
+// Zero Framer Motion. Zero JS animation.
+// pathLength="1" normalizes each path to unit length.
+// stroke-dasharray="0.15 0.85" = 15% dash, 85% gap (in normalized units).
+// Animating dashoffset 1 → -1 travels the dash exactly one full loop.
+// This is the CSS equivalent of Framer Motion's pathOffset: [0, 1, 0].
 
-@keyframes opacity-pulse {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
-}
+const KEYFRAMES = `
+  @keyframes travel {
+    0%   { stroke-dashoffset: 1; }
+    100% { stroke-dashoffset: -1; }
+  }
 `;
 
-type PathDef = {
-  d: string;
-  dur: number;
-  delay: number;
-  opacity: number;
-  width: number;
-};
-
-function generatePaths(direction: "down" | "up"): PathDef[] {
-  const paths: PathDef[] = [];
-
-  for (let i = 0; i < 20; i++) {
-    const offset = i * 20;
-
-    const d = direction === "down"
-      ? `M${-200 + offset} 900 C${200 + offset} 600, ${600 + offset} 300, ${1200 + offset} -200`
-      : `M${-200 + offset} -200 C${200 + offset} 200, ${600 + offset} 600, ${1200 + offset} 900`;
-
-    paths.push({
-      d,
-      dur: 8 + (i % 4) * 2,
-      delay: -i * 1.2,
-      opacity: 0.15 + i * 0.02,   // 🔥 MUCH MORE VISIBLE
-      width: 0.8 + i * 0.02,      // 🔥 THICKER LINES
-    });
-  }
-
-  return paths;
+// Exact same S-curve formula as the original source.
+// position=1 → white paths sweeping one direction
+// position=-1 → blue paths sweeping the mirror direction
+function buildPaths(position: number) {
+  return Array.from({ length: 18 }, (_, i) => {
+    const p = position;
+    return {
+      d: `M-${380 - i * 5 * p} -${189 + i * 6}C-${380 - i * 5 * p} -${
+        189 + i * 6
+      } -${312 - i * 5 * p} ${216 - i * 6} ${152 - i * 5 * p} ${
+        343 - i * 6
+      }C${616 - i * 5 * p} ${470 - i * 6} ${684 - i * 5 * p} ${
+        875 - i * 6
+      } ${684 - i * 5 * p} ${875 - i * 6}`,
+      width: 0.5 + i * 0.03,
+      opacity: 0.1 + (i % 6) * 0.03,
+      // Staggered durations — no Math.random(), deterministic
+      dur: 20 + (i % 8) * 2,
+      delay: -(i * 2.5),
+    };
+  });
 }
 
-const WHITE_PATHS = generatePaths("down");
-const BLUE_PATHS = generatePaths("up");
+// Pre-built at module level — computed once, never on re-render
+const WHITE_PATHS = buildPaths(1);
+const BLUE_PATHS  = buildPaths(-1);
 
-function FlowLayer({
+function SpiralLayer({
   paths,
   stroke,
-  reverse = false,
 }: {
-  paths: PathDef[];
+  paths: ReturnType<typeof buildPaths>;
   stroke: string;
-  reverse?: boolean;
 }) {
   return (
+    // viewBox matches the original exactly — critical for path coords
     <svg
-      style={{
-        position: "absolute",
-        inset: 0,
-        width: "100%",
-        height: "100%",
-      }}
-      viewBox="0 0 1200 800"
+      style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+      viewBox="0 0 696 316"
       fill="none"
       preserveAspectRatio="xMidYMid slice"
     >
@@ -73,13 +62,12 @@ function FlowLayer({
           stroke={stroke}
           strokeWidth={p.width}
           strokeOpacity={p.opacity}
-          strokeDasharray="80 200"   // 🔥 SHORTER → MORE MOTION
+          // pathLength="1" normalizes this path to unit length.
+          // dasharray/dashoffset values are now in 0–1 space.
+          pathLength="1"
+          strokeDasharray="0.15 0.85"
           style={{
-            animation: `
-              dash-flow ${p.dur}s linear ${p.delay}s infinite,
-              opacity-pulse ${p.dur * 1.2}s ease-in-out ${p.delay}s infinite
-            `,
-            animationDirection: reverse ? "reverse" : "normal",
+            animation: `travel ${p.dur}s linear ${p.delay}s infinite`,
           }}
         />
       ))}
@@ -101,28 +89,18 @@ export function BackgroundPathsLayer() {
     >
       <style>{KEYFRAMES}</style>
 
-      {/* Stronger glow */}
+      {/* Static radial glow — zero animation cost */}
       <div
         style={{
           position: "absolute",
           inset: 0,
           background:
-            "radial-gradient(circle at 50% 50%, rgba(10,102,194,0.18) 0%, transparent 70%)",
+            "radial-gradient(circle at 50% 50%, rgba(10,102,194,0.15) 0%, transparent 70%)",
         }}
       />
 
-      {/* WHITE FLOW */}
-      <FlowLayer
-        paths={WHITE_PATHS}
-        stroke="rgba(255,255,255,0.9)"
-      />
-
-      {/* BLUE FLOW */}
-      <FlowLayer
-        paths={BLUE_PATHS}
-        stroke="rgba(10,102,194,0.9)"
-        reverse
-      />
+      <SpiralLayer paths={WHITE_PATHS} stroke="rgba(255,255,255,0.9)" />
+      <SpiralLayer paths={BLUE_PATHS}  stroke="rgba(10,102,194,0.9)"  />
     </div>
   );
 }
