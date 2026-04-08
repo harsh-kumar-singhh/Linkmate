@@ -40,7 +40,7 @@ export function TrialModal() {
                 🚀 You just created your first post.
               </DialogTitle>
               <DialogDescription className="text-muted-foreground text-[15px] leading-relaxed">
-                Now imagine this running automatically every day. You've unlocked <span className="text-primary font-bold">Linkmate Pro</span> — <span className="text-foreground uppercase text-xs font-black tracking-widest px-1.5 py-0.5 rounded bg-primary/20">Free</span> for 1 month.
+                Now imagine this running automatically every day. You&apos;ve unlocked <span className="text-primary font-bold">Linkmate Pro</span> — <span className="text-foreground uppercase text-xs font-black tracking-widest px-1.5 py-0.5 rounded bg-primary/20">Free</span> for 1 month.
               </DialogDescription>
             </div>
 

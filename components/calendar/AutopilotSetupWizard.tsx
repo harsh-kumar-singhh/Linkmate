@@ -88,7 +88,7 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                 }
             }
         }
-    }, [isOpen]);
+    }, [isOpen, initialData]);
 
     const maxDays = parseInt(frequency);
 

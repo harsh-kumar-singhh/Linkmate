@@ -42,7 +42,7 @@ export default function UpgradePage() {
           <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary mx-auto">
             <Rocket className="w-8 h-8" />
           </div>
-          <h1 className="text-3xl font-bold">You're already a Pro!</h1>
+          <h1 className="text-3xl font-bold">You&apos;re already a Pro!</h1>
           <p className="text-muted-foreground">Enjoy your premium features.</p>
           <Link href="/dashboard">
             <Button size="lg" className="rounded-xl mt-4">Go to Dashboard</Button>
@@ -76,7 +76,7 @@ export default function UpgradePage() {
             animate={{ opacity: 1, y: 0 }}
             className="text-4xl md:text-6xl font-black tracking-tight leading-[0.9] text-foreground"
           >
-            You’ve unlocked <br /> <span className="text-primary">early access 🎁</span>
+            You&rsquo;ve unlocked <br /> <span className="text-primary">early access 🎁</span>
           </motion.h1>
           <motion.p 
             initial={{ opacity: 0, y: 20 }}
