@@ -156,7 +156,7 @@ export default function CalendarPage() {
                             <ChevronRight className="w-4 h-4" />
                         </Button>
                     </div>
-                    <Link href="/posts/new">
+                    <Link href="/posts/new" prefetch={false}>
                         <Button size="sm" className="h-10 px-4 rounded-xl shadow-sm gap-2">
                             <Plus className="w-4 h-4" />
                             <span className="hidden sm:inline">Schedule Post</span>
@@ -299,7 +299,7 @@ export default function CalendarPage() {
                                             )}>
                                                 {date}
                                             </span>
-                                            <Link href={`/posts/new?date=${cellDate?.toISOString()}`}>
+                                            <Link href={`/posts/new?date=${cellDate?.toISOString()}`} prefetch={false}>
                                                 <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 rounded-md hover:bg-primary/10 hover:text-primary transition-all p-0">
                                                     <Plus className="w-3 h-3" />
                                                 </Button>
@@ -308,7 +308,7 @@ export default function CalendarPage() {
 
                                         <div className="mt-1 space-y-1">
                                             {datePosts.slice(0, 3).map((post) => (
-                                                <Link key={post.id} href={`/posts/new?id=${post.id}`}>
+                                                <Link key={post.id} href={`/posts/new?id=${post.id}`} prefetch={false}>
                                                     <div className={cn(
                                                         "px-1.5 py-0.5 rounded-md text-[9px] font-bold truncate transition-all flex items-center justify-between gap-1.5 cursor-pointer",
                                                         post.status === "PUBLISHED"

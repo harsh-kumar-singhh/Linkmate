@@ -209,7 +209,7 @@ export default function DashboardPage() {
       <div className="space-y-8 pt-2">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold tracking-tight">Post Manager</h2>
-          <Link href="/posts/new">
+          <Link href="/posts/new" prefetch={false}>
             <Button className="rounded-xl h-10 px-4 gap-2 font-bold shadow-lg shadow-primary/20">
               <Plus className="w-4 h-4" />
               Create Post
@@ -406,7 +406,7 @@ function PostCard({ post, index }: { post: Post, index: number }) {
             </div>
 
             <div className="flex items-center gap-1 shrink-0">
-              <Link href={isPublished ? `/stats` : `/posts/new?id=${post.id}`}>
+              <Link href={isPublished ? `/stats` : `/posts/new?id=${post.id}`} prefetch={false}>
                 <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-primary/10 hover:text-primary transition-colors">
                   {isPublished ? <ArrowUpRight className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
                 </Button>
@@ -429,7 +429,7 @@ function EmptyState() {
         <h3 className="text-lg font-semibold text-foreground">No posts yet</h3>
         <p className="text-muted-foreground max-w-xs mx-auto">Create your first post to get started with your consistent journey.</p>
       </div>
-      <Link href="/posts/new">
+      <Link href="/posts/new" prefetch={false}>
         <Button variant="outline" className="rounded-full mt-2">
           Create Post
         </Button>
