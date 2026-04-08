@@ -177,15 +177,15 @@ export default async function SettingsPage() {
                                 <div className="space-y-3">
                                     <div className="flex items-center gap-2 text-primary font-bold text-sm uppercase tracking-wider">
                                         <Sparkles className="w-4 h-4" />
-                                        {userPlan?.toUpperCase() === "PRO" ? "Pro Benefits" : "Unlock Pro"}
+                                        {userPlan?.toUpperCase() === "PRO" ? "Pro Benefits" : "Unlock Pro for Free"}
                                     </div>
                                     <p className="text-sm text-muted-foreground leading-relaxed">
                                         {userPlan?.toUpperCase() === "PRO"
                                             ? "Your LinkedIn performance is being optimized by our advanced AI. Keep growing!"
-                                            : "Professional creators use Pro to save 10+ hours a week with Autopilot and unlimited generation."}
+                                            : "Get exclusive early access to Linkmate Pro for free. Save 10+ hours a week with Autopilot."}
                                     </p>
                                 </div>
-                                <Link href={userPlan?.toUpperCase() === "PRO" ? "/activity" : "/pricing"} className="w-full">
+                                <Link href={userPlan?.toUpperCase() === "PRO" ? "/activity" : "/upgrade"} className="w-full">
                                     <Button 
                                         className={cn(
                                             "h-12 px-6 rounded-xl font-bold w-full shadow-lg transition-all",
@@ -195,7 +195,7 @@ export default async function SettingsPage() {
                                         )}
                                         variant={userPlan?.toUpperCase() === "PRO" ? "primary" : "primary"}
                                     >
-                                        {userPlan?.toUpperCase() === "PRO" ? "View My Growth" : "Upgrade to Pro"}
+                                        {userPlan?.toUpperCase() === "PRO" ? "View My Growth" : "Upgrade to Pro for Free"}
                                         <ArrowRight className="w-4 h-4 ml-2" />
                                     </Button>
                                 </Link>

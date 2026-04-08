@@ -66,9 +66,9 @@ export default function PricingPage() {
     {
       name: "Pro",
       id: "pro",
-      price: "₹249",
+      price: "₹0",
       period: "/month",
-      description: "For serious creators who want total LinkedIn automation.",
+      description: "Free for limited early users. Save 10+ hours a week.",
       features: [
         { text: "Unlimited AI posts", included: true },
         { text: "Unlimited writing styles", included: true },

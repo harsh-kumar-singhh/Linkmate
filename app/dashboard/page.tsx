@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { useRouter } from "next/navigation"
 import { useUser } from "@/context/UserContext"
+import { useTrialTrigger } from "@/context/TrialTriggerContext"
 import Link from "next/link"
 import { useEffect, useState, useCallback } from "react"
 import { AnimatedCard } from "@/components/animated/AnimatedCard"
@@ -41,6 +42,7 @@ interface Post {
 
 export default function DashboardPage() {
   const { user, isLoading: isUserLoading } = useUser()
+  const { trackAction } = useTrialTrigger()
   const router = useRouter()
 
   const [posts, setPosts] = useState<Post[]>([])
@@ -107,6 +109,14 @@ export default function DashboardPage() {
     if (!user) return
     fetchData()
   }, [user, fetchData])
+
+  // Track dashboard view only once
+  useEffect(() => {
+    if (user) {
+      trackAction("view_dashboard")
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user])
 
   const dismissNotification = async (postId: string) => {
     try {

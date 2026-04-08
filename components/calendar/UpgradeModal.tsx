@@ -76,11 +76,11 @@ export function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                                         onClick={handleUpgrade}
                                         className="w-full h-14 text-base rounded-2xl gap-2 font-bold"
                                     >
-                                        <span>Upgrade to Pro</span>
+                                        <span>Upgrade to Pro for Free</span>
                                         <ArrowRight className="w-4 h-4" />
                                     </Button>
                                     <p className="text-[10px] text-muted-foreground mt-4 font-medium uppercase tracking-widest">
-                                        Unlock full automation for only ₹249/mo
+                                        Unlock full automation for free (early users only)
                                     </p>
                                 </div>
                             </div>

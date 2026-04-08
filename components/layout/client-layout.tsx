@@ -7,6 +7,9 @@ import { useSession } from "next-auth/react";
 import { AnimatedCard } from "@/components/animated/AnimatedCard";
 
 import { DashboardHeader } from "./header";
+import { UpgradeBanner } from "@/components/upgrade/UpgradeBanner";
+import { TrialModal } from "@/components/upgrade/TrialModal";
+import { LockedFeatureModal } from "@/components/upgrade/LockedFeatureModal";
 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
@@ -25,6 +28,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
             <div className="flex h-screen bg-slate-50 dark:bg-[#020617] transition-colors duration-300">
                 <Sidebar />
                 <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative pb-16 md:pb-0">
+                    <UpgradeBanner />
                     <DashboardHeader />
                     <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8">
                         <AnimatedCard
@@ -34,10 +38,23 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
                         </AnimatedCard>
                     </main>
                     <MobileNav />
+                    <TrialModal />
+                    <LockedFeatureModal />
                 </div>
             </div>
         );
     }
 
-    return <>{children}</>;
+    return (
+        <>
+            {pathname === "/" && <UpgradeBanner />}
+            {children}
+            {pathname === "/" && (
+                <>
+                    <TrialModal />
+                    <LockedFeatureModal />
+                </>
+            )}
+        </>
+    );
 }

@@ -66,25 +66,29 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // PART 4 & 5 FIX: Sync state with initialData whenever it changes or modal opens
+    // PART 4 & 5 FIX: Sync state with initialData only when modal opens
     useEffect(() => {
-        if (isOpen && initialData) {
-            console.log("[Autopilot] Prefilling wizard with initialData:", initialData);
-            if (initialData.topics) setTopics(initialData.topics);
-            if (initialData.frequency) setFrequency(initialData.frequency);
-            if (initialData.days) setDays(initialData.days);
-            if (initialData.aboutYou) setAboutYou(initialData.aboutYou);
-            if (initialData.currentFocus) setCurrentFocus(initialData.currentFocus);
-            if (initialData.writingStyleId) {
-                setWritingStyleId(initialData.writingStyleId);
-                setSelectionMode(initialData.writingStyleId !== "default" ? "manual" : "automatic");
-            }
+        if (isOpen) {
+            setStep(1); // Reset to first step when opening
             
-            if (initialData.time) {
-                setTime(initialData.time);
+            if (initialData) {
+                console.log("[Autopilot] Prefilling wizard with initialData:", initialData);
+                if (initialData.topics) setTopics(initialData.topics);
+                if (initialData.frequency) setFrequency(initialData.frequency);
+                if (initialData.days) setDays(initialData.days);
+                if (initialData.aboutYou) setAboutYou(initialData.aboutYou);
+                if (initialData.currentFocus) setCurrentFocus(initialData.currentFocus);
+                if (initialData.writingStyleId) {
+                    setWritingStyleId(initialData.writingStyleId);
+                    setSelectionMode(initialData.writingStyleId !== "default" ? "manual" : "automatic");
+                }
+                
+                if (initialData.time) {
+                    setTime(initialData.time);
+                }
             }
         }
-    }, [isOpen, initialData]);
+    }, [isOpen]);
 
     const maxDays = parseInt(frequency);
 
@@ -527,7 +531,7 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                         </div>
 
                         {/* Sticky Footer - Always visible */}
-                        <div className="p-6 md:px-10 md:pb-10 bg-gradient-to-t from-card via-card to-transparent pt-10 border-t border-border/10">
+                        <div className="p-6 md:px-10 md:pb-10 bg-card border-t border-border/10">
                             <div className="flex items-center gap-4">
                                 {step > 1 && (
                                     <Button
@@ -541,18 +545,26 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                 )}
                                 
                                 {step < 4 ? (
-                                    <Button
-                                        onClick={handleNext}
-                                        className="flex-1 h-14 rounded-2xl text-base font-bold gap-2 bg-foreground text-background hover:bg-foreground/90 transition-all shadow-xl shadow-foreground/5"
-                                        disabled={(step === 1 && !isStep1Valid) || (step === 3 && !isStep3Valid)}
-                                    >
-                                        <span>Next Step</span>
-                                        <ArrowRight className="w-4 h-4" />
-                                    </Button>
+                                    <div className="flex-1 flex flex-col gap-2">
+                                        <Button
+                                            onClick={handleNext}
+                                            className={cn(
+                                                "w-full h-14 rounded-2xl text-base font-bold gap-2 bg-foreground text-background hover:bg-foreground/90 transition-all shadow-xl shadow-foreground/5",
+                                                ((step === 1 && !isStep1Valid) || (step === 3 && !isStep3Valid)) && "opacity-50 cursor-not-allowed"
+                                            )}
+                                            disabled={(step === 1 && !isStep1Valid) || (step === 3 && !isStep3Valid)}
+                                        >
+                                            <span>Next Step</span>
+                                            <ArrowRight className="w-4 h-4" />
+                                        </Button>
+                                    </div>
                                 ) : (
                                     <Button
                                         onClick={handleActivate}
-                                        className="flex-1 h-14 rounded-2xl text-base font-bold gap-2 bg-blue-600 hover:bg-blue-500 text-white shadow-xl shadow-blue-500/20 transition-all"
+                                        className={cn(
+                                            "flex-1 h-14 rounded-2xl text-base font-bold gap-2 bg-blue-600 hover:bg-blue-500 text-white shadow-xl shadow-blue-500/20 transition-all",
+                                            (days.length !== maxDays || isSaving) && "opacity-50 cursor-not-allowed"
+                                        )}
                                         disabled={days.length !== maxDays || isSaving}
                                     >
                                         {isSaving ? (

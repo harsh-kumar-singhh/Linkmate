@@ -31,11 +31,13 @@ import { LinkedInPreview } from "@/components/posts/LinkedInPreview"
 import { AICoach } from "@/components/ai/AICoach"
 import { StyleSelector } from "@/components/posts/style-selector"
 import { useUser } from "@/context/UserContext"
+import { useTrialTrigger } from "@/context/TrialTriggerContext"
 import { format } from "date-fns"
 import { toZonedTime } from "date-fns-tz"
 
 function EditorContent() {
     const { user, isPro, isLoading } = useUser()
+    const { trackAction, triggerLockedModal } = useTrialTrigger()
     const searchParams = useSearchParams()
     const router = useRouter()
     const userPlan = (user?.plan || "FREE").toUpperCase()
@@ -172,13 +174,12 @@ function EditorContent() {
             if (data.content) {
                 setContent(data.content)
                 setMode("manual")
+                trackAction("generate_post")
             }
         } catch (error: any) {
             console.error("Generation failed", error)
             if (error.message.includes("limit") || error.message.includes("quota")) {
-                if (confirm(`You've reached your daily AI post limit for the Free plan. Upgrade to Pro for unlimited AI generation!`)) {
-                    router.push("/pricing");
-                }
+                triggerLockedModal("AI Daily Limit Reached")
             } else {
                 alert(error instanceof Error ? error.message : "Failed to generate post.");
             }
@@ -264,6 +265,7 @@ function EditorContent() {
             }
 
             if (statusArg !== "DRAFT") {
+                trackAction("schedule_post")
                 router.push("/calendar")
             } else {
                 router.push("/dashboard")
@@ -271,9 +273,7 @@ function EditorContent() {
         } catch (error: any) {
             console.error("Error saving post:", error);
             if (error.message.includes("limit") || error.message.includes("quota")) {
-                if (confirm(`You've reached the ${statusArg === "SCHEDULED" ? "monthly scheduling" : "AI usage"} limit for the Free plan. Upgrade to Pro for unlimited access!`)) {
-                    router.push("/pricing");
-                }
+                triggerLockedModal(statusArg === "SCHEDULED" ? "Monthly Scheduling Limit Reached" : "AI Usage Limit Reached")
             } else {
                 alert(error instanceof Error ? error.message : "Failed to save post");
             }

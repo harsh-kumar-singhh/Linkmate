@@ -268,7 +268,7 @@ export default function CalendarPage() {
                     ))}
                 </div>
 
-                <div className="grid grid-cols-7 border-l border-t border-border/30">
+                <div className="grid grid-cols-7">
                     {DATES.map((date, i) => {
                         const cellDate = date ? new Date(currentYear, currentMonth, date) : null
                         const datePosts = cellDate ? posts.filter(p => {
@@ -279,14 +279,13 @@ export default function CalendarPage() {
 
                         const isToday = cellDate && new Date().toDateString() === cellDate.toDateString()
 
-                        if (i >= 35 && !date && i % 7 === 0) return null
-
                         return (
                             <div
                                 key={i}
                                 className={cn(
-                                    "min-h-[70px] md:min-h-[100px] border-r border-b border-border/30 p-2 md:p-3 transition-all hover:bg-secondary/5 relative group",
-                                    !date && "bg-secondary/[0.02] opacity-30"
+                                    "min-h-[80px] md:min-h-[120px] border-r border-b border-border/50 p-2 md:p-3 transition-all hover:bg-secondary/5 relative group",
+                                    (i + 1) % 7 === 0 && "border-r-0",
+                                    !date && "bg-secondary/[0.02]"
                                 )}
                             >
                                 {date && (

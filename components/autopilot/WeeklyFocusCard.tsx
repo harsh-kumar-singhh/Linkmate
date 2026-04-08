@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { Sparkles, Save, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useUser } from "@/context/UserContext";
+import { useTrialTrigger } from "@/context/TrialTriggerContext";
 
 interface WeeklyFocusCardProps {
     initialFocus?: string;
@@ -11,6 +13,8 @@ interface WeeklyFocusCardProps {
 }
 
 export function WeeklyFocusCard({ initialFocus = "", onUpdate }: WeeklyFocusCardProps) {
+    const { isPro } = useUser();
+    const { triggerLockedModal } = useTrialTrigger();
     const [focus, setFocus] = useState(initialFocus);
     const [isSaving, setIsSaving] = useState(false);
     const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
@@ -56,12 +60,28 @@ export function WeeklyFocusCard({ initialFocus = "", onUpdate }: WeeklyFocusCard
                         </div>
                         <div>
                             <h3 className="font-bold text-lg tracking-tight">Weekly Focus</h3>
-                            <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold font-mono">Autopilot Context</p>
+                            <div className="flex items-center gap-2">
+                                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold font-mono">Autopilot Context</p>
+                                {!isPro && (
+                                    <span className="px-1.5 py-0.5 rounded bg-primary/20 text-primary text-[8px] font-black uppercase tracking-tighter">Pro</span>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-4 relative">
+                    {!isPro && (
+                        <div 
+                            className="absolute inset-0 z-10 cursor-pointer flex flex-col items-center justify-center bg-background/5 rounded-2xl border border-dashed border-border/50 group/lock hover:bg-background/10 transition-all"
+                            onClick={() => triggerLockedModal("Autopilot Strategy")}
+                        >
+                            <div className="p-3 rounded-full bg-background border border-border shadow-sm group-hover/lock:scale-110 transition-transform">
+                                <Sparkles className="w-5 h-5 text-primary" />
+                            </div>
+                            <p className="mt-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Click to unlock Autopilot</p>
+                        </div>
+                    )}
                     <textarea
                         value={focus}
                         onChange={(e) => setFocus(e.target.value)}

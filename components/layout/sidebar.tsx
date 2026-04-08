@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { signOut } from "next-auth/react"
 import { AnimatedCard } from "@/components/animated/AnimatedCard"
 import { LayoutDashboard, PenSquare, Calendar, Settings, LogOut, BarChart3 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -66,7 +67,10 @@ export function Sidebar() {
                 </nav>
 
                 <div className="mt-auto">
-                    <button className="flex items-center gap-4 px-4 py-3 rounded-lg text-[13px] font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-all w-full group">
+                    <button 
+                        onClick={() => signOut({ callbackUrl: "/" })}
+                        className="flex items-center gap-4 px-4 py-3 rounded-lg text-[13px] font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-all w-full group"
+                    >
                         <LogOut className="w-4.5 h-4.5" />
                         Sign Out
                     </button>
