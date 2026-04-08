@@ -47,7 +47,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
 
     return (
         <>
-            {pathname === "/" && <UpgradeBanner />}
+            {/* Banner removed from homepage as requested */}
             {children}
             {pathname === "/" && (
                 <>

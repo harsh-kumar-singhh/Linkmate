@@ -28,11 +28,20 @@ export function TrialModal() {
           {/* Decorative Background */}
           <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-primary/10 to-transparent pointer-events-none" />
           
-          <div className="relative space-y-6">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="relative space-y-6"
+          >
             <div className="flex justify-center">
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
+              <motion.div 
+                animate={{ y: [0, -8, 0] }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner"
+              >
                 <Rocket className="w-8 h-8" />
-              </div>
+              </motion.div>
             </div>
 
             <div className="text-center space-y-2">
@@ -46,23 +55,31 @@ export function TrialModal() {
 
             <div className="grid grid-cols-1 gap-3 py-4">
               <FeatureItem 
+                index={0}
                 icon={<Sparkles className="w-4 h-4" />} 
                 title="AI-powered content system" 
                 desc="Infinite post ideas and generations"
               />
               <FeatureItem 
+                index={1}
                 icon={<Clock className="w-4 h-4" />} 
                 title="Auto scheduling" 
                 desc="Set and forget your entire month"
               />
               <FeatureItem 
+                index={2}
                 icon={<Zap className="w-4 h-4" />} 
                 title="Growth automation" 
                 desc="Autopilot and smart strategies"
               />
             </div>
 
-            <div className="space-y-3 pt-2">
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+              className="space-y-3 pt-2"
+            >
               <Link href="/upgrade" className="w-full block">
                 <Button 
                   className="w-full h-14 rounded-xl text-[15px] font-black shadow-lg shadow-primary/25 hover:shadow-primary/40 active:scale-[0.98] transition-all bg-primary"
@@ -78,21 +95,26 @@ export function TrialModal() {
               >
                 Maybe later
               </Button>
-            </div>
+            </motion.div>
             
             <p className="text-[10px] text-center text-muted-foreground font-medium uppercase tracking-[0.2em]">
                Limited early access • No payment required
             </p>
-          </div>
+          </motion.div>
         </div>
       </DialogContent>
     </Dialog>
   );
 }
 
-function FeatureItem({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) {
+function FeatureItem({ icon, title, desc, index }: { icon: React.ReactNode, title: string, desc: string, index: number }) {
   return (
-    <div className="flex items-start gap-4 p-3 rounded-2xl border border-border/40 bg-secondary/5 hover:bg-secondary/10 transition-colors group">
+    <motion.div 
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: 0.3 + (index * 0.1) }}
+      className="flex items-start gap-4 p-3 rounded-2xl border border-border/40 bg-secondary/5 hover:bg-secondary/10 transition-colors group"
+    >
       <div className="w-8 h-8 rounded-lg bg-background border border-border flex items-center justify-center text-primary shrink-0 group-hover:scale-110 transition-transform">
         {icon}
       </div>
@@ -100,6 +122,6 @@ function FeatureItem({ icon, title, desc }: { icon: React.ReactNode, title: stri
         <h4 className="text-sm font-bold text-foreground">{title}</h4>
         <p className="text-xs text-muted-foreground">{desc}</p>
       </div>
-    </div>
+    </motion.div>
   );
 }
