@@ -126,7 +126,9 @@ export default function Home() {
 
 
       {/* 2. Problem Section */}
-      <Section variant="default" padding="xl" className="bg-secondary/5 border-y border-border/40">
+      <Section variant="default" padding="xl" className="bg-secondary/5 relative overflow-hidden">
+        {/* Subtle glow for section separation instead of hard border */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent opacity-50" />
         <ParallaxLayer offset={-30}>
           <Container size="sm" className="text-center">
             <SmoothTransition>
@@ -220,7 +222,9 @@ export default function Home() {
         </DepthContainer>
       </Section>
 
-      <footer className="py-12 px-6 border-t border-border bg-background">
+      <footer className="py-12 px-6 bg-background relative">
+        {/* Seamless transition instead of hard border */}
+        <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-t from-background to-transparent -translate-y-full pointer-events-none" />
         <Container className="flex flex-col md:flex-row justify-between items-center gap-8 text-center md:text-left">
           <div className="font-bold text-xl tracking-tight uppercase flex items-center gap-2 justify-center md:justify-start">
             <div className="w-2 h-2 rounded-full bg-primary" />

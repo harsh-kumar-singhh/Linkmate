@@ -57,3 +57,43 @@ export function WelcomeSkeleton() {
     </div>
   )
 }
+
+export function ActivityMetricSkeleton() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {[1, 2, 3, 4].map((i) => (
+        <Card key={i} className="bg-card border border-border/60 rounded-2xl p-5 shadow-sm space-y-4 overflow-hidden">
+          <div className="flex items-center justify-between">
+            <div className="h-3 w-20 bg-zinc-200 dark:bg-zinc-800 animate-pulse rounded" />
+            <div className="h-4 w-4 bg-zinc-200 dark:bg-zinc-800 animate-pulse rounded-full" />
+          </div>
+          <div className="space-y-2">
+            <div className="h-8 w-12 bg-zinc-300 dark:bg-zinc-700 animate-pulse rounded" />
+            <div className="h-3 w-32 bg-zinc-100 dark:bg-zinc-900 animate-pulse rounded" />
+          </div>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
+export function ActivityChartSkeleton() {
+  return (
+    <Card className="bg-card border border-border/60 rounded-3xl p-6 md:p-8 shadow-sm space-y-8 overflow-hidden">
+      <div className="flex items-center justify-between">
+        <div className="h-7 w-64 bg-zinc-200 dark:bg-zinc-800 animate-pulse rounded-lg" />
+        <div className="h-6 w-24 bg-zinc-100 dark:bg-zinc-900 animate-pulse rounded-full" />
+      </div>
+
+      <div className="h-64 w-full flex items-end justify-between gap-1 md:gap-2 px-1 mt-4">
+        {[...Array(15)].map((_, i) => (
+          <div
+            key={i}
+            className="flex-1 bg-zinc-100 dark:bg-zinc-800/50 animate-pulse rounded-t-sm"
+            style={{ height: `${Math.random() * 40 + 10}%` }}
+          />
+        ))}
+      </div>
+    </Card>
+  )
+}
