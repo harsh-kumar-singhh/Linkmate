@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { toZonedTime } from "date-fns-tz"
 import { AICoach } from "@/components/ai/AICoach"
+import { StatSkeleton, PostSkeleton, WelcomeSkeleton } from "@/components/dashboard/DashboardSkeletons"
 
 interface Post {
   id: string
@@ -127,18 +128,8 @@ export default function DashboardPage() {
     }
   }
 
-  if (isUserLoading || isLoading) {
-    return (
-      <div className="min-h-full flex items-center justify-center">
-        <div className="w-12 h-12 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
-
-  if (!user) return null
-
-  // Get first name for greeting
-  const firstName = user.name?.split(' ')[0] || "there"
+  // Only block if we are sure there is no user and we're not loading anymore
+  if (!isUserLoading && !user) return null
 
   const scheduledPosts = posts.filter(p => p.status === "SCHEDULED")
   const publishedPosts = posts.filter(p => p.status === "PUBLISHED").slice(0, 5) // Recent 5
@@ -177,33 +168,43 @@ export default function DashboardPage() {
 
       {/* Header */}
       <AnimatedCard animation="fade-in-up" className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Welcome back, {firstName}!</h1>
-        <p className="text-muted-foreground text-sm font-medium">
-          Here&apos;s what&apos;s happening with your LinkedIn presence
-        </p>
+        {isUserLoading ? (
+          <WelcomeSkeleton />
+        ) : (
+          <>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">Welcome back, {user?.name?.split(' ')[0] || "there"}!</h1>
+            <p className="text-muted-foreground text-sm font-medium">
+              Here&apos;s what&apos;s happening with your LinkedIn presence
+            </p>
+          </>
+        )}
       </AnimatedCard>
 
       {/* Stats */}
-      <AnimatedCard animation="stagger-container" className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard
-          label="Posting Streak"
-          value={stats?.stats?.postingStreak ? `${stats.stats.postingStreak} ${stats.stats.postingStreak === 1 ? 'day' : 'days'}` : "0 days"}
-          icon={<Zap className="w-5 h-5" />}
-          color="text-amber-500 bg-amber-500/10"
-        />
-        <StatCard
-          label="Posts Published"
-          value={stats?.stats?.totalPostsPublished || 0}
-          icon={<CheckCircle2 className="w-5 h-5" />}
-          color="text-emerald-500 bg-emerald-500/10"
-        />
-        <StatCard
-          label="Posts Queued"
-          value={stats?.stats?.postsQueued || 0}
-          icon={<Calendar className="w-5 h-5" />}
-          color="text-primary bg-primary/10"
-        />
-      </AnimatedCard>
+      {isLoading ? (
+        <StatSkeleton />
+      ) : (
+        <AnimatedCard animation="stagger-container" className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <StatCard
+            label="Posting Streak"
+            value={stats?.stats?.postingStreak ? `${stats.stats.postingStreak} ${stats.stats.postingStreak === 1 ? 'day' : 'days'}` : "0 days"}
+            icon={<Zap className="w-5 h-5" />}
+            color="text-amber-500 bg-amber-500/10"
+          />
+          <StatCard
+            label="Posts Published"
+            value={stats?.stats?.totalPostsPublished || 0}
+            icon={<CheckCircle2 className="w-5 h-5" />}
+            color="text-emerald-500 bg-emerald-500/10"
+          />
+          <StatCard
+            label="Posts Queued"
+            value={stats?.stats?.postsQueued || 0}
+            icon={<Calendar className="w-5 h-5" />}
+            color="text-primary bg-primary/10"
+          />
+        </AnimatedCard>
+      )}
 
       {/* Your Posts Section */}
       <div className="space-y-8 pt-2">
@@ -217,7 +218,9 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        {posts.length === 0 ? (
+        {isLoading ? (
+          <PostSkeleton />
+        ) : posts.length === 0 ? (
           <EmptyState />
         ) : (
           <div className="space-y-10">
