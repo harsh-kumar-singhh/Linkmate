@@ -1,9 +1,10 @@
 "use client"
 
 import { useSession } from "next-auth/react"
-import { Globe, MoreHorizontal, ThumbsUp, MessageSquare, Send } from "lucide-react"
+import { Globe, MoreHorizontal, ThumbsUp, MessageSquare, Send, Image as ImageIcon, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Image from "next/image"
+import { motion } from "framer-motion"
 
 interface LinkedInPreviewProps {
     content: string
@@ -41,9 +42,7 @@ export function LinkedInPreview({ content, imageUrl, className }: LinkedInPrevie
                         </h4>
                         <span className="text-[14px] text-zinc-500 dark:text-zinc-400 font-normal leading-tight">• 1st</span>
                     </div>
-                    <p className="text-[12px] text-zinc-500 dark:text-zinc-400 line-clamp-1 leading-tight mt-0.5">
-                        Professional at LinkMate • Strategy & Growth
-                    </p>
+                    {/* Subtitle removed as requested - keeps it clean and dynamic */}
                     <div className="flex items-center gap-1 text-[12px] text-zinc-500 dark:text-zinc-400 mt-0.5">
                         <span>Now</span>
                         <span>•</span>
@@ -77,11 +76,52 @@ export function LinkedInPreview({ content, imageUrl, className }: LinkedInPrevie
                     />
                 </div>
             ) : (
-                <div className="bg-[#F8F9FA] dark:bg-[#121619] border-y border-zinc-100 dark:border-zinc-800 flex flex-col items-center justify-center p-12 mt-2 group cursor-pointer transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800/50">
-                    <div className="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center mb-3">
-                        <Globe className="w-5 h-5 text-zinc-400 dark:text-zinc-500" />
+                <div className="relative h-[280px] mt-2 overflow-hidden group cursor-pointer border-y border-zinc-100 dark:border-zinc-800">
+                    {/* Dynamic Background */}
+                    <div className="absolute inset-0 bg-zinc-50 dark:bg-zinc-900/50 transition-colors group-hover:bg-zinc-100 dark:group-hover:bg-zinc-800/80" />
+                    <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none bg-[radial-gradient(#0A66C2_1px,transparent_1px)] [background-size:20px_20px]" />
+                    
+                    <div className="relative h-full flex flex-col items-center justify-center p-8 text-center space-y-4">
+                        <motion.div
+                            animate={{ 
+                                y: [0, -8, 0],
+                                rotate: [0, 5, -5, 0]
+                            }}
+                            transition={{ 
+                                duration: 4, 
+                                repeat: Infinity, 
+                                ease: "easeInOut" 
+                            }}
+                            className="w-16 h-16 rounded-3xl bg-white dark:bg-zinc-800 shadow-xl shadow-zinc-200/50 dark:shadow-none flex items-center justify-center relative"
+                        >
+                            <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-[#0A66C2]/10 to-transparent opacity-50" />
+                            <ImageIcon className="w-8 h-8 text-[#0A66C2] relative z-10" />
+                            
+                            {/* Decorative Sparks */}
+                            <motion.div 
+                                animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
+                                transition={{ duration: 2, repeat: Infinity }}
+                                className="absolute -top-1 -right-1 w-4 h-4 text-[#0A66C2]"
+                            >
+                                <Sparkles className="w-full h-full" />
+                            </motion.div>
+                        </motion.div>
+
+                        <div className="space-y-1 max-w-[280px]">
+                            <h5 className="text-[15px] font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
+                                Visuals drive 2x more reach 🚀
+                            </h5>
+                            <p className="text-[13px] text-zinc-500 dark:text-zinc-400 leading-snug">
+                                Add an image or video to make your story impossible to ignore.
+                            </p>
+                        </div>
+
+                        <div className="pt-2">
+                             <span className="text-[11px] font-bold text-[#0A66C2] px-3 py-1 rounded-full bg-[#0A66C2]/5 border border-[#0A66C2]/10 uppercase tracking-widest">
+                                Boost Engagement
+                             </span>
+                        </div>
                     </div>
-                    <p className="text-[12px] text-zinc-500 dark:text-zinc-400 font-medium tracking-tight">Image preview will be shown here</p>
                 </div>
             )}
 

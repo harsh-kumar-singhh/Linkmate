@@ -356,7 +356,6 @@ export default function CalendarPage() {
                     frequency: user.autopilotFrequency,
                     days: user.autopilotDays,
                     time: user.autopilotTime,
-                    aboutYou: user.autopilotAboutYou,
                     currentFocus: user.autopilotCurrentFocus,
                     writingStyleId: user.autopilotWritingStyleId,
                     writingStyles: user.writingStyles

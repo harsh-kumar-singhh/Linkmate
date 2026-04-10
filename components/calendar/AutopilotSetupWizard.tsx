@@ -20,7 +20,6 @@ interface AutopilotSetupWizardProps {
         frequency: string;
         days: string[];
         time: string; // UTC
-        aboutYou?: string;
         currentFocus?: string;
         writingStyleId?: string;
         writingStyles?: Array<{ id: string; name: string }>;
@@ -47,7 +46,6 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
     // autopilotTime is already local HH:mm
     const [time, setTime] = useState(initialData?.time || "10:00");
 
-    const [aboutYou, setAboutYou] = useState(initialData?.aboutYou || "");
     const [currentFocus, setCurrentFocus] = useState(initialData?.currentFocus || "");
     const [writingStyleId, setWritingStyleId] = useState<string>(initialData?.writingStyleId || "default");
     const [selectionMode, setSelectionMode] = useState<"automatic" | "manual">(
@@ -76,7 +74,6 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                 if (initialData.topics) setTopics(initialData.topics);
                 if (initialData.frequency) setFrequency(initialData.frequency);
                 if (initialData.days) setDays(initialData.days);
-                if (initialData.aboutYou) setAboutYou(initialData.aboutYou);
                 if (initialData.currentFocus) setCurrentFocus(initialData.currentFocus);
                 if (initialData.writingStyleId) {
                     setWritingStyleId(initialData.writingStyleId);
@@ -131,7 +128,6 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                 frequency,
                 days,
                 time: time,
-                aboutYou,
                 currentFocus,
                 writingStyleId: selectionMode === "automatic" ? "default" : writingStyleId,
             };
@@ -391,22 +387,12 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
 
                                                 <div className="space-y-4">
                                                     <div className="space-y-1.5">
-                                                        <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">About You (Optional)</label>
-                                                        <textarea 
-                                                            value={aboutYou}
-                                                            onChange={(e) => setAboutYou(e.target.value)}
-                                                            placeholder="e.g., Founder building an AI SaaS called Linkmate that helps professionals grow on LinkedIn."
-                                                            className="w-full h-24 bg-secondary/30 border-none rounded-2xl p-4 text-sm focus:ring-2 focus:ring-blue-600/30 resize-none"
-                                                        />
-                                                    </div>
-
-                                                    <div className="space-y-1.5">
                                                         <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Weekly Focus (Optional)</label>
                                                         <textarea 
                                                             value={currentFocus}
                                                             onChange={(e) => setCurrentFocus(e.target.value)}
                                                             placeholder="e.g., Preparing to launch Linkmate publicly and documenting the journey."
-                                                            className="w-full h-24 bg-secondary/30 border-none rounded-2xl p-4 text-sm focus:ring-2 focus:ring-blue-600/30 resize-none"
+                                                            className="w-full h-32 bg-secondary/30 border-none rounded-2xl p-4 text-sm focus:ring-2 focus:ring-blue-600/30 resize-none"
                                                         />
                                                     </div>
 

@@ -27,7 +27,7 @@ model User {
   autopilotFrequency String?
   autopilotDays String[]  @default([])
   autopilotTime String?
-  autopilotAboutYou String? @db.Text
+  aboutYou      String?   @db.Text
   autopilotCurrentFocus String? @db.Text
   autopilotWritingStyleId String?
   createdAt     DateTime  @default(now())

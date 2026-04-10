@@ -29,6 +29,7 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { LinkedInPreview } from "@/components/posts/LinkedInPreview"
 import { AICoach } from "@/components/ai/AICoach"
+import { EmotiveTips } from "@/components/posts/EmotiveTips"
 import { StyleSelector } from "@/components/posts/style-selector"
 import { useUser } from "@/context/UserContext"
 import { useTrialTrigger } from "@/context/TrialTriggerContext"
@@ -198,6 +199,10 @@ function EditorContent() {
             return
         }
 
+        // Instant Local Preview
+        const localPreviewUrl = URL.createObjectURL(file);
+        setImageUrl(localPreviewUrl);
+
         setIsUploading(true)
         try {
             const formData = new FormData()
@@ -210,10 +215,13 @@ function EditorContent() {
 
             if (response.ok) {
                 const data = await response.json()
-                setImageUrl(data.imageUrl)
+                // Use base64 for persistent preview to avoid 404s on local dev
+                const base64Url = `data:image/png;base64,${data.imageData}`;
+                setImageUrl(base64Url)
                 setImageData(data.imageData)
             } else {
                 alert("Upload failed")
+                setImageUrl(null) // Reset on failure
             }
         } catch (error) {
             console.error("Upload error:", error)
@@ -637,27 +645,7 @@ function EditorContent() {
 
                     {/* Right Column: Information/Tips */}
                     <div className="hidden lg:block space-y-6 sticky top-8 h-fit">
-                        <div className="bg-background border border-border/80 rounded-[28px] p-8 space-y-6 shadow-sm">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                                    <Sparkles className="w-5 h-5 text-primary" />
-                                </div>
-                                <h2 className="text-xl font-bold tracking-tight">Pro Tips</h2>
-                            </div>
-                            <div className="space-y-4">
-                                {[
-                                    { title: "Hashtags", desc: "Use 3-5 relevant hashtags for better reach." },
-                                    { title: "Hook", desc: "The first 2 lines are critical; make them hooky." },
-                                    { title: "Links", desc: "Avoid outbound links in the body; use 'link in comments'." },
-                                    { title: "Tags", desc: "Only tag people if genuinely relevant." }
-                                ].map((tip, i) => (
-                                    <div key={i} className="space-y-1">
-                                        <p className="text-sm font-bold text-foreground">{tip.title}</p>
-                                        <p className="text-[13px] text-muted-foreground leading-relaxed">{tip.desc}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                        <EmotiveTips />
                     </div>
                 </div>
             </main>

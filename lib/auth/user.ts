@@ -30,7 +30,7 @@ export const resolveUser = cache(async (providedSession?: Session | null) => {
         autopilotFrequency: true,
         autopilotDays: true,
         autopilotTime: true,
-        autopilotAboutYou: true,
+        aboutYou: true,
         autopilotCurrentFocus: true,
         autopilotWritingStyleId: true,
         // Legacy fields for backward compatibility

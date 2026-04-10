@@ -87,6 +87,7 @@ export function SettingsForm({ user: initialUser }: SettingsFormProps) {
         engagement: false,
     });
 
+    const [aboutYou, setAboutYou] = useState(activeUser?.aboutYou || "");
     const [isSaving, setIsSaving] = useState(false);
     const [isSaved, setIsSaved] = useState(false);
     const { setTheme, theme } = useTheme();
@@ -100,6 +101,7 @@ export function SettingsForm({ user: initialUser }: SettingsFormProps) {
             if (field === 'account') body.name = name;
             if (field === 'theme') body.theme = value;
             if (field === 'tone') body.defaultTone = value;
+            if (field === 'aboutYou') body.aboutYou = aboutYou;
 
             const response = await fetch("/api/user/settings", {
                 method: "PUT",
@@ -292,6 +294,46 @@ export function SettingsForm({ user: initialUser }: SettingsFormProps) {
                         >
                             {isSaved ? <Check className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
                             Save All Styles
+                        </Button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Personalize AI Card (Global Context) */}
+            <div className="bg-card border border-border/60 rounded-[24px] shadow-sm overflow-hidden">
+                <div className="p-6 md:p-8 space-y-6">
+                    <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-primary" />
+                        <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Personalize your AI</h3>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">About You (Global Context)</label>
+                            <p className="text-xs text-muted-foreground">This helps the AI understand your background, niche, and company whenever it generates content for you.</p>
+                            <div className="relative group">
+                                <TextareaAutosize
+                                    minRows={6}
+                                    value={aboutYou}
+                                    onChange={(e) => setAboutYou(e.target.value)}
+                                    placeholder={`e.g., "I'm a founder building LinkMate, an AI-powered SaaS for LinkedIn growth. I write about startups, AI, and productivity."`}
+                                    className="w-full resize-none text-base p-6 rounded-2xl bg-secondary/20 border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all text-foreground"
+                                />
+                                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <User className="w-4 h-4 text-primary/40" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="pt-2">
+                        <Button
+                            onClick={() => handleSave('aboutYou')}
+                            disabled={isSaving}
+                            className="h-12 px-6 rounded-xl font-bold gap-2"
+                        >
+                            {isSaved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+                            Save AI Context
                         </Button>
                     </div>
                 </div>

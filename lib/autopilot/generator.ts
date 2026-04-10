@@ -129,7 +129,7 @@ export async function generateAutopilotPosts(
       autopilotTopics: true,
       autopilotDays: true,
       autopilotTime: true,
-      autopilotAboutYou: true,
+      aboutYou: true,
       autopilotCurrentFocus: true,
       autopilotWritingStyleId: true,
       writingStyles: true,
@@ -167,7 +167,7 @@ export async function generateAutopilotPosts(
   let slotIndex = sortedDays.indexOf(specificDay.toUpperCase());
   if (slotIndex === -1) slotIndex = 0;
 
-  const additionalContexts = user.autopilotAboutYou ? [user.autopilotAboutYou] : [];
+  const additionalContexts = user.aboutYou ? [user.aboutYou] : [];
   
   const contentPlan = createContentPlan(
     user.autopilotCurrentFocus || undefined,
@@ -189,8 +189,8 @@ export async function generateAutopilotPosts(
     promptContext = `CONTEXT/BACKGROUND: ${currentPlan.value}`;
   } else if (currentPlan.source === "TOPIC") {
     promptTopic = currentPlan.value || topics[0];
-    if (user.autopilotAboutYou) {
-      promptContext = `ABOUT ME: ${user.autopilotAboutYou}`;
+    if (user.aboutYou) {
+      promptContext = `ABOUT ME: ${user.aboutYou}`;
     }
   }
 

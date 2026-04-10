@@ -1,4 +1,4 @@
-export const runtime = "nodejs";
+ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
@@ -62,11 +62,16 @@ export async function POST(req: Request) {
                 select: {
                     writingStyles: true,
                     writingStyle: true,
-                    customStyles: true
+                    customStyles: true,
+                    aboutYou: true
                 }
             } as any);
 
             if (userData) {
+                if ((userData as any).aboutYou) {
+                   // Append global context to the generation context
+                   // We'll pass it to generatePost below
+                }
                 let styles = (userData as any).writingStyles || [];
                 // Bridge logic: combine legacy and new styles if needed
                 if (styles.length === 0) {
@@ -94,12 +99,18 @@ export async function POST(req: Request) {
 
         try {
             const { generatePost } = require("@/lib/gemini");
+            
+            // PRE-FILL: Prepend global "About You" context if available
+            const globalContext = (user as any).aboutYou ? `USER BACKGROUND: ${(user as any).aboutYou}\n\n` : "";
+            const midContext = context ? `ADDITIONAL CONTEXT: ${context}` : "";
+            const finalContext = `${globalContext}${midContext}`.trim();
+
             const cleanedContent = await generatePost({
                 topic,
                 style,
                 userWritingSample,
                 targetLength,
-                context
+                context: finalContext
             });
 
             return NextResponse.json({ content: cleanedContent });

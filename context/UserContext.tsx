@@ -14,7 +14,7 @@ interface User {
     autopilotFrequency: string;
     autopilotDays: string[];
     autopilotTime: string;
-    autopilotAboutYou?: string;
+    aboutYou?: string;
     autopilotCurrentFocus?: string;
     autopilotWritingStyleId?: string;
     defaultTone?: string;
