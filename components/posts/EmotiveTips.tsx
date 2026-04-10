@@ -137,7 +137,7 @@ export function EmotiveTips() {
                         ))}
                     </div>
                     <p className="text-[11px] font-medium text-muted-foreground italic">
-                        "Your best post is just one click away..."
+                        &quot;Your best post is just one click away...&quot;
                     </p>
                 </div>
             </div>
