@@ -605,7 +605,15 @@ function EditorContent() {
                                 <Globe className="w-5 h-5 text-primary" />
                                 <h3 className="font-bold text-lg">Post Preview</h3>
                             </div>
-                            <LinkedInPreview content={content} imageUrl={imageUrl} />
+                            <LinkedInPreview
+                                content={content}
+                                imageUrl={imageUrl}
+                                onAddImage={() => {
+                                    setMode("manual")
+                                    // Small delay to let the file input render if switching from AI mode
+                                    setTimeout(() => fileInputRef.current?.click(), 50)
+                                }}
+                            />
                         </div>
 
                         {/* Action Buttons */}

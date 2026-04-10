@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { 
@@ -15,7 +15,10 @@ import {
     CheckCircle2, 
     Edit2, 
     Lock,
-    Sparkles
+    Sparkles,
+    CalendarPlus,
+    FileText,
+    X
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -32,6 +35,71 @@ const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
+// Quick Action Popup Component
+function QuickActionPopup({
+    date,
+    onClose,
+    cellRect
+}: {
+    date: Date;
+    onClose: () => void;
+    cellRect: DOMRect | null;
+}) {
+    const isoDate = date.toISOString()
+    return (
+        <div
+            className="fixed z-50 animate-in fade-in zoom-in-95 duration-150"
+            style={{
+                top: cellRect ? cellRect.top + window.scrollY + 8 : "50%",
+                left: cellRect ? Math.min(cellRect.left, window.innerWidth - 200) : "50%",
+                transform: cellRect ? undefined : "translate(-50%, -50%)"
+            }}
+            onClick={(e) => e.stopPropagation()}
+        >
+            <div className="bg-[#0d1829] border border-blue-500/20 rounded-2xl shadow-2xl shadow-black/60 p-1.5 min-w-[180px]">
+                <div className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border/40 mb-1">
+                    {format(date, "MMMM d")}
+                </div>
+                <Link href={`/posts/new?date=${isoDate}`} prefetch={false} onClick={onClose}>
+                    <button className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-foreground hover:bg-blue-500/10 hover:text-blue-400 transition-colors">
+                        <CalendarPlus className="w-4 h-4 text-blue-400" />
+                        Schedule Post
+                    </button>
+                </Link>
+                <Link href={`/posts/new?date=${isoDate}&draft=true`} prefetch={false} onClick={onClose}>
+                    <button className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-foreground hover:bg-blue-500/10 hover:text-blue-400 transition-colors">
+                        <FileText className="w-4 h-4 text-blue-300" />
+                        Quick Draft
+                    </button>
+                </Link>
+                <button
+                    onClick={onClose}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:bg-secondary/40 hover:text-foreground transition-colors"
+                >
+                    <X className="w-4 h-4" />
+                    Dismiss
+                </button>
+            </div>
+        </div>
+    )
+}
+
+// Status dot for a post
+function StatusDot({ status }: { status: string }) {
+    if (status === "SCHEDULED") {
+        return (
+            <span className="relative flex items-center justify-center">
+                <span className="absolute inline-flex h-2 w-2 rounded-full bg-blue-400 opacity-60 animate-ping" />
+                <span className="relative w-1.5 h-1.5 bg-blue-400 rounded-full" />
+            </span>
+        )
+    }
+    if (status === "PUBLISHED") {
+        return <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full shrink-0" />
+    }
+    return <span className="w-1.5 h-1.5 bg-slate-400 rounded-full shrink-0" />
+}
+
 export default function CalendarPage() {
     const { user, isPro, refreshUser } = useUser()
     const router = useRouter()
@@ -45,6 +113,10 @@ export default function CalendarPage() {
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false)
     const [isSetupWizardOpen, setIsSetupWizardOpen] = useState(false)
     const [isToggling, setIsToggling] = useState(false)
+    const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+    const [selectedCellRect, setSelectedCellRect] = useState<DOMRect | null>(null)
+    const [monthDirection, setMonthDirection] = useState<"left" | "right" | null>(null)
+    const [isTransitioning, setIsTransitioning] = useState(false)
 
     const currentYear = viewDate.getFullYear()
     const currentMonth = viewDate.getMonth()
@@ -64,6 +136,15 @@ export default function CalendarPage() {
             setSchedulingMode("autopilot")
         }
     }, [user])
+
+    // Close popup when clicking outside
+    useEffect(() => {
+        const handleClickOutside = () => setSelectedDate(null)
+        if (selectedDate) {
+            document.addEventListener("click", handleClickOutside)
+            return () => document.removeEventListener("click", handleClickOutside)
+        }
+    }, [selectedDate])
 
     const fetchPosts = async () => {
         try {
@@ -99,268 +180,427 @@ export default function CalendarPage() {
         }
     }
 
-    const nextMonth = () => setViewDate(new Date(currentYear, currentMonth + 1, 1))
-    const prevMonth = () => setViewDate(new Date(currentYear, currentMonth - 1, 1))
+    const changeMonth = (direction: "left" | "right") => {
+        if (isTransitioning) return
+        setMonthDirection(direction)
+        setIsTransitioning(true)
+        setTimeout(() => {
+            if (direction === "right") {
+                setViewDate(new Date(currentYear, currentMonth + 1, 1))
+            } else {
+                setViewDate(new Date(currentYear, currentMonth - 1, 1))
+            }
+            setIsTransitioning(false)
+            setMonthDirection(null)
+        }, 250)
+    }
+
+    const nextMonth = () => changeMonth("right")
+    const prevMonth = () => changeMonth("left")
+
+    const handleCellClick = (e: React.MouseEvent<HTMLDivElement>, cellDate: Date) => {
+        e.stopPropagation()
+        const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
+        setSelectedCellRect(rect)
+        setSelectedDate(prev =>
+            prev?.toDateString() === cellDate.toDateString() ? null : cellDate
+        )
+    }
 
     return (
+        <>
+            <style jsx global>{`
+                @keyframes pulse-ring {
+                    0% { transform: scale(0.9); opacity: 0.8; }
+                    70% { transform: scale(1.4); opacity: 0; }
+                    100% { transform: scale(1.4); opacity: 0; }
+                }
+                @keyframes today-glow {
+                    0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0.4), 0 0 12px rgba(59,130,246,0.2); }
+                    50% { box-shadow: 0 0 0 4px rgba(59,130,246,0.1), 0 0 20px rgba(59,130,246,0.35); }
+                }
+                .today-cell {
+                    animation: today-glow 2.8s ease-in-out infinite;
+                }
+                .calendar-grid-enter-left {
+                    animation: slideFromLeft 0.28s cubic-bezier(0.4,0,0.2,1) forwards;
+                }
+                .calendar-grid-enter-right {
+                    animation: slideFromRight 0.28s cubic-bezier(0.4,0,0.2,1) forwards;
+                }
+                @keyframes slideFromLeft {
+                    from { opacity: 0; transform: translateX(-24px); }
+                    to { opacity: 1; transform: translateX(0); }
+                }
+                @keyframes slideFromRight {
+                    from { opacity: 0; transform: translateX(24px); }
+                    to { opacity: 1; transform: translateX(0); }
+                }
+                .day-cell {
+                    transition: background 0.18s, transform 0.18s, box-shadow 0.18s;
+                    will-change: transform;
+                }
+                .day-cell:hover {
+                    transform: translateY(-2px) scale(1.01);
+                    z-index: 2;
+                }
+                .day-cell:active {
+                    transform: translateY(0px) scale(0.99);
+                    transition-duration: 0.08s;
+                }
+                .post-chip {
+                    transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+                }
+                .post-chip:hover {
+                    transform: translateX(2px);
+                }
+                .schedule-btn-glow {
+                    box-shadow: 0 0 0 0 rgba(59,130,246,0.5);
+                    transition: box-shadow 0.3s;
+                }
+                .schedule-btn-glow:hover {
+                    box-shadow: 0 0 20px rgba(59,130,246,0.4), 0 0 40px rgba(59,130,246,0.15);
+                }
+                .toggle-pill {
+                    transition: background 0.2s;
+                }
+                .toggle-indicator {
+                    transition: transform 0.22s cubic-bezier(0.4,0,0.2,1), background 0.2s;
+                }
+            `}</style>
 
-        <div className="max-w-7xl mx-auto h-full flex flex-col py-6 md:py-8 gap-8">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 px-4 md:px-0">
-                <div className="space-y-1">
-                    <h1 className="text-[10px] font-bold tracking-[0.2em] text-muted-foreground uppercase">Schedule</h1>
-                    <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Content Pipeline</h2>
-                </div>
-
-                {/* Scheduling Mode Toggle */}
-                <div className="flex bg-secondary/40 p-1 rounded-xl items-center font-medium self-center md:self-end">
-                    <button
-                        onClick={() => setSchedulingMode("manual")}
-                        className={cn(
-                            "py-1.5 px-4 rounded-lg text-xs transition-all flex items-center gap-2",
-                            schedulingMode === "manual" ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"
-                        )}
-                    >
-                        Manual
-                    </button>
-                    <button
-                        onClick={() => {
-                            if (!isPro) {
-                                setIsUpgradeModalOpen(true)
-                            } else {
-                                if (!user?.autopilotTopics || user.autopilotTopics.length === 0) {
-                                    setIsSetupWizardOpen(true)
-                                } else {
-                                    setSchedulingMode("autopilot")
-                                }
-                            }
-                        }}
-                        className={cn(
-                            "py-1.5 px-4 rounded-lg text-xs transition-all flex items-center gap-2",
-                            schedulingMode === "autopilot" ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"
-                        )}
-                    >
-                        Autopilot
-                        {!isPro && <Lock className="w-3 h-3" />}
-                    </button>
-                </div>
-
-                <div className="flex items-center justify-between md:justify-end gap-4 md:gap-8">
-                    <div className="flex items-center gap-1 md:gap-2">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-secondary" onClick={prevMonth}>
-                            <ChevronLeft className="w-4 h-4" />
-                        </Button>
-                        <span className="text-sm md:text-base font-bold tracking-tight text-foreground w-32 md:w-36 text-center">
-                            {format(viewDate, 'MMMM yyyy')}
-                        </span>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-secondary" onClick={nextMonth}>
-                            <ChevronRight className="w-4 h-4" />
-                        </Button>
+            <div className="max-w-7xl mx-auto h-full flex flex-col py-6 md:py-8 gap-8">
+                {/* Header */}
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 px-4 md:px-0">
+                    <div className="space-y-1">
+                        <h1 className="text-[10px] font-bold tracking-[0.2em] text-muted-foreground uppercase">Schedule</h1>
+                        <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Content Pipeline</h2>
                     </div>
-                    <Link href="/posts/new" prefetch={false}>
-                        <Button size="sm" className="h-10 px-4 rounded-xl shadow-sm gap-2">
-                            <Plus className="w-4 h-4" />
-                            <span className="hidden sm:inline">Schedule Post</span>
-                        </Button>
-                    </Link>
-                </div>
-            </div>
 
-            {/* Autopilot Status Bar (Pro only) */}
-            {isPro && schedulingMode === "autopilot" && user?.autopilotTopics && user.autopilotTopics.length > 0 && (
-                <div className="space-y-6">
-                    <div className="mx-2 md:mx-0 bg-blue-600/5 border border-blue-600/20 rounded-[24px] p-6 flex flex-col md:flex-row items-center justify-between gap-6 transition-all duration-500">
-                        <div className="flex items-center gap-4">
-                            <div className={cn(
-                                "p-3 rounded-2xl",
-                                user.autopilotEnabled ? "bg-emerald-500/10" : "bg-amber-500/10"
-                            )}>
-                                {user.autopilotEnabled ? (
-                                    <Zap className="w-6 h-6 text-emerald-600" />
-                                ) : (
-                                    <Pause className="w-6 h-6 text-amber-600" />
+                    {/* Scheduling Mode Toggle — pill with sliding indicator */}
+                    <div className="relative flex bg-secondary/40 p-1 rounded-xl items-center font-medium self-center md:self-end toggle-pill">
+                        {/* Sliding background */}
+                        <div
+                            className="toggle-indicator absolute top-1 bottom-1 rounded-lg bg-background shadow-sm"
+                            style={{
+                                width: "calc(50% - 4px)",
+                                transform: schedulingMode === "autopilot" ? "translateX(calc(100% + 4px))" : "translateX(0)",
+                                left: 4
+                            }}
+                        />
+                        <button
+                            onClick={() => setSchedulingMode("manual")}
+                            className={cn(
+                                "relative py-1.5 px-4 rounded-lg text-xs transition-colors flex items-center gap-2 z-10",
+                                schedulingMode === "manual" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            Manual
+                        </button>
+                        <button
+                            onClick={() => {
+                                if (!isPro) {
+                                    setIsUpgradeModalOpen(true)
+                                } else {
+                                    if (!user?.autopilotTopics || user.autopilotTopics.length === 0) {
+                                        setIsSetupWizardOpen(true)
+                                    } else {
+                                        setSchedulingMode("autopilot")
+                                    }
+                                }
+                            }}
+                            className={cn(
+                                "relative py-1.5 px-4 rounded-lg text-xs transition-colors flex items-center gap-2 z-10",
+                                schedulingMode === "autopilot" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            Autopilot
+                            {!isPro && <Lock className="w-3 h-3" />}
+                        </button>
+                    </div>
+
+                    <div className="flex items-center justify-between md:justify-end gap-4 md:gap-8">
+                        <div className="flex items-center gap-1 md:gap-2">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 rounded-full hover:bg-secondary"
+                                onClick={prevMonth}
+                            >
+                                <ChevronLeft className="w-4 h-4" />
+                            </Button>
+                            <span
+                                key={`${currentYear}-${currentMonth}`}
+                                className={cn(
+                                    "text-sm md:text-base font-bold tracking-tight text-foreground w-32 md:w-36 text-center",
+                                    !isTransitioning && monthDirection === "right" && "calendar-grid-enter-right",
+                                    !isTransitioning && monthDirection === "left" && "calendar-grid-enter-left"
                                 )}
-                            </div>
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2">
-                                    <h3 className="font-bold text-lg">Autopilot is {user.autopilotEnabled ? "Active" : "Paused"}</h3>
-                                    {user.autopilotEnabled && (
-                                        <div className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 text-[10px] font-bold rounded-full flex items-center gap-1 uppercase tracking-wider">
-                                            <CheckCircle2 className="w-3 h-3" />
-                                            Optimal
-                                        </div>
+                            >
+                                {format(viewDate, 'MMMM yyyy')}
+                            </span>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 rounded-full hover:bg-secondary"
+                                onClick={nextMonth}
+                            >
+                                <ChevronRight className="w-4 h-4" />
+                            </Button>
+                        </div>
+                        <Link href="/posts/new" prefetch={false}>
+                            <Button
+                                size="sm"
+                                className="h-10 px-4 rounded-xl shadow-sm gap-2 schedule-btn-glow"
+                            >
+                                <Plus className="w-4 h-4" />
+                                <span className="hidden sm:inline">Schedule Post</span>
+                            </Button>
+                        </Link>
+                    </div>
+                </div>
+
+                {/* Autopilot Status Bar (Pro only) */}
+                {isPro && schedulingMode === "autopilot" && user?.autopilotTopics && user.autopilotTopics.length > 0 && (
+                    <div className="space-y-6">
+                        <div className="mx-2 md:mx-0 bg-blue-600/5 border border-blue-600/20 rounded-[24px] p-6 flex flex-col md:flex-row items-center justify-between gap-6 transition-all duration-500">
+                            <div className="flex items-center gap-4">
+                                <div className={cn(
+                                    "p-3 rounded-2xl",
+                                    user.autopilotEnabled ? "bg-emerald-500/10" : "bg-amber-500/10"
+                                )}>
+                                    {user.autopilotEnabled ? (
+                                        <Zap className="w-6 h-6 text-emerald-600" />
+                                    ) : (
+                                        <Pause className="w-6 h-6 text-amber-600" />
                                     )}
                                 </div>
-                                 <div className="space-y-2">
-                                    <p className="text-sm text-muted-foreground">
-                                        {user.autopilotFrequency} posts/week • {user.autopilotDays.length} days active • Posting at {(() => {
-                                            if (!user.autopilotTime) return "10:00 AM";
-                                            const localDate = new Date(`1970-01-01T${user.autopilotTime}:00`);
-                                            
-                                            console.log('[UI DEBUG FINAL] Raw Time:', user.autopilotTime);
-                                            console.log('[UI DEBUG FINAL] Local Date:', localDate);
-                                            console.log('[UI DEBUG FINAL] Formatted:', format(localDate, 'hh:mm a'));
-
-                                            return format(localDate, 'hh:mm a');
-                                        })()}
-                                    </p>
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {user.autopilotTopics?.map((topic: string) => (
-                                            <span key={topic} className="px-2 py-0.5 bg-blue-600/5 border border-blue-600/10 text-blue-600/70 text-[10px] font-bold rounded-md">
-                                                {topic}
-                                            </span>
-                                        ))}
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="font-bold text-lg">Autopilot is {user.autopilotEnabled ? "Active" : "Paused"}</h3>
+                                        {user.autopilotEnabled && (
+                                            <div className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 text-[10px] font-bold rounded-full flex items-center gap-1 uppercase tracking-wider">
+                                                <CheckCircle2 className="w-3 h-3" />
+                                                Optimal
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <p className="text-sm text-muted-foreground">
+                                            {user.autopilotFrequency} posts/week • {user.autopilotDays.length} days active • Posting at {(() => {
+                                                if (!user.autopilotTime) return "10:00 AM";
+                                                const localDate = new Date(`1970-01-01T${user.autopilotTime}:00`);
+                                                return format(localDate, 'hh:mm a');
+                                            })()}
+                                        </p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {user.autopilotTopics?.map((topic: string) => (
+                                                <span key={topic} className="px-2 py-0.5 bg-blue-600/5 border border-blue-600/10 text-blue-600/70 text-[10px] font-bold rounded-md">
+                                                    {topic}
+                                                </span>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
+
+                            <div className="flex items-center gap-3 w-full md:w-auto">
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    className="flex-1 md:flex-none h-11 rounded-xl gap-2 font-bold px-5"
+                                    onClick={() => setIsSetupWizardOpen(true)}
+                                >
+                                    <Edit2 className="w-4 h-4" />
+                                    Edit Settings
+                                </Button>
+                                <Button
+                                    variant={user.autopilotEnabled ? "outline" : "primary"}
+                                    size="sm"
+                                    className={cn(
+                                        "flex-1 md:flex-none h-11 rounded-xl gap-2 font-bold px-5",
+                                        user.autopilotEnabled ? "border-amber-500/30 text-amber-600 hover:bg-amber-500/5" : "bg-emerald-600 hover:bg-emerald-500 text-white"
+                                    )}
+                                    onClick={handleToggleAutopilot}
+                                    disabled={isToggling}
+                                >
+                                    {user.autopilotEnabled ? (
+                                        <>
+                                            <Pause className="w-4 h-4" />
+                                            Pause
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Play className="w-4 h-4" />
+                                            Resume
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
                         </div>
 
-                        <div className="flex items-center gap-3 w-full md:w-auto">
-                            <Button 
-                                variant="secondary" 
-                                size="sm" 
-                                className="flex-1 md:flex-none h-11 rounded-xl gap-2 font-bold px-5"
-                                onClick={() => setIsSetupWizardOpen(true)}
-                            >
-                                <Edit2 className="w-4 h-4" />
-                                Edit Settings
-                            </Button>
-                            <Button 
-                                variant={user.autopilotEnabled ? "outline" : "primary"}
-                                size="sm" 
-                                className={cn(
-                                    "flex-1 md:flex-none h-11 rounded-xl gap-2 font-bold px-5",
-                                    user.autopilotEnabled ? "border-amber-500/30 text-amber-600 hover:bg-amber-500/5" : "bg-emerald-600 hover:bg-emerald-500 text-white"
-                                )}
-                                 onClick={handleToggleAutopilot}
-                                disabled={isToggling}
-                            >
-                                {user.autopilotEnabled ? (
-                                    <>
-                                        <Pause className="w-4 h-4" />
-                                        Pause
-                                    </>
-                                ) : (
-                                    <>
-                                        <Play className="w-4 h-4" />
-                                        Resume
-                                    </>
-                                )}
-                            </Button>
+                        {/* Weekly Focus Context */}
+                        <div className="mx-2 md:mx-0">
+                            <WeeklyFocusCard
+                                initialFocus={user?.autopilotCurrentFocus || ""}
+                                onUpdate={() => refreshUser()}
+                            />
                         </div>
                     </div>
-                
-                    {/* Weekly Focus Context */}
-                    <div className="mx-2 md:mx-0">
-                        <WeeklyFocusCard 
-                            initialFocus={user?.autopilotCurrentFocus || ""} 
-                            onUpdate={() => refreshUser()} 
-                        />
+                )}
+
+                {/* Calendar Grid */}
+                <div
+                    className="flex-1 rounded-[24px] md:rounded-[32px] border border-blue-500/10 overflow-hidden transition-all duration-500 mx-2 md:mx-0"
+                    style={{
+                        background: "linear-gradient(135deg, #0d1829 0%, #0a1120 60%, #0d1829 100%)",
+                        boxShadow: "0 8px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)"
+                    }}
+                >
+                    {/* Day labels header */}
+                    <div className="grid grid-cols-7 border-b border-blue-500/10" style={{ background: "rgba(255,255,255,0.02)" }}>
+                        {DAYS.map((day) => (
+                            <div key={day} className="py-3 md:py-4 text-center text-[9px] md:text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">
+                                {day}
+                            </div>
+                        ))}
                     </div>
-                </div>
-            )}
 
-            <div className="flex-1 bg-card rounded-[24px] md:rounded-[32px] border border-border overflow-hidden shadow-sm transition-all duration-500 mx-2 md:mx-0">
-                <div className="grid grid-cols-7 border-b border-border bg-secondary/5">
-                    {DAYS.map((day) => (
-                        <div key={day} className="py-3 md:py-4 text-center text-[9px] md:text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                            {day}
-                        </div>
-                    ))}
-                </div>
+                    {/* Date cells */}
+                    <div
+                        key={`${currentYear}-${currentMonth}`}
+                        className={cn(
+                            "grid grid-cols-7",
+                            monthDirection === "right" && "calendar-grid-enter-right",
+                            monthDirection === "left" && "calendar-grid-enter-left"
+                        )}
+                    >
+                        {DATES.map((date, i) => {
+                            const cellDate = date ? new Date(currentYear, currentMonth, date) : null
+                            const datePosts = cellDate ? posts.filter(p => {
+                                if (!p.scheduledFor && !p.createdAt) return false
+                                const d = new Date(p.scheduledFor || p.createdAt)
+                                return d.toDateString() === cellDate.toDateString()
+                            }) : []
 
-                <div className="grid grid-cols-7">
-                    {DATES.map((date, i) => {
-                        const cellDate = date ? new Date(currentYear, currentMonth, date) : null
-                        const datePosts = cellDate ? posts.filter(p => {
-                            if (!p.scheduledFor && !p.createdAt) return false
-                            const d = new Date(p.scheduledFor || p.createdAt)
-                            return d.toDateString() === cellDate.toDateString()
-                        }) : []
+                            const isToday = cellDate && new Date().toDateString() === cellDate.toDateString()
+                            const isSelected = selectedDate && cellDate && selectedDate.toDateString() === cellDate.toDateString()
+                            const hasContent = datePosts.length > 0
+                            const isPastDay = cellDate && cellDate < new Date() && !isToday
 
-                        const isToday = cellDate && new Date().toDateString() === cellDate.toDateString()
+                            return (
+                                <div
+                                    key={i}
+                                    onClick={date && cellDate ? (e) => handleCellClick(e, cellDate) : undefined}
+                                    className={cn(
+                                        "day-cell min-h-[80px] md:min-h-[120px] border-r border-b p-2 md:p-3 relative group cursor-pointer",
+                                        (i + 1) % 7 === 0 && "border-r-0",
+                                        isToday ? "border-blue-500/20 today-cell" : "border-blue-500/8",
+                                        !date && "opacity-30 pointer-events-none",
+                                        isSelected && "ring-2 ring-blue-500/50 ring-inset",
+                                        isToday && "bg-blue-500/[0.06]",
+                                        !isToday && !isSelected && hasContent && "bg-white/[0.01]",
+                                        !isToday && !isSelected && !hasContent && "bg-transparent",
+                                        isPastDay && !hasContent && "opacity-60"
+                                    )}
+                                    style={!date ? { borderColor: "rgba(59,130,246,0.05)" } : undefined}
+                                >
+                                    {date && (
+                                        <>
+                                            {/* Date number */}
+                                            <div className="flex justify-between items-start mb-1.5">
+                                                <span
+                                                    className={cn(
+                                                        "text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-lg transition-all",
+                                                        isToday
+                                                            ? "bg-blue-500 text-white font-bold shadow-lg shadow-blue-500/30"
+                                                            : isSelected
+                                                                ? "bg-blue-500/20 text-blue-400 font-bold"
+                                                                : "text-muted-foreground/70 group-hover:text-foreground"
+                                                    )}
+                                                >
+                                                    {date}
+                                                </span>
 
-                        return (
-                            <div
-                                key={i}
-                                className={cn(
-                                    "min-h-[80px] md:min-h-[120px] border-r border-b border-border/50 p-2 md:p-3 transition-all hover:bg-secondary/5 relative group",
-                                    (i + 1) % 7 === 0 && "border-r-0",
-                                    !date && "bg-secondary/[0.02]"
-                                )}
-                            >
-                                {date && (
-                                    <>
-                                        <div className="flex justify-between items-start">
-                                            <span className={cn(
-                                                "text-xs font-medium w-6 h-6 flex items-center justify-center rounded-lg transition-all",
-                                                isToday
-                                                    ? "bg-primary text-primary-foreground shadow-sm font-bold"
-                                                    : "text-muted-foreground group-hover:text-foreground"
-                                            )}>
-                                                {date}
-                                            </span>
-                                            <Link href={`/posts/new?date=${cellDate?.toISOString()}`} prefetch={false}>
-                                                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 rounded-md hover:bg-primary/10 hover:text-primary transition-all p-0">
-                                                    <Plus className="w-3 h-3" />
-                                                </Button>
-                                            </Link>
-                                        </div>
-
-                                        <div className="mt-1 space-y-1">
-                                            {datePosts.slice(0, 3).map((post) => (
-                                                <Link key={post.id} href={`/posts/new?id=${post.id}`} prefetch={false}>
-                                                    <div className={cn(
-                                                        "px-1.5 py-0.5 rounded-md text-[9px] font-bold truncate transition-all flex items-center justify-between gap-1.5 cursor-pointer",
-                                                        post.status === "PUBLISHED"
-                                                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
-                                                            : post.status === "SCHEDULED"
-                                                                ? "bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400"
-                                                                : "bg-secondary text-muted-foreground dark:bg-slate-800"
-                                                    )}>
-                                                        <div className="flex items-center gap-1.5 truncate">
-                                                            <div className={cn("w-1 h-1 rounded-full shrink-0",
-                                                                post.status === "PUBLISHED" ? "bg-emerald-500" :
-                                                                    post.status === "SCHEDULED" ? "bg-blue-500" : "bg-muted-foreground"
-                                                            )} />
-                                                            <span className="truncate">{post.content}</span>
-                                                        </div>
-                                                        {post.source === "autopilot" && (
-                                                            <Sparkles className="w-2.5 h-2.5 text-blue-500 shrink-0" />
-                                                        )}
+                                                {/* Add post hint on hover */}
+                                                <Link href={`/posts/new?date=${cellDate?.toISOString()}`} prefetch={false} onClick={(e) => e.stopPropagation()}>
+                                                    <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center gap-1 text-[9px] font-bold text-blue-400/70 hover:text-blue-400">
+                                                        <Plus className="w-3 h-3" />
+                                                        <span className="hidden md:inline">Add</span>
                                                     </div>
                                                 </Link>
-                                            ))}
-                                            {datePosts.length > 3 && (
-                                                <div className="text-[9px] font-bold text-muted-foreground pl-1.5">
-                                                    + {datePosts.length - 3} more
-                                                </div>
-                                            )}
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        )
-                    })}
-                </div>
-            </div>
+                                            </div>
 
-            <UpgradeModal isOpen={isUpgradeModalOpen} onClose={() => setIsUpgradeModalOpen(false)} />
-            <AutopilotSetupWizard 
-                isOpen={isSetupWizardOpen} 
-                onClose={() => {
-                    setIsSetupWizardOpen(false);
-                    refreshUser(); // Refresh user data from context
-                }} 
-                initialData={user ? {
-                    topics: user.autopilotTopics,
-                    frequency: user.autopilotFrequency,
-                    days: user.autopilotDays,
-                    time: user.autopilotTime,
-                    currentFocus: user.autopilotCurrentFocus,
-                    writingStyleId: user.autopilotWritingStyleId,
-                    writingStyles: user.writingStyles
-                } : undefined}
-            />
-        </div>
+                                            {/* Post previews */}
+                                            <div className="space-y-1">
+                                                {datePosts.slice(0, 2).map((post) => (
+                                                    <Link key={post.id} href={`/posts/new?id=${post.id}`} prefetch={false} onClick={(e) => e.stopPropagation()}>
+                                                        <div className={cn(
+                                                            "post-chip px-1.5 py-1 rounded-md text-[9px] font-bold truncate flex items-center gap-1.5 cursor-pointer",
+                                                            post.status === "PUBLISHED"
+                                                                ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                                                                : post.status === "SCHEDULED"
+                                                                    ? "bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
+                                                                    : "bg-slate-500/10 text-slate-400 hover:bg-slate-500/20"
+                                                        )}>
+                                                            <StatusDot status={post.status} />
+                                                            <span className="truncate flex-1">{post.content?.slice(0, 30) || "Post"}</span>
+                                                            {post.source === "autopilot" && (
+                                                                <Sparkles className="w-2.5 h-2.5 shrink-0 opacity-70" />
+                                                            )}
+                                                        </div>
+                                                    </Link>
+                                                ))}
+                                                {datePosts.length > 2 && (
+                                                    <div className="text-[9px] font-bold text-blue-400/60 pl-1">
+                                                        +{datePosts.length - 2} more
+                                                    </div>
+                                                )}
+
+                                                {/* Empty state hint */}
+                                                {datePosts.length === 0 && !isPastDay && (
+                                                    <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 mt-1">
+                                                        <p className="text-[8px] md:text-[9px] text-muted-foreground/40 leading-tight px-0.5">
+                                                            Plan something ✨
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+
+                {/* Quick Action Popup */}
+                {selectedDate && (
+                    <QuickActionPopup
+                        date={selectedDate}
+                        onClose={() => setSelectedDate(null)}
+                        cellRect={selectedCellRect}
+                    />
+                )}
+
+                <UpgradeModal isOpen={isUpgradeModalOpen} onClose={() => setIsUpgradeModalOpen(false)} />
+                <AutopilotSetupWizard
+                    isOpen={isSetupWizardOpen}
+                    onClose={() => {
+                        setIsSetupWizardOpen(false);
+                        refreshUser();
+                    }}
+                    initialData={user ? {
+                        topics: user.autopilotTopics,
+                        frequency: user.autopilotFrequency,
+                        days: user.autopilotDays,
+                        time: user.autopilotTime,
+                        currentFocus: user.autopilotCurrentFocus,
+                        writingStyleId: user.autopilotWritingStyleId,
+                        writingStyles: user.writingStyles
+                    } : undefined}
+                />
+            </div>
+        </>
     )
 }
