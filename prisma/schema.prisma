@@ -47,6 +47,21 @@ model User {
   planExpiry              DateTime?
   razorpayCustomerId      String?
   razorpaySubscriptionId  String?
+  ideas         Idea[]
+}
+
+// Idea Vault - raw idea capture linked to a user
+model Idea {
+  id        String   @id @default(cuid())
+  userId    String
+  content   String   @db.Text
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }
 
 // OAuth Account (LinkedIn connection)

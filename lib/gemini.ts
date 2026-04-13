@@ -25,41 +25,49 @@ export async function generatePost({
     if (!topic) throw new Error("Topic is required for AI generation.");
 
     // Determine Tone
-    let activeTone: keyof typeof TONE_GUIDELINES = "professional";
+    let activeTone: string = "professional";
     if (style) {
         const lowerStyle = style.toLowerCase();
-        if (lowerStyle.includes("enthusiastic")) activeTone = "enthusiastic";
-        else if (lowerStyle.includes("storytelling")) activeTone = "storytelling";
-        else if (lowerStyle.includes("casual")) activeTone = "casual";
-        else if (lowerStyle.includes("bold")) activeTone = "bold";
+        if (lowerStyle.includes("enthusiastic")) activeTone = "Enthusiastic";
+        else if (lowerStyle.includes("storytelling")) activeTone = "Storytelling";
+        else if (lowerStyle.includes("casual")) activeTone = "Casual";
+        else if (lowerStyle.includes("bold")) activeTone = "Bold";
+        else if (lowerStyle.includes("write like me")) activeTone = "User's specific personal tone";
+        else activeTone = style;
     }
+    
+    // Resolve tone description if it's a built-in one
+    const resolvedToneDescription = activeTone.toLowerCase() in TONE_GUIDELINES 
+        ? TONE_GUIDELINES[activeTone.toLowerCase() as keyof typeof TONE_GUIDELINES] 
+        : activeTone;
+
+    const targetWords = Math.max(Math.floor(targetLength / 5), 50);
 
     // Construct canonical prompt using AI Core rules
-    let prompt = `Role: Elite LinkedIn Ghostwriter
-Action: Write a high-engagement LinkedIn post about "${topic}".
-Goal: Aim for a length of ${targetLength} characters.
+    let basePrompt = `You are an expert LinkedIn content writer.
+Write in the EXACT style of the user.
+Tone: ${resolvedToneDescription}
+Topic: ${topic}
+Context: ${context || "None"}
+Target length: STRICTLY around ${targetWords} words. You MUST meet this word count.
 
-GLOBAL RULES:
-${AI_CORE_CONFIG.GLOBAL_RULES.hard_constraints.map(c => `- ${c}`).join('\n')}
-${AI_CORE_CONFIG.GLOBAL_RULES.prohibited_behavior.map(b => `- ${b}`).join('\n')}
+Instructions:
+- Do NOT be generic.
+- Use strong hooks.
+- Make writing feel human and opinionated.
+- Expand fully on the context provided.
+- Do NOT shorten or summarize important points.
+- Use storytelling or structured flow when possible.
+- Avoid AI-sounding phrases.
+- DO NOT use markdown code blocks like \`\`\`text or \`\`\`markdown. Output plain text directly.
 
-Tone Enforcement (${activeTone}):
-${TONE_GUIDELINES[activeTone]}
-
-Constraint Rules:
-- Start with a compelling hook.
-- Use structured points/short paragraphs with whitespace.
-- Emojis: Strictly 3-5 professional ones.
-- End with a strong CTA or question.
-- No labels (e.g., "Hook:", "Tone:").
-
-HARD CONSTRAINT - LENGTH:
-- Your response MUST be under ${targetLength} characters.
-- This is a CRITICAL LIMIT. If you exceed it, the response is invalid.
-- Prune unnecessary words to fit.`;
+Output format:
+- Strong hook (1-2 lines)
+- Body (clear, engaging, structured)
+- Optional punchline or closing insight`;
 
     if (userWritingSample && style?.includes("Write Like Me")) {
-        prompt += `\n\nCRITICAL - WRITING STYLE REPLICATION (WRITE LIKE ME):
+        basePrompt += `\n\nCRITICAL - WRITING STYLE REPLICATION (WRITE LIKE ME):
 ${AI_CORE_CONFIG.WRITE_LIKE_ME.instruction}
 ${AI_CORE_CONFIG.WRITE_LIKE_ME.rules.map(r => `- ${r}`).join('\n')}
 
@@ -80,29 +88,49 @@ FORMATTING FIDELITY:
 - If the sample is plain text, your output MUST be plain text.`;
     }
 
-    if (context) {
-        prompt += `\n\nSpecific Context to include:\n"${context}"`;
+    let currentRetry = 0;
+    const maxRetries = 1;
+    let finalContent = "";
+    let promptExtension = "";
+
+    while (currentRetry <= maxRetries) {
+        try {
+            console.log(`[AI] Generating post via OpenRouter fallback system for topic: ${topic.substring(0, 30)}... [Attempt ${currentRetry + 1}]`);
+            const messages = [
+                { role: "user", content: basePrompt + promptExtension }
+            ];
+
+            let content = await generateWithFallback(messages);
+            
+            if (!content) throw new Error("Empty response from AI");
+
+            content = content
+                .replace(/^```[a-z]*\n/gi, "")
+                .replace(/```$/gi, "")
+                .replace(/^(Hook|Headline|Body|CTA|Conclusion|Post|Draft|Tone|Style|Insight|Lesson|Takeaway):\s*/gmi, "")
+                .replace(/\*\*(Hook|Headline|Body|CTA|Conclusion|Post|Draft|Tone|Style|Insight|Lesson|Takeaway)\*\*:\s*/gmi, "")
+                .trim();
+                
+            // Validate word count length
+            const wordCount = content.split(/\s+/).filter((w: string) => w.length > 0).length;
+            
+            if (wordCount < targetWords * 0.7 && currentRetry < maxRetries) {
+                console.log(`[AI] Output too short (${wordCount} words vs target ${targetWords}). Regenerating with strict length instruction...`);
+                promptExtension = `\n\nCRITICAL ENFORCEMENT: Your previous generation was only ${wordCount} words long. You MUST ensure the length is exactly around ${targetWords} words. Expand thoroughly on the ideas, do not summarize. DO NOT output any conversational text or acknowledge this message, just re-output the post correctly.`;
+                currentRetry++;
+                continue;
+            }
+            
+            finalContent = content;
+            break;
+
+        } catch (error: any) {
+            console.error("[AI] Generation Failed:", error);
+            throw error; // Let the caller handle it (e.g. with getPublicErrorMessage)
+        }
     }
-
-    const messages = [
-        { role: "user", content: prompt }
-    ];
-
-    try {
-        console.log(`[AI] Generating post via OpenRouter fallback system for topic: ${topic.substring(0, 30)}...`);
-        const content = await generateWithFallback(messages);
-        
-        if (!content) throw new Error("Empty response from AI");
-
-        return content
-            .replace(/^(Hook|Headline|Body|CTA|Conclusion|Post|Draft|Tone|Style|Insight|Lesson|Takeaway):\s*/gmi, "")
-            .replace(/\*\*(Hook|Headline|Body|CTA|Conclusion|Post|Draft|Tone|Style|Insight|Lesson|Takeaway)\*\*:\s*/gmi, "")
-            .trim();
-
-    } catch (error: any) {
-        console.error("[AI] Generation Failed:", error);
-        throw error; // Let the caller handle it (e.g. with getPublicErrorMessage)
-    }
+    
+    return finalContent;
 }
 
 

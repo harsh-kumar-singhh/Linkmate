@@ -34,7 +34,7 @@ export async function POST(req: Request) {
 
         const userId = user.id;
 
-        const { topic, style, targetLength = 1000, context } = await req.json();
+        let { topic, style, targetLength = 1000, context } = await req.json();
 
         if (!topic) {
             return NextResponse.json({ error: "Topic is required" }, { status: 400 });
@@ -63,7 +63,8 @@ export async function POST(req: Request) {
                     writingStyles: true,
                     writingStyle: true,
                     customStyles: true,
-                    aboutYou: true
+                    aboutYou: true,
+                    defaultTone: true
                 }
             } as any);
 
@@ -93,6 +94,21 @@ export async function POST(req: Request) {
                 if (matchedStyle?.sample) {
                     userWritingSample = matchedStyle.sample;
                     console.log(`[GENERATE] Using writing style: ${matchedStyle.name}`);
+                } else {
+                    // Try to fetch historical posts as fallback style reference
+                    const recentPosts = await prisma.post.findMany({
+                        where: { userId, source: 'MANUAL', content: { not: '' } },
+                        orderBy: { createdAt: 'desc' },
+                        take: 3
+                    });
+
+                    if (recentPosts.length > 0) {
+                        userWritingSample = recentPosts.map(p => p.content).join('\n\n---\n\n');
+                        console.log(`[GENERATE] Using ${recentPosts.length} recent posts for Write Like Me style`);
+                    } else if (userData?.defaultTone) {
+                        console.log(`[GENERATE] No history found. Falling back to defaultTone: ${userData.defaultTone}`);
+                        style = userData.defaultTone; // Fallback to their selected basic tone
+                    }
                 }
             }
         }

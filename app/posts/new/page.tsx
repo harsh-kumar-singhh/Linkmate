@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 import { useEffect, useState, useRef, Suspense } from "react"
 import Image from "next/image"
 import { AnimatedCard } from "@/components/animated/AnimatedCard"
+import { IdeaVault } from "@/components/posts/IdeaVault"
 import TextareaAutosize from "react-textarea-autosize"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -23,7 +24,8 @@ import {
     Loader2,
     CheckCircle2,
     Globe,
-    Check
+    Check,
+    Lightbulb
 } from "lucide-react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -62,6 +64,12 @@ function EditorContent() {
     const [style, setStyle] = useState("Professional")
     const [targetLength, setTargetLength] = useState(700)
     const [context, setContext] = useState("")
+
+    // Idea Vault State
+    const [isIdeaVaultOpen, setIsIdeaVaultOpen] = useState(false)
+    const [quickIdea, setQuickIdea] = useState("")
+    const [isSavingQuickIdea, setIsSavingQuickIdea] = useState(false)
+    const [successFeedback, setSuccessFeedback] = useState(false)
     const [availableStyles, setAvailableStyles] = useState(["Professional", "Casual", "Enthusiastic", "Storytelling"]);
 
     const postId = searchParams.get("id")
@@ -145,6 +153,39 @@ function EditorContent() {
     }, [postId, dateParam, user])
 
     // Handlers
+    const submitQuickIdea = async () => {
+        if (!quickIdea.trim() || isSavingQuickIdea) return;
+        setIsSavingQuickIdea(true);
+        try {
+            const res = await fetch("/api/ideas", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ content: quickIdea.trim() })
+            });
+            if (res.ok) {
+                setQuickIdea("");
+                setSuccessFeedback(true);
+                setTimeout(() => setSuccessFeedback(false), 2000);
+            }
+        } catch (error) {
+            console.error("Failed to quick save idea", error);
+        } finally {
+            setIsSavingQuickIdea(false);
+        }
+    };
+
+    const handleQuickSave = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            submitQuickIdea();
+        }
+    };
+
+    const handleQuickSaveSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        submitQuickIdea();
+    };
+
     const handleGenerate = async () => {
         if (!user || !topic) return
 
@@ -345,28 +386,40 @@ function EditorContent() {
                             )}
                         </div>
 
-                        {/* Mode Switch (Subtle Segmented Control) */}
-                        <div className="bg-secondary/40 p-1 rounded-xl flex items-center font-medium w-fit">
-                            <button
-                                onClick={() => setMode("ai")}
-                                className={cn(
-                                    "py-2 px-6 rounded-lg text-sm transition-all flex items-center justify-center gap-2",
-                                    mode === "ai" ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"
-                                )}
+                        <div className="flex items-center justify-between">
+                            {/* Mode Switch (Subtle Segmented Control) */}
+                            <div className="bg-secondary/40 p-1 rounded-xl flex items-center font-medium w-fit">
+                                <button
+                                    onClick={() => setMode("ai")}
+                                    className={cn(
+                                        "py-2 px-6 rounded-lg text-sm transition-all flex items-center justify-center gap-2",
+                                        mode === "ai" ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    <Sparkles className="w-4 h-4" />
+                                    AI Generate
+                                </button>
+                                <button
+                                    onClick={() => setMode("manual")}
+                                    className={cn(
+                                        "py-2 px-6 rounded-lg text-sm transition-all flex items-center justify-center gap-2",
+                                        mode === "manual" ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    <PenTool className="w-4 h-4" />
+                                    Manual Edit
+                                </button>
+                            </div>
+
+                            {/* Idea Vault Button */}
+                            <Button 
+                                variant="ghost" 
+                                className="rounded-xl bg-secondary/30 hover:bg-primary/10 hover:text-primary transition-all font-medium gap-2"
+                                onClick={() => setIsIdeaVaultOpen(true)}
                             >
-                                <Sparkles className="w-4 h-4" />
-                                AI Generate
-                            </button>
-                            <button
-                                onClick={() => setMode("manual")}
-                                className={cn(
-                                    "py-2 px-6 rounded-lg text-sm transition-all flex items-center justify-center gap-2",
-                                    mode === "manual" ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"
-                                )}
-                            >
-                                <PenTool className="w-4 h-4" />
-                                Manual Edit
-                            </button>
+                                <Lightbulb className="w-4 h-4" />
+                                Idea Vault
+                            </Button>
                         </div>
 
                         {/* Content Section */}
@@ -376,6 +429,42 @@ function EditorContent() {
                                     <div className="flex items-center gap-2 mb-2">
                                         <Sparkles className="w-5 h-5 text-blue-500" />
                                         <h3 className="font-semibold text-lg">AI Content Generator</h3>
+                                    </div>
+
+                                    {/* Quick Idea Capture Inline */}
+                                    <div className="space-y-2">
+                                        <form onSubmit={handleQuickSaveSubmit} className="relative">
+                                            <Input
+                                                placeholder="Drop a raw thought... we'll shape it ✨"
+                                                value={quickIdea}
+                                                onChange={(e) => setQuickIdea(e.target.value)}
+                                                onKeyDown={handleQuickSave}
+                                                className={cn(
+                                                    "h-11 pr-12 bg-secondary/20 border-border/60 rounded-xl transition-all shadow-inner focus:border-primary/50 text-sm placeholder:text-muted-foreground",
+                                                    successFeedback && "border-emerald-500/50 bg-emerald-500/5 shadow-[0_0_15px_rgba(16,185,129,0.1)] text-emerald-600"
+                                                )}
+                                                disabled={isSavingQuickIdea}
+                                            />
+                                            <Button 
+                                                type="submit" 
+                                                size="icon" 
+                                                disabled={!quickIdea.trim() || isSavingQuickIdea}
+                                                className={cn(
+                                                    "absolute right-1 top-1 bottom-1 h-9 w-9 rounded-lg transition-all disabled:opacity-50",
+                                                    successFeedback 
+                                                        ? "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20" 
+                                                        : "bg-primary/10 text-primary hover:bg-primary hover:text-white"
+                                                )}
+                                            >
+                                                {isSavingQuickIdea ? (
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                ) : successFeedback ? (
+                                                    <Check className="w-4 h-4" />
+                                                ) : (
+                                                    <Send className="w-4 h-4" />
+                                                )}
+                                            </Button>
+                                        </form>
                                     </div>
 
                                     <div className="space-y-2">
@@ -470,7 +559,7 @@ function EditorContent() {
                                         <TextareaAutosize
                                             minRows={12}
                                             placeholder="Start writing or edit the generated content..."
-                                            className="w-full resize-none p-5 rounded-2xl bg-card border border-border/80 text-lg leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all shadow-sm group-hover:border-primary/20"
+                                            className="w-full resize-none p-5 rounded-2xl bg-card border border-border/80 text-lg leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all shadow-sm group-hover:border-primary/20 text-foreground dark:text-zinc-100"
                                             value={content}
                                             onChange={(e) => setContent(e.target.value)}
                                             autoFocus
@@ -658,6 +747,15 @@ function EditorContent() {
                 </div>
             </main>
             <AICoach draftContent={content} />
+            <IdeaVault 
+                isOpen={isIdeaVaultOpen} 
+                onClose={() => setIsIdeaVaultOpen(false)} 
+                onSelectIdea={(ideaContent) => {
+                    setTopic(ideaContent);
+                    setIsIdeaVaultOpen(false);
+                    // Optional toast could be added here
+                }} 
+            />
         </div>
     )
 }
