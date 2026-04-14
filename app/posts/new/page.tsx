@@ -487,9 +487,8 @@ function EditorContent() {
                                 className="rounded-xl bg-secondary/30 hover:bg-primary/10 hover:text-primary transition-all font-medium gap-2 shrink-0 sm:shrink h-10 px-3 sm:h-11 sm:px-4"
                                 onClick={() => setIsIdeaVaultOpen(true)}
                             >
-                                <Lightbulb className="w-4 h-4" />
-                                <span className="hidden xs:inline">Idea Vault</span>
-                                <span className="xs:hidden">Vault</span>
+                                <Lightbulb className="w-4 h-4 text-amber-500" />
+                                <span>Idea Vault</span>
                             </Button>
                         </div>
 

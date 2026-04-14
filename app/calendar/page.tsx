@@ -56,7 +56,7 @@ function QuickActionPopup({
             }}
             onClick={(e) => e.stopPropagation()}
         >
-            <div className="bg-[#0d1829] border border-blue-500/20 rounded-2xl shadow-2xl shadow-black/60 p-1.5 min-w-[180px]">
+            <div className="bg-popover border border-border rounded-2xl shadow-2xl shadow-black/20 dark:shadow-black/60 p-1.5 min-w-[180px]">
                 <div className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border/40 mb-1">
                     {format(date, "MMMM d")}
                 </div>
@@ -446,14 +446,10 @@ export default function CalendarPage() {
 
                 {/* Calendar Grid */}
                 <div
-                    className="flex-1 rounded-[24px] md:rounded-[32px] border border-blue-500/10 overflow-hidden transition-all duration-500 mx-2 md:mx-0"
-                    style={{
-                        background: "linear-gradient(135deg, #0d1829 0%, #0a1120 60%, #0d1829 100%)",
-                        boxShadow: "0 8px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)"
-                    }}
+                    className="flex-1 rounded-[24px] md:rounded-[32px] border border-border overflow-hidden transition-all duration-500 mx-2 md:mx-0 bg-card shadow-premium dark:shadow-2xl dark:shadow-black/50"
                 >
                     {/* Day labels header */}
-                    <div className="grid grid-cols-7 border-b border-blue-500/10" style={{ background: "rgba(255,255,255,0.02)" }}>
+                    <div className="grid grid-cols-7 border-b border-border bg-secondary/20 dark:bg-white/[0.02]">
                         {DAYS.map((day) => (
                             <div key={day} className="py-3 md:py-4 text-center text-[9px] md:text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">
                                 {day}
@@ -488,17 +484,15 @@ export default function CalendarPage() {
                                     key={i}
                                     onClick={date && cellDate ? (e) => handleCellClick(e, cellDate) : undefined}
                                     className={cn(
-                                        "day-cell min-h-[80px] md:min-h-[120px] border-r border-b p-2 md:p-3 relative group cursor-pointer",
+                                        "day-cell min-h-[80px] md:min-h-[120px] border-r border-b border-border p-2 md:p-3 relative group cursor-pointer",
                                         (i + 1) % 7 === 0 && "border-r-0",
-                                        isToday ? "border-blue-500/20 today-cell" : "border-blue-500/8",
+                                        isToday && "bg-primary/[0.04] dark:bg-blue-500/[0.06]",
                                         !date && "opacity-30 pointer-events-none",
-                                        isSelected && "ring-2 ring-blue-500/50 ring-inset",
-                                        isToday && "bg-blue-500/[0.06]",
-                                        !isToday && !isSelected && hasContent && "bg-white/[0.01]",
+                                        isSelected && "ring-2 ring-primary/40 dark:ring-blue-500/50 ring-inset",
+                                        !isToday && !isSelected && hasContent && "bg-primary/[0.01] dark:bg-white/[0.01]",
                                         !isToday && !isSelected && !hasContent && "bg-transparent",
                                         isPastDay && !hasContent && "opacity-60"
                                     )}
-                                    style={!date ? { borderColor: "rgba(59,130,246,0.05)" } : undefined}
                                 >
                                     {date && (
                                         <>
@@ -519,7 +513,7 @@ export default function CalendarPage() {
 
                                                 {/* Add post hint on hover */}
                                                 <Link href={`/posts/new?date=${cellDate?.toISOString()}`} prefetch={false} onClick={(e) => e.stopPropagation()}>
-                                                    <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center gap-1 text-[9px] font-bold text-blue-400/70 hover:text-blue-400">
+                                                <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center gap-1 text-[9px] font-bold text-primary/70 hover:text-primary">
                                                         <Plus className="w-3 h-3" />
                                                         <span className="hidden md:inline">Add</span>
                                                     </div>
@@ -533,10 +527,10 @@ export default function CalendarPage() {
                                                         <div className={cn(
                                                             "post-chip px-1.5 py-1 rounded-md text-[9px] font-bold truncate flex items-center gap-1.5 cursor-pointer",
                                                             post.status === "PUBLISHED"
-                                                                ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                                                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
                                                                 : post.status === "SCHEDULED"
-                                                                    ? "bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
-                                                                    : "bg-slate-500/10 text-slate-400 hover:bg-slate-500/20"
+                                                                    ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20"
+                                                                    : "bg-slate-500/10 text-slate-600 dark:text-slate-400 hover:bg-slate-500/20"
                                                         )}>
                                                             <StatusDot status={post.status} />
                                                             <span className="truncate flex-1">{post.content?.slice(0, 30) || "Post"}</span>
