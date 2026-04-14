@@ -1,4 +1,4 @@
-import { prisma } from "./prisma";
+import { prisma, withRetry } from "./prisma";
 import { AIUsageType } from "@prisma/client";
 import { PLAN_LIMITS } from "./plan-limits";
 
@@ -37,11 +37,17 @@ export async function checkAndIncrementAIQuota(
   const today = getUTCStartOfDay();
 
   try {
+    // --- DEVELOPMENT OVERRIDE: Allow unlimited generation locally ---
+    if (process.env.NODE_ENV === 'development') {
+        console.log(`[QUOTA] [DEV MODE] Bypassing quota check for ${type}`);
+        return { allowed: true, currentCount: 0, limit: Infinity };
+    }
+
     // --- ROBUSTNESS: Verify user exists before touching AIUsage ---
-    const user = await prisma.user.findUnique({
+    const user = await withRetry(() => prisma.user.findUnique({
       where: { id: userId },
       select: { id: true }
-    });
+    }));
 
     if (!user) {
       console.warn(`[QUOTA] Attempted to check quota for non-existent user: ${userId}`);
@@ -49,7 +55,7 @@ export async function checkAndIncrementAIQuota(
     }
 
     // We use a transaction to ensure atomic increment for correctness
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await withRetry(() => prisma.$transaction(async (tx) => {
       // Find or create the usage record for today and this specific type
       const usage = await tx.aIUsage.upsert({
         where: {
@@ -82,7 +88,7 @@ export async function checkAndIncrementAIQuota(
       console.log(`[QUOTA] [${type}] User: ${userId} | Date: ${today.toISOString()} | Count: ${updatedUsage.count} | Allowed: true`);
 
       return { allowed: true, currentCount: updatedUsage.count };
-    });
+    }));
 
     return { ...result, limit };
 

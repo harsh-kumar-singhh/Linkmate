@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { resolveUser } from "@/lib/auth/user";
-import { prisma } from "@/lib/prisma";
+import { prisma, withRetry } from "@/lib/prisma";
 import { generateWithFallback, getPublicErrorMessage } from "@/lib/openrouter";
 import { checkAndIncrementAIQuota } from "@/lib/usage";
 import { AIUsageType } from "@prisma/client";
@@ -57,7 +57,7 @@ export async function POST(req: Request) {
         let userWritingSample = undefined;
 
         if (style && style.includes("Write Like Me")) {
-            const userData = await prisma.user.findUnique({
+            const userData = await withRetry(() => prisma.user.findUnique({
                 where: { id: userId },
                 select: {
                     writingStyles: true,
@@ -66,7 +66,7 @@ export async function POST(req: Request) {
                     aboutYou: true,
                     defaultTone: true
                 }
-            } as any);
+            } as any));
 
             if (userData) {
                 if ((userData as any).aboutYou) {
@@ -96,11 +96,11 @@ export async function POST(req: Request) {
                     console.log(`[GENERATE] Using writing style: ${matchedStyle.name}`);
                 } else {
                     // Try to fetch historical posts as fallback style reference
-                    const recentPosts = await prisma.post.findMany({
+                    const recentPosts = await withRetry(() => prisma.post.findMany({
                         where: { userId, source: 'MANUAL', content: { not: '' } },
                         orderBy: { createdAt: 'desc' },
                         take: 3
-                    });
+                    }));
 
                     if (recentPosts.length > 0) {
                         userWritingSample = recentPosts.map(p => p.content).join('\n\n---\n\n');
@@ -131,18 +131,34 @@ export async function POST(req: Request) {
 
             return NextResponse.json({ content: cleanedContent });
         } catch (aiError: any) {
-            console.error("[GENERATE] AI Generation failed:", aiError);
+            // Log full error details in development
+            if (process.env.NODE_ENV === 'development') {
+                console.error("[GENERATE] Full AI Error:", aiError);
+            }
+            
+            const publicMessage = getPublicErrorMessage(aiError);
+            console.error(`[GENERATE] AI Generation failed for user ${userId}: ${publicMessage}`);
+            
             return NextResponse.json(
-                { error: getPublicErrorMessage(aiError) },
-                { status: 500 }
+                { error: publicMessage },
+                { status: publicMessage.includes('session') ? 401 : 500 }
             );
         }
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("API Error in Generate route:", error);
+        
+        const isDbError = error.name === "PrismaClientInitializationError" || 
+                         error.message?.includes("database") || 
+                         error.code?.startsWith("P1");
+                         
+        const message = isDbError 
+            ? "Database temporarily unavailable - waking up servers" 
+            : (error?.message || "Something went wrong on our end. Please try again shortly.");
+            
         return NextResponse.json(
-            { error: "Something went wrong on our end. Please try again shortly." },
-            { status: 500 }
+            { success: false, error: message },
+            { status: isDbError ? 503 : 500 }
         );
     }
 }

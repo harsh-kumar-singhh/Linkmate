@@ -134,6 +134,11 @@ export async function generateWithFallback(
 
       lastError = new AIError(errorMessage, errorType, model.id);
 
+      // CRITICAL: Log detailed error in dev to help debugging
+      if (process.env.NODE_ENV === 'development') {
+        console.error(`[AI ERROR] [${model.id}] [${errorType}]:`, errorMessage);
+      }
+
       await logAIEvent({
         model_id: model.id,
         error_type: errorType,
@@ -157,7 +162,7 @@ export async function generateWithFallback(
 export const USER_MESSAGES = {
   unauthorized: AI_CORE_CONFIG.ERROR_MESSAGES.session_issue,
   quota_exhausted: AI_CORE_CONFIG.ERROR_MESSAGES.quota_exceeded_post,
-  model_failure: AI_CORE_CONFIG.ERROR_MESSAGES.service_busy,
+  model_failure: "The AI service is temporarily busy. Please try again in 30 seconds.",
   unknown: AI_CORE_CONFIG.ERROR_MESSAGES.unknown_internal
 };
 

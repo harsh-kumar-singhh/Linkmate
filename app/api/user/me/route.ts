@@ -55,8 +55,11 @@ export async function GET() {
     }, {
       headers: { "Cache-Control": "no-store" },
     })
-  } catch (err) {
-    console.error("USER_ME error:", err)
-    return NextResponse.json({ error: "Failed" }, { status: 500 })
+  } catch (error: any) {
+    console.error("USER_ME error:", error)
+    const message = error.name === "PrismaClientInitializationError" 
+      ? "Database temporarily unavailable - waking up servers" 
+      : "Failed to fetch user data";
+    return NextResponse.json({ success: false, message }, { status: 503 })
   }
 }

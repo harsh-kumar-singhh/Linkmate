@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
+import { prisma, withRetry } from "@/lib/prisma"
 import { Session } from "next-auth"
 import { cache } from "react"
 
@@ -38,26 +38,27 @@ export const resolveUser = cache(async (providedSession?: Session | null) => {
         customStyles: true,
     }
 
-    // 1. Primary lookup by ID
-    let user = await prisma.user.findUnique({
+    // 1. Primary lookup by ID (with retry for Neon cold starts)
+    let user = await withRetry(() => prisma.user.findUnique({
         where: { id: session.user.id },
         select: userSelect
-    })
+    }))
 
     // 2. Secondary lookup by email if ID lookup failed
-    if (!user && session.user.email) {
-        user = await prisma.user.findUnique({
-            where: { email: session.user.email },
+    if (!user && typeof session.user.email === "string") {
+        user = await withRetry(() => prisma.user.findUnique({
+            where: { email: session.user.email as string },
             select: userSelect
-        })
+        }))
     }
+
 
     // 3. Auto-Healing: Create user if it doesn't exist
     if (!user) {
         console.warn(`[AUTH] Auto-healing missing user record for: ${session.user.id}`)
 
         try {
-            user = await prisma.user.create({
+            user = await withRetry(() => prisma.user.create({
                 data: {
                     id: session.user.id,
                     email: session.user.email,
@@ -65,7 +66,7 @@ export const resolveUser = cache(async (providedSession?: Session | null) => {
                     image: session.user.image,
                 },
                 select: userSelect
-            })
+            }))
         } catch (error) {
             console.error(`[AUTH] Failed to auto-heal user: ${error}`)
             return null

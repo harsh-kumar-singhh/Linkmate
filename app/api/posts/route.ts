@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import { resolveUser } from "@/lib/auth/user";
-import { prisma } from "@/lib/prisma";
+import { prisma, withRetry } from "@/lib/prisma";
 import { publishToLinkedIn } from "@/lib/linkedin";
 
 export async function GET(req: Request) {
@@ -16,7 +16,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const posts = await prisma.post.findMany({
+    const posts = await withRetry(() => prisma.post.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
       skip,
@@ -34,9 +34,9 @@ export async function GET(req: Request) {
         source: true,
         // Exclude imageData for list view efficiency
       }
-    });
+    }));
 
-    const total = await prisma.post.count({ where: { userId: user.id } });
+    const total = await withRetry(() => prisma.post.count({ where: { userId: user.id } }));
 
     return NextResponse.json({ 
       posts, 
@@ -47,9 +47,12 @@ export async function GET(req: Request) {
         totalPages: Math.ceil(total / limit)
       } 
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching posts:", error);
-    return NextResponse.json({ error: "Failed to fetch posts" }, { status: 500 });
+    const message = error.name === "PrismaClientInitializationError" 
+      ? "Database temporarily unavailable - waking up servers" 
+      : "Failed to fetch posts";
+    return NextResponse.json({ success: false, message }, { status: 503 });
   }
 }
 
@@ -66,7 +69,7 @@ export async function POST(req: Request) {
     }
 
     // Harden flow: Create record first as PENDING if status is PUBLISHED
-    let post = await prisma.post.create({
+    let post = await withRetry(() => prisma.post.create({
       data: {
         userId: user.id,
         content,
@@ -77,31 +80,31 @@ export async function POST(req: Request) {
         writingStyle: writingStyle || null,
         source: source || "MANUAL",
       } as any,
-    });
+    }));
 
     // If status is PUBLISHED, try to publish to LinkedIn
     if (status === "PUBLISHED") {
       try {
         const result = await publishToLinkedIn(user.id, content, imageUrl, imageData);
         
-        post = await prisma.post.update({
+        post = await withRetry(() => prisma.post.update({
           where: { id: post.id },
           data: {
             status: "PUBLISHED",
             publishedAt: new Date(),
             linkedinPostId: result.linkedinPostId,
           }
-        });
+        }));
       } catch (error) {
         console.error("LinkedIn publishing failed:", error);
         
-        await prisma.post.update({
+        await withRetry(() => prisma.post.update({
           where: { id: post.id },
           data: {
             status: "FAILED",
             failureReason: error instanceof Error ? error.message : "Failed to publish"
           }
-        });
+        }));
 
         return NextResponse.json(
           { error: error instanceof Error ? error.message : "LinkedIn publishing failed" },
@@ -111,8 +114,11 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json(post);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating post:", error);
-    return NextResponse.json({ error: "Failed to create post" }, { status: 500 });
+    const message = error.name === "PrismaClientInitializationError" 
+      ? "Database temporarily unavailable - waking up servers" 
+      : "Failed to create post";
+    return NextResponse.json({ success: false, message }, { status: 503 });
   }
 }

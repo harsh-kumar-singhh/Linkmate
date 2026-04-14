@@ -25,6 +25,7 @@ interface UserContextType {
     user: User | null;
     isPro: boolean;
     isLoading: boolean;
+    isDatabaseWaking: boolean;
     refreshUser: () => Promise<void>;
 }
 
@@ -34,6 +35,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const { status } = useSession();
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isDatabaseWaking, setIsDatabaseWaking] = useState(false);
     const isFetchingRef = React.useRef(false);
 
     const refreshUser = useCallback(async () => {
@@ -42,10 +44,22 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         isFetchingRef.current = true;
         try {
             const response = await fetch("/api/user/me");
+            
+            if (response.status === 503) {
+                setIsDatabaseWaking(true);
+                // Retry after a short delay if it's a cold start
+                setTimeout(() => {
+                    isFetchingRef.current = false;
+                    refreshUser();
+                }, 2000);
+                return;
+            }
+
             if (response.ok) {
                 const data = await response.json();
                 if (data.user) {
                     setUser(data.user);
+                    setIsDatabaseWaking(false);
                 }
             }
         } catch (error) {
@@ -62,6 +76,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         } else if (status === "unauthenticated") {
             setUser(null);
             setIsLoading(false);
+            setIsDatabaseWaking(false);
         }
     }, [status, refreshUser]);
 
@@ -71,8 +86,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         user,
         isPro,
         isLoading,
+        isDatabaseWaking,
         refreshUser
-    }), [user, isPro, isLoading, refreshUser]);
+    }), [user, isPro, isLoading, isDatabaseWaking, refreshUser]);
 
     return (
         <UserContext.Provider value={value}>
