@@ -129,9 +129,12 @@ export async function POST(req: Request) {
                 context: finalContext
             });
 
-            return NextResponse.json({ content: cleanedContent });
+            return NextResponse.json({ 
+                success: true, 
+                data: { content: cleanedContent },
+                message: "Post generated successfully" 
+            });
         } catch (aiError: any) {
-            // Log full error details in development
             if (process.env.NODE_ENV === 'development') {
                 console.error("[GENERATE] Full AI Error:", aiError);
             }
@@ -140,7 +143,11 @@ export async function POST(req: Request) {
             console.error(`[GENERATE] AI Generation failed for user ${userId}: ${publicMessage}`);
             
             return NextResponse.json(
-                { error: publicMessage },
+                { 
+                    success: false, 
+                    error: publicMessage,
+                    message: publicMessage 
+                },
                 { status: publicMessage.includes('session') ? 401 : 500 }
             );
         }
@@ -157,7 +164,11 @@ export async function POST(req: Request) {
             : (error?.message || "Something went wrong on our end. Please try again shortly.");
             
         return NextResponse.json(
-            { success: false, error: message },
+            { 
+                success: false, 
+                error: message,
+                message: message 
+            },
             { status: isDbError ? 503 : 500 }
         );
     }

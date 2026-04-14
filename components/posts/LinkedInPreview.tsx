@@ -88,14 +88,14 @@ export function LinkedInPreview({ content, imageUrl, className, onAddImage }: Li
                 >
                     {/* === LAYERED BACKGROUND SYSTEM === */}
 
-                    {/* Base gradient: dark blue/black blend */}
-                    <div className="absolute inset-0 rounded-[24px] bg-gradient-to-br from-[#0c1220] via-[#091526] to-[#060e1c]" />
+                    {/* Base gradient: subtle depth */}
+                    <div className="absolute inset-0 rounded-[24px] bg-gradient-to-br from-blue-500/[0.03] via-transparent to-zinc-500/[0.03] dark:from-primary/10 dark:via-transparent dark:to-primary/5" />
 
                     {/* Radial glow behind icon area */}
-                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_65%_50%_at_50%_38%,rgba(10,102,194,0.2)_0%,transparent_70%)]" />
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_65%_50%_at_50%_38%,rgba(var(--primary),0.05)_0%,transparent_70%)]" />
 
                     {/* Subtle noise texture via SVG filter */}
-                    <svg className="absolute inset-0 w-full h-full opacity-[0.04] pointer-events-none rounded-[24px]" xmlns="http://www.w3.org/2000/svg">
+                    <svg className="absolute inset-0 w-full h-full opacity-[0.03] dark:opacity-[0.05] pointer-events-none rounded-[24px]" xmlns="http://www.w3.org/2000/svg">
                         <filter id="lm-noise">
                             <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" />
                             <feColorMatrix type="saturate" values="0" />
@@ -104,37 +104,24 @@ export function LinkedInPreview({ content, imageUrl, className, onAddImage }: Li
                     </svg>
 
                     {/* Very subtle dot grid */}
-                    <div className="absolute inset-0 opacity-[0.05] pointer-events-none bg-[radial-gradient(rgba(10,102,194,0.8)_1px,transparent_1px)] [background-size:22px_22px]" />
+                    <div className="absolute inset-0 opacity-[0.05] dark:opacity-[0.1] pointer-events-none bg-[radial-gradient(currentColor_1px,transparent_1px)] [background-size:22px_22px] text-primary/20" />
 
                     {/* === GRADIENT BORDER RING (always visible, premium feel) === */}
                     <div
-                        className="absolute inset-0 rounded-[24px] pointer-events-none"
-                        style={{
-                            background: "linear-gradient(135deg, rgba(90,164,255,0.12) 0%, rgba(10,102,194,0.05) 50%, rgba(255,255,255,0.04) 100%)",
-                            padding: "1px",
-                            WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
-                            WebkitMaskComposite: "xor",
-                            maskComposite: "exclude",
-                        }}
+                        className="absolute inset-0 rounded-[24px] pointer-events-none border border-primary/10 dark:border-primary/20"
                     />
 
                     {/* === HOVER INNER GLOW === */}
                     <motion.div
-                        className="absolute inset-0 rounded-[24px] pointer-events-none"
-                        initial={{ opacity: 0 }}
-                        whileHover={{ opacity: 1 }}
-                        transition={{ duration: 0.35 }}
+                        className="absolute inset-0 rounded-[24px] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"
                         style={{
-                            boxShadow: "inset 0 0 40px rgba(10,102,194,0.1)"
+                            boxShadow: "inset 0 0 40px rgba(var(--primary), 0.05)"
                         }}
                     />
 
-                    {/* === BLURRED PLACEHOLDER IMAGE SHAPES (possibility suggestion) === */}
-                    {/* Soft rounded ghost shapes suggesting images could exist here */}
-                    <div className="absolute left-3 top-6 w-24 h-18 rounded-2xl bg-gradient-to-br from-[#0A66C2]/10 to-[#1a3a5c]/8 border border-white/[0.05] rotate-[-10deg] blur-[2px]" />
-                    <div className="absolute right-4 top-5 w-18 h-22 rounded-2xl bg-gradient-to-br from-[#1a4a7a]/8 to-[#0A66C2]/5 border border-white/[0.04] rotate-[8deg] blur-[2px]" />
-                    <div className="absolute left-8 bottom-8 w-20 h-14 rounded-2xl bg-gradient-to-br from-white/[0.03] to-[#0A66C2]/6 border border-white/[0.03] rotate-[-5deg] blur-[2.5px]" />
-                    <div className="absolute right-8 bottom-6 w-20 h-12 rounded-2xl bg-gradient-to-br from-[#0A66C2]/6 to-transparent border border-white/[0.03] rotate-[6deg] blur-[2px]" />
+                    {/* === BLURRED PLACEHOLDER IMAGE SHAPES === */}
+                    <div className="absolute left-3 top-6 w-24 h-18 rounded-2xl bg-secondary/50 dark:bg-primary/5 rotate-[-10deg] blur-[2px]" />
+                    <div className="absolute right-4 top-5 w-18 h-22 rounded-2xl bg-secondary/40 dark:bg-primary/5 rotate-[8deg] blur-[2px]" />
 
                     {/* === SLOW LIGHT SWEEP === */}
                     <motion.div
@@ -142,7 +129,7 @@ export function LinkedInPreview({ content, imageUrl, className, onAddImage }: Li
                         animate={{ x: ["-100%", "200%"] }}
                         transition={{ duration: 6, repeat: Infinity, ease: "linear", repeatDelay: 4 }}
                         style={{
-                            background: "linear-gradient(105deg, transparent 30%, rgba(100,160,255,0.04) 50%, transparent 70%)",
+                            background: "linear-gradient(105deg, transparent 30%, rgba(var(--primary), 0.03) 50%, transparent 70%)",
                         }}
                     />
 
@@ -154,39 +141,29 @@ export function LinkedInPreview({ content, imageUrl, className, onAddImage }: Li
                             animate={{ y: [0, -7, 0] }}
                             transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
                             className="relative flex items-center justify-center"
-                            style={{ willChange: "transform" }}
                         >
                             {/* Outer glow ring */}
                             <motion.div
-                                className="absolute w-20 h-20 rounded-full"
+                                className="absolute w-20 h-20 rounded-full bg-primary/5 dark:bg-primary/10"
                                 animate={{ scale: [1, 1.15, 1], opacity: [0.3, 0.6, 0.3] }}
                                 transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-                                style={{
-                                    background: "radial-gradient(circle, rgba(10,102,194,0.35) 0%, transparent 70%)",
-                                }}
                             />
                             {/* Icon container */}
                             <motion.div
-                                className="w-16 h-16 rounded-2xl flex items-center justify-center relative z-10"
+                                className="w-16 h-16 rounded-2xl flex items-center justify-center relative z-10 bg-background/80 border border-border shadow-sm dark:bg-secondary/20 dark:border-primary/30 backdrop-blur-sm"
                                 whileHover={{ scale: 1.08 }}
                                 transition={{ type: "spring", stiffness: 400, damping: 15 }}
-                                style={{
-                                    background: "linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(10,102,194,0.2) 100%)",
-                                    border: "1px solid rgba(10,102,194,0.3)",
-                                    boxShadow: "0 8px 32px rgba(10,102,194,0.25), inset 0 1px 0 rgba(255,255,255,0.08)",
-                                    backdropFilter: "blur(8px)",
-                                }}
                             >
-                                <ImageIcon className="w-7 h-7" style={{ color: "#5ba4f5" }} />
+                                <ImageIcon className="w-7 h-7 text-primary" />
                             </motion.div>
                         </motion.div>
 
                         {/* Improved copy — emotional & punchy */}
                         <div className="space-y-1.5 max-w-[260px]">
-                            <h5 className="text-[15px] font-bold tracking-tight leading-tight" style={{ color: "#e8edf2" }}>
+                            <h5 className="text-[15px] font-bold tracking-tight leading-tight text-foreground">
                                 Your post deserves attention.
                             </h5>
-                            <p className="text-[12.5px] leading-snug" style={{ color: "rgba(180,195,212,0.7)" }}>
+                            <p className="text-[12.5px] leading-snug text-muted-foreground">
                                 Add an image to make it scroll-stopping.
                             </p>
                         </div>
@@ -197,14 +174,7 @@ export function LinkedInPreview({ content, imageUrl, className, onAddImage }: Li
                             whileTap={{ scale: 0.97 }}
                             transition={{ type: "spring", stiffness: 400, damping: 15 }}
                             onClick={onAddImage}
-                            className="flex items-center gap-1.5 px-4 py-2 rounded-full text-[12px] font-semibold mt-1"
-                            style={{
-                                background: "linear-gradient(135deg, rgba(10,102,194,0.85) 0%, rgba(6,78,156,0.9) 100%)",
-                                border: "1px solid rgba(90,164,255,0.35)",
-                                color: "#e8f0ff",
-                                boxShadow: "0 4px 16px rgba(10,102,194,0.3), inset 0 1px 0 rgba(255,255,255,0.1)",
-                                letterSpacing: "0.01em",
-                            }}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-full text-[12px] font-semibold mt-1 bg-primary text-primary-foreground shadow-md hover:opacity-90 transition-all tracking-wide"
                         >
                             <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
                             Add Image

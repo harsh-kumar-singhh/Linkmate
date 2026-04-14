@@ -29,12 +29,20 @@ export async function POST(req: Request) {
         const imageUrl = `/uploads/${fileName}`;
 
         return NextResponse.json({
-            imageUrl,
-            imageData: base64Data,
-            name: file.name
+            success: true,
+            data: {
+                imageUrl,
+                imageData: base64Data,
+                name: file.name
+            },
+            message: "Image uploaded successfully"
         });
     } catch (error) {
         console.error("Upload error:", error);
-        return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+        return NextResponse.json({ 
+            success: false, 
+            error: "Upload failed",
+            message: "Failed to upload image" 
+        }, { status: 500 });
     }
 }

@@ -70,8 +70,8 @@ export default function DashboardPage() {
       ])
 
       if (postsRes.ok) {
-        const data = await postsRes.json()
-        const fetchedPosts: Post[] = data.posts || []
+        const result = await postsRes.json()
+        const fetchedPosts: Post[] = result.data?.posts || result.posts || []
         setPosts(fetchedPosts)
 
         const unnotified = fetchedPosts.filter(

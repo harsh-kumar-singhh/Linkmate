@@ -150,15 +150,10 @@ export default function CalendarPage() {
         try {
             const response = await fetch("/api/posts")
             if (response.ok) {
-                const data = await response.json()
-                console.log(`[Frontend] Fetched ${data.posts?.length || 0} posts from API.`);
-                const autopilotPosts = data.posts?.filter((p: any) => p.source === "autopilot") || [];
-                console.log(`[Frontend] Autopilot posts found:`, autopilotPosts.length, autopilotPosts.map((p: any) => ({
-                    id: p.id,
-                    scheduledFor: p.scheduledFor,
-                    status: p.status
-                })));
-                setPosts(data.posts || [])
+                const result = await response.json()
+                const fetchedPosts = result.data?.posts || result.posts || [];
+                console.log(`[Frontend] Fetched ${fetchedPosts.length} posts from API.`);
+                setPosts(fetchedPosts)
             }
         } catch (error) {
             console.error("[Frontend] Error fetching posts:", error)

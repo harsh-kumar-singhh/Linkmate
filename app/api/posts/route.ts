@@ -13,7 +13,7 @@ export async function GET(req: Request) {
   try {
     const user = await resolveUser();
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ success: false, error: "Unauthorized", message: "Unauthorized" }, { status: 401 });
     }
 
     const posts = await withRetry(() => prisma.post.findMany({
@@ -32,27 +32,30 @@ export async function GET(req: Request) {
         writingStyle: true,
         createdAt: true,
         source: true,
-        // Exclude imageData for list view efficiency
       }
     }));
 
     const total = await withRetry(() => prisma.post.count({ where: { userId: user.id } }));
 
     return NextResponse.json({ 
-      posts, 
-      pagination: { 
-        page, 
-        limit, 
-        total,
-        totalPages: Math.ceil(total / limit)
-      } 
+      success: true,
+      data: {
+        posts, 
+        pagination: { 
+          page, 
+          limit, 
+          total,
+          totalPages: Math.ceil(total / limit)
+        } 
+      },
+      message: "Posts fetched successfully"
     });
   } catch (error: any) {
     console.error("Error fetching posts:", error);
     const message = error.name === "PrismaClientInitializationError" 
       ? "Database temporarily unavailable - waking up servers" 
       : "Failed to fetch posts";
-    return NextResponse.json({ success: false, message }, { status: 503 });
+    return NextResponse.json({ success: false, error: error.message, message }, { status: 503 });
   }
 }
 
@@ -60,12 +63,12 @@ export async function POST(req: Request) {
   try {
     const user = await resolveUser();
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ success: false, error: "Unauthorized", message: "Unauthorized" }, { status: 401 });
     }
     const { content, status, scheduledFor, linkedinPostId, imageUrl, imageData, writingStyle, source } = await req.json();
 
     if (!content) {
-      return NextResponse.json({ error: "Content is required" }, { status: 400 });
+      return NextResponse.json({ success: false, error: "Content is required", message: "Content is required" }, { status: 400 });
     }
 
     // Harden flow: Create record first as PENDING if status is PUBLISHED
@@ -95,7 +98,7 @@ export async function POST(req: Request) {
             linkedinPostId: result.linkedinPostId,
           }
         }));
-      } catch (error) {
+      } catch (error: any) {
         console.error("LinkedIn publishing failed:", error);
         
         await withRetry(() => prisma.post.update({
@@ -107,18 +110,26 @@ export async function POST(req: Request) {
         }));
 
         return NextResponse.json(
-          { error: error instanceof Error ? error.message : "LinkedIn publishing failed" },
+          { 
+              success: false, 
+              error: error instanceof Error ? error.message : "LinkedIn publishing failed",
+              message: "Failed to publish to LinkedIn. Post saved as FAILED."
+          },
           { status: 500 }
         );
       }
     }
 
-    return NextResponse.json(post);
+    return NextResponse.json({
+        success: true,
+        data: post,
+        message: status === "PUBLISHED" ? "Post published successfully" : (status === "SCHEDULED" ? "Post scheduled" : "Draft saved")
+    });
   } catch (error: any) {
     console.error("Error creating post:", error);
     const message = error.name === "PrismaClientInitializationError" 
       ? "Database temporarily unavailable - waking up servers" 
       : "Failed to create post";
-    return NextResponse.json({ success: false, message }, { status: 503 });
+    return NextResponse.json({ success: false, error: error.message, message }, { status: 503 });
   }
 }

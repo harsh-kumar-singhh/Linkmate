@@ -13,7 +13,7 @@ export async function GET(
     try {
         const session = await auth();
         if (!session || !session.user?.id) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json({ success: false, error: "Unauthorized", message: "Unauthorized" }, { status: 401 });
         }
 
         const post = await prisma.post.findUnique({
@@ -21,13 +21,17 @@ export async function GET(
         });
 
         if (!post) {
-            return NextResponse.json({ error: "Post not found" }, { status: 404 });
+            return NextResponse.json({ success: false, error: "Post not found", message: "Post not found" }, { status: 404 });
         }
 
-        return NextResponse.json(post);
+        return NextResponse.json({
+            success: true,
+            data: post,
+            message: "Post fetched successfully"
+        });
     } catch (error) {
         console.error("Error fetching post:", error);
-        return NextResponse.json({ error: "Failed to fetch post" }, { status: 500 });
+        return NextResponse.json({ success: false, error: "Failed to fetch post", message: "Failed to fetch post" }, { status: 500 });
     }
 }
 
@@ -38,18 +42,16 @@ export async function PUT(
     try {
         const session = await auth();
         if (!session || !session.user?.id) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json({ success: false, error: "Unauthorized", message: "Unauthorized" }, { status: 401 });
         }
 
         const postId = params.id;
         if (!postId || postId === 'undefined' || postId === 'null') {
-            console.warn("[POST_UPDATE] Skipping: Invalid or missing postId");
-            return NextResponse.json({ error: "Invalid post ID" }, { status: 400 });
+            return NextResponse.json({ success: false, error: "Invalid post ID", message: "Invalid post ID" }, { status: 400 });
         }
 
         const { content, status, scheduledFor, imageUrl, imageData, writingStyle } = await req.json();
 
-        // If status is being updated to PUBLISHED, try to publish to LinkedIn
         let finalLinkedinPostId = undefined;
         if (status === "PUBLISHED") {
             const user = await prisma.user.findUnique({
@@ -57,17 +59,16 @@ export async function PUT(
             });
 
             if (!user) {
-                return NextResponse.json({ error: "User not found" }, { status: 404 });
+                return NextResponse.json({ success: false, error: "User not found", message: "User not found" }, { status: 404 });
             }
 
             try {
-                // @ts-ignore - Ignore type desync for new imageData field
                 const result = await publishToLinkedIn(user.id, content, imageUrl, imageData);
                 finalLinkedinPostId = result.linkedinPostId;
-            } catch (error) {
+            } catch (error: any) {
                 console.error("LinkedIn publishing failed:", error);
                 return NextResponse.json(
-                    { error: error instanceof Error ? error.message : "Failed to publish to LinkedIn" },
+                    { success: false, error: error.message, message: "LinkedIn publishing failed" },
                     { status: 500 }
                 );
             }
@@ -84,18 +85,21 @@ export async function PUT(
                 imageUrl: imageUrl !== undefined ? imageUrl : undefined,
                 imageData: imageData !== undefined ? imageData : undefined,
                 writingStyle: writingStyle !== undefined ? writingStyle : undefined,
-                userModified: true, // Mark as user-controlled on any manual edit
+                userModified: true,
             } as any,
         });
 
-        return NextResponse.json(post);
+        return NextResponse.json({
+            success: true,
+            data: post,
+            message: "Post updated successfully"
+        });
     } catch (error: any) {
         if (error.code === 'P2025') {
-            console.warn(`[POST_UPDATE] Skip: Post ${params.id} not found`);
-            return NextResponse.json({ error: "Post not found" }, { status: 404 });
+            return NextResponse.json({ success: false, error: "Post not found", message: "Post not found" }, { status: 404 });
         }
         console.error("Error updating post:", error);
-        return NextResponse.json({ error: "Failed to update post" }, { status: 500 });
+        return NextResponse.json({ success: false, error: "Failed to update post", message: "Failed to update post" }, { status: 500 });
     }
 }
 
@@ -106,26 +110,27 @@ export async function DELETE(
     try {
         const session = await auth();
         if (!session || !session.user?.id) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            return NextResponse.json({ success: false, error: "Unauthorized", message: "Unauthorized" }, { status: 401 });
         }
 
         const postId = params.id;
         if (!postId || postId === 'undefined' || postId === 'null') {
-            console.warn("[POST_DELETE] Skipping: Invalid or missing postId");
-            return NextResponse.json({ error: "Invalid post ID" }, { status: 400 });
+            return NextResponse.json({ success: false, error: "Invalid post ID", message: "Invalid post ID" }, { status: 400 });
         }
 
         await prisma.post.delete({
             where: { id: postId },
         });
 
-        return NextResponse.json({ message: "Post deleted successfully" });
+        return NextResponse.json({ 
+            success: true, 
+            message: "Post deleted successfully" 
+        });
     } catch (error: any) {
         if (error.code === 'P2025') {
-            console.warn(`[POST_DELETE] Skip: Post ${params.id} already deleted or not found`);
-            return NextResponse.json({ message: "Post already deleted" });
+            return NextResponse.json({ success: true, message: "Post already deleted" });
         }
         console.error("Error deleting post:", error);
-        return NextResponse.json({ error: "Failed to delete post" }, { status: 500 });
+        return NextResponse.json({ success: false, error: "Failed to delete post", message: "Failed to delete post" }, { status: 500 });
     }
 }

@@ -104,7 +104,9 @@ function EditorContent() {
             try {
                 const response = await fetch(`/api/posts/${postId}`)
                 if (response.ok) {
-                    const data = await response.json()
+                    const result = await response.json()
+                    const data = result.data || result; // Handle both old and new formats for safety
+                    
                     setContent(data.content)
                     setMode("manual")
                     setImageUrl(data.imageUrl || null)
@@ -114,13 +116,8 @@ function EditorContent() {
                         const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                         const zonedDate = toZonedTime(data.scheduledFor, userTimezone);
                         
-                        console.log('[UI DEBUG] Post Editor Load - Raw UTC:', data.scheduledFor);
-                        console.log('[UI DEBUG] Post Editor Load - Timezone:', userTimezone);
-                        console.log('[UI DEBUG] Post Editor Load - Zoned Date:', zonedDate);
-                        
                         // Format specifically for datetime-local input (YYYY-MM-DDTHH:mm)
                         const formatted = format(zonedDate, "yyyy-MM-dd'T'HH:mm");
-                        console.log('[UI DEBUG] Post Editor Load - Formatted:', formatted);
                         setScheduledFor(formatted);
                     }
                 }
@@ -207,16 +204,26 @@ function EditorContent() {
                 body: JSON.stringify({ topic, style, targetLength, context }),
             })
 
-            const data = await response.json()
-
-            if (!response.ok) {
-                throw new Error(data.error || "Failed to generate post")
+            // Stability Fix: Validate response status and content type
+            const contentType = response.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                const text = await response.text();
+                console.error("Non-JSON response received:", text);
+                throw new Error("Server returned an invalid response format. Please try again.");
             }
 
-            if (data.content) {
-                setContent(data.content)
-                setMode("manual")
-                trackAction("generate_post")
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || result.message || "Failed to generate post");
+            }
+
+            // Standardized format handling: result.data.content
+            const contentData = result.data?.content || result.content;
+            if (contentData) {
+                setContent(contentData);
+                setMode("manual");
+                trackAction("generate_post");
             }
         } catch (error: any) {
             console.error("Generation failed", error)
@@ -235,38 +242,90 @@ function EditorContent() {
         const file = e.target.files?.[0]
         if (!file) return
 
-        if (file.size > 5 * 1024 * 1024) {
-            alert("Image size should be less than 5MB")
-            return
-        }
+        // Image Compression Logic
+        const compressImage = (file: File): Promise<File> => {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = (event) => {
+                    const img = document.createElement('img');
+                     // Set src AFTER onload
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const MAX_WIDTH = 1200;
+                        const MAX_HEIGHT = 1200;
+                        let width = img.width;
+                        let height = img.height;
 
-        // Instant Local Preview
-        const localPreviewUrl = URL.createObjectURL(file);
-        setImageUrl(localPreviewUrl);
+                        if (width > height) {
+                            if (width > MAX_WIDTH) {
+                                height *= MAX_WIDTH / width;
+                                width = MAX_WIDTH;
+                            }
+                        } else {
+                            if (height > MAX_HEIGHT) {
+                                width *= MAX_HEIGHT / height;
+                                height = MAX_HEIGHT;
+                            }
+                        }
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx?.drawImage(img, 0, 0, width, height);
+                        canvas.toBlob((blob) => {
+                            if (blob) {
+                                resolve(new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", { type: 'image/jpeg' }));
+                            } else {
+                                resolve(file); // Fallback to original
+                            }
+                        }, 'image/jpeg', 0.7);
+                    };
+                    img.src = event.target?.result as string;
+                };
+                reader.onerror = () => resolve(file);
+            });
+        };
 
-        setIsUploading(true)
+        setIsUploading(true);
         try {
+            // Target < 1MB
+            let processedFile = file;
+            if (file.size > 1024 * 1024) {
+                processedFile = await compressImage(file);
+            }
+
+            // Instant Local Preview
+            const localPreviewUrl = URL.createObjectURL(processedFile);
+            setImageUrl(localPreviewUrl);
+
             const formData = new FormData()
-            formData.append("file", file)
+            formData.append("file", processedFile)
 
             const response = await fetch("/api/upload", {
                 method: "POST",
                 body: formData,
             })
 
-            if (response.ok) {
-                const data = await response.json()
-                // Use base64 for persistent preview to avoid 404s on local dev
-                const base64Url = `data:image/png;base64,${data.imageData}`;
+            const contentType = response.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                throw new Error("Invalid server response");
+            }
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                const uploadData = result.data;
+                const base64Url = `data:image/png;base64,${uploadData.imageData}`;
                 setImageUrl(base64Url)
-                setImageData(data.imageData)
+                setImageData(uploadData.imageData)
             } else {
-                alert("Upload failed")
-                setImageUrl(null) // Reset on failure
+                throw new Error(result.message || "Upload failed");
             }
         } catch (error) {
             console.error("Upload error:", error)
-            alert("Upload failed")
+            alert("Upload failed. Please try a smaller image or check your connection.");
+            setImageUrl(null)
+            setImageData(null)
         } finally {
             setIsUploading(false)
         }
@@ -308,9 +367,15 @@ function EditorContent() {
                 }),
             })
 
+            const contentType = response.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                throw new Error("Invalid response from server");
+            }
+
+            const result = await response.json();
+
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || "Failed to save post");
+                throw new Error(result.error || result.message || "Failed to save post");
             }
 
             if (statusArg !== "DRAFT") {
@@ -337,7 +402,12 @@ function EditorContent() {
         try {
             const response = await fetch(`/api/posts/${postId}`, { method: "DELETE" })
             if (response.ok) {
-                router.push("/dashboard")
+                const result = await response.json();
+                if (result.success !== false) {
+                    router.push("/dashboard")
+                } else {
+                    alert(result.message || "Failed to delete post")
+                }
             }
         } catch (error) {
             console.error("Error deleting post:", error)
@@ -386,13 +456,13 @@ function EditorContent() {
                             )}
                         </div>
 
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-row flex-wrap items-center justify-between gap-3 sm:gap-4 overflow-hidden">
                             {/* Mode Switch (Subtle Segmented Control) */}
-                            <div className="bg-secondary/40 p-1 rounded-xl flex items-center font-medium w-fit">
+                            <div className="bg-secondary/40 p-1 rounded-xl flex items-center font-medium w-fit max-w-full overflow-x-auto no-scrollbar">
                                 <button
                                     onClick={() => setMode("ai")}
                                     className={cn(
-                                        "py-2 px-6 rounded-lg text-sm transition-all flex items-center justify-center gap-2",
+                                        "py-2 px-4 sm:px-6 rounded-lg text-sm transition-all flex items-center justify-center gap-2 whitespace-nowrap",
                                         mode === "ai" ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"
                                     )}
                                 >
@@ -402,7 +472,7 @@ function EditorContent() {
                                 <button
                                     onClick={() => setMode("manual")}
                                     className={cn(
-                                        "py-2 px-6 rounded-lg text-sm transition-all flex items-center justify-center gap-2",
+                                        "py-2 px-4 sm:px-6 rounded-lg text-sm transition-all flex items-center justify-center gap-2 whitespace-nowrap",
                                         mode === "manual" ? "bg-background text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"
                                     )}
                                 >
@@ -411,23 +481,24 @@ function EditorContent() {
                                 </button>
                             </div>
 
-                            {/* Idea Vault Button */}
+                            {/* Idea Vault Button - Fix Overflow */}
                             <Button 
                                 variant="ghost" 
-                                className="rounded-xl bg-secondary/30 hover:bg-primary/10 hover:text-primary transition-all font-medium gap-2"
+                                className="rounded-xl bg-secondary/30 hover:bg-primary/10 hover:text-primary transition-all font-medium gap-2 shrink-0 sm:shrink h-10 px-3 sm:h-11 sm:px-4"
                                 onClick={() => setIsIdeaVaultOpen(true)}
                             >
                                 <Lightbulb className="w-4 h-4" />
-                                Idea Vault
+                                <span className="hidden xs:inline">Idea Vault</span>
+                                <span className="xs:hidden">Vault</span>
                             </Button>
                         </div>
 
                         {/* Content Section */}
                         <div className="space-y-6">
                             {mode === "ai" ? (
-                                <AnimatedCard animation="fade-in-scale" className="space-y-6 bg-card border border-border/60 rounded-2xl p-6 shadow-sm">
+                                <AnimatedCard animation="fade-in-scale" className="space-y-6 bg-card border border-border/80 rounded-2xl p-4 sm:p-6 shadow-sm interaction-smooth">
                                     <div className="flex items-center gap-2 mb-2">
-                                        <Sparkles className="w-5 h-5 text-blue-500" />
+                                        <Sparkles className="w-5 h-5 text-primary" />
                                         <h3 className="font-semibold text-lg">AI Content Generator</h3>
                                     </div>
 
@@ -580,7 +651,7 @@ function EditorContent() {
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                className="rounded-xl gap-2 border-dashed border-2 hover:border-primary/50 hover:bg-primary/5"
+                                                className="rounded-xl gap-2 border-dashed border-2 bg-background hover:border-primary/50 hover:bg-primary/5 text-muted-foreground hover:text-primary transition-all duration-200"
                                                 onClick={() => fileInputRef.current?.click()}
                                                 disabled={isUploading}
                                             >

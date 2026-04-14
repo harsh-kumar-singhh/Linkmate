@@ -38,8 +38,9 @@ export function IdeaVault({ isOpen, onClose, onSelectIdea }: IdeaVaultProps) {
         try {
             const res = await fetch("/api/ideas");
             if (res.ok) {
-                const data = await res.json();
-                setIdeas(data);
+                const result = await res.json();
+                const ideasList = result.data || [];
+                setIdeas(Array.isArray(ideasList) ? ideasList : []);
             }
         } catch (error) {
             console.error("Failed to fetch ideas", error);
@@ -61,11 +62,13 @@ export function IdeaVault({ isOpen, onClose, onSelectIdea }: IdeaVaultProps) {
             });
 
             if (res.ok) {
-                const createdIdea = await res.json();
-                setIdeas([createdIdea, ...ideas]);
-                setNewIdea("");
-                setSuccessFeedback(true);
-                setTimeout(() => setSuccessFeedback(false), 2000);
+                const result = await res.json();
+                if (result.success && result.data) {
+                    setIdeas([result.data, ...ideas]);
+                    setNewIdea("");
+                    setSuccessFeedback(true);
+                    setTimeout(() => setSuccessFeedback(false), 2000);
+                }
             }
         } catch (error) {
             console.error("Failed to save idea", error);
