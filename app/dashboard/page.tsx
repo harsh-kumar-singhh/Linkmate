@@ -2,6 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
+import React from "react"
 import { useRouter } from "next/navigation"
 import { useUser } from "@/context/UserContext"
 import { useTrialTrigger } from "@/context/TrialTriggerContext"
@@ -136,9 +137,18 @@ export default function DashboardPage() {
   const drafts = posts.filter(p => p.status === "DRAFT")
 
   return (
-    <div className="space-y-10 max-w-2xl mx-auto py-8 px-4 md:px-0">
-      {/* Notifications */}
-      {notifications.length > 0 && (
+    <div className="relative min-h-screen bg-transparent">
+      {/* Background Depth Layers */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] dark:bg-primary/5" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/10 rounded-full blur-[120px] dark:bg-blue-600/5" />
+        <div className="absolute inset-0 noise-bg opacity-[0.03] dark:opacity-[0.05]" />
+        <div className="absolute inset-0 vignette opacity-20 dark:opacity-40" />
+      </div>
+
+      <div className="relative z-10 space-y-12 max-w-2xl mx-auto py-12 px-4 md:px-0">
+        {/* Notifications */}
+        {notifications.length > 0 && (
         <div className="fixed top-24 right-4 md:right-8 z-50 w-[calc(100%-2rem)] md:w-80 space-y-4 pointer-events-none">
           {notifications.map(n => (
             <AnimatedCard key={n.id} animation="slide-up">
@@ -167,16 +177,27 @@ export default function DashboardPage() {
       )}
 
       {/* Header */}
-      <AnimatedCard animation="fade-in-up" className="space-y-2">
+      <AnimatedCard animation="fade-in-up" className="relative">
         {isUserLoading ? (
           <WelcomeSkeleton />
         ) : (
-          <>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">Welcome back, {user?.name?.split(' ')[0] || "there"}!</h1>
-            <p className="text-muted-foreground text-sm font-medium">
-              Here&apos;s what&apos;s happening with your LinkedIn presence
-            </p>
-          </>
+          <div className="space-y-3 relative">
+            <div className="absolute -top-12 -left-12 w-64 h-64 bg-primary/10 rounded-full blur-[80px] -z-10 animate-pulse" />
+            <h1 className="text-4xl md:text-5xl font-black tracking-tight text-foreground bg-clip-text text-transparent bg-gradient-to-br from-foreground via-foreground/90 to-primary/50">
+              Welcome back, {user?.name?.split(' ')[0] || "there"}!
+            </h1>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <p className="text-muted-foreground text-base font-medium">
+                Your LinkedIn growth is on track. Keep the momentum!
+              </p>
+              {stats?.stats?.postingStreak > 0 && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 text-xs font-bold animate-bounce-subtle">
+                  <Zap className="w-3.5 h-3.5 fill-amber-500" />
+                  {stats.stats.postingStreak} Day Streak!
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </AnimatedCard>
 
@@ -209,11 +230,15 @@ export default function DashboardPage() {
       {/* Your Posts Section */}
       <div className="space-y-8 pt-2">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold tracking-tight">Post Manager</h2>
+          <h2 className="text-2xl font-black tracking-tight flex items-center gap-3">
+            Post Manager
+            <div className="h-1 w-1 rounded-full bg-primary" />
+          </h2>
           <Link href="/posts/new" prefetch={false}>
-            <Button className="rounded-xl h-10 px-4 gap-2 font-bold shadow-lg shadow-primary/20">
-              <Plus className="w-4 h-4" />
+            <Button className="rounded-2xl h-11 px-6 gap-2 font-black shadow-xl shadow-primary/30 transition-all hover:scale-105 active:scale-95 bg-gradient-to-r from-primary to-blue-600 border-none group">
+              <Plus className="w-5 h-5 transition-transform group-hover:rotate-90" />
               Create Post
+              <Sparkles className="w-4 h-4 text-white/50" />
             </Button>
           </Link>
         </div>
@@ -259,10 +284,8 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <div className="h-24"></div>
-
-      {/* AI Content Coach */}
       <AICoach />
+      </div>
     </div>
   )
 }
@@ -320,15 +343,42 @@ function CoachSuggestionCard({ postCount }: { postCount: number }) {
 }
 
 function StatCard({ label, value, icon, color }: { label: string, value: string | number, icon: React.ReactNode, color: string }) {
+  const isStreak = label === "Posting Streak";
+  const isPublished = label === "Posts Published";
+  const isQueued = label === "Posts Queued";
+  
+  // Extract base color classes for the glow
+  const glowClass = isStreak ? "from-amber-500/10 border-amber-500/20" : 
+                    isPublished ? "from-emerald-500/10 border-emerald-500/20" : 
+                    "from-primary/10 border-primary/20";
+
   return (
-    <Card className="rounded-2xl border-border/50 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
-      <CardContent className="p-6 flex items-center justify-between">
+    <Card className={cn(
+      "rounded-3xl border-border/40 bg-card/50 backdrop-blur-md shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 group overflow-hidden relative",
+      glowClass
+    )}>
+      <div className={cn("absolute inset-0 bg-gradient-to-br to-transparent pointer-events-none opacity-50", isStreak ? "from-amber-500/5" : isPublished ? "from-emerald-500/5" : "from-primary/5")} />
+      
+      <CardContent className="p-6 flex items-center justify-between relative z-10">
         <div className="space-y-1">
-          <p className="text-sm font-medium text-muted-foreground">{label}</p>
-          <p className="text-3xl font-bold tracking-tight text-foreground">{value}</p>
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{label}</p>
+          <p className={cn(
+            "text-4xl font-black tracking-tighter text-foreground drop-shadow-sm transition-transform duration-300 group-hover:scale-105 origin-left",
+            isStreak && "text-amber-500",
+            isPublished && "text-emerald-500",
+            isQueued && "text-primary"
+          )}>{value}</p>
         </div>
-        <div className={cn("h-10 w-10 rounded-full flex items-center justify-center", color)}>
-          {icon}
+        <div className={cn(
+          "h-12 w-12 rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:rotate-12 group-hover:scale-110 shadow-lg", 
+          color,
+          isStreak && "shadow-amber-500/20",
+          isPublished && "shadow-emerald-500/20",
+          isQueued && "shadow-primary/20"
+        )}>
+          {React.cloneElement(icon as React.ReactElement, { 
+            className: cn((icon as React.ReactElement).props.className, "w-6 h-6 animate-pulse-subtle") 
+          })}
         </div>
       </CardContent>
     </Card>
@@ -337,12 +387,14 @@ function StatCard({ label, value, icon, color }: { label: string, value: string 
 
 function PostSection({ title, children, icon }: { title: string, children: React.ReactNode, icon: React.ReactNode }) {
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 pl-1">
-        {icon}
-        <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">{title}</h3>
+    <div className="space-y-5">
+      <div className="flex items-center gap-3 pl-1">
+        <div className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-border/50 shadow-sm">
+          {React.cloneElement(icon as React.ReactElement, { className: cn((icon as React.ReactElement).props.className, "w-4 h-4") })}
+        </div>
+        <h3 className="text-xs font-black text-muted-foreground uppercase tracking-[0.2em]">{title}</h3>
       </div>
-      <div className="space-y-3">
+      <div className="space-y-4">
         {children}
       </div>
     </div>
@@ -356,52 +408,58 @@ function PostCard({ post, index }: { post: Post, index: number }) {
 
   return (
     <AnimatedCard animation="slide-up" index={index}>
-      <Card className="rounded-2xl border-border/50 hover:border-primary/20 hover:shadow-md transition-all group">
-        <CardContent className="p-5">
+      <Card className={cn(
+        "rounded-[2rem] border-border/40 bg-card/40 backdrop-blur-sm hover:bg-card/60 hover:border-primary/30 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)] transition-all duration-300 group relative overflow-hidden",
+        isScheduled && "hover:shadow-primary/5"
+      )}>
+        {/* Left Accent Line */}
+        <div className={cn(
+          "absolute left-0 top-6 bottom-6 w-1 rounded-r-full transition-all duration-300 opacity-20 group-hover:opacity-100 group-hover:h-12 group-hover:top-1/2 group-hover:-translate-y-1/2",
+          isScheduled && "bg-primary shadow-[0_0_10px_hsla(var(--primary),0.5)]",
+          isPublished && "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]",
+          isDraft && "bg-zinc-400"
+        )} />
+
+        <CardContent className="p-6 pl-8">
           <div className="flex items-start justify-between gap-4">
-            <div className="space-y-3 flex-1">
-              <p className="text-[15px] text-foreground/90 line-clamp-2 leading-relaxed font-medium">
+            <div className="space-y-4 flex-1">
+              <p className="text-[17px] text-foreground/90 line-clamp-2 leading-relaxed font-bold tracking-tight">
                 {post.content}
               </p>
 
               <div className="flex flex-wrap items-center gap-3">
                 {isScheduled && post.scheduledFor && (
-                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-primary/5 text-primary text-[11px] font-bold border border-primary/10">
-                    <Clock className="w-3 h-3" />
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-primary/5 text-primary text-xs font-black border border-primary/10 shadow-sm">
+                    <Clock className="w-3.5 h-3.5" />
                     {(() => {
                       const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                       const zonedDate = toZonedTime(post.scheduledFor, userTimezone);
-                      console.log('[UI DEBUG] Raw UTC:', post.scheduledFor);
-                      console.log('[UI DEBUG] Timezone:', userTimezone);
-                      console.log('[UI DEBUG] Zoned:', zonedDate);
-                      console.log('[UI DEBUG] Formatted:', format(zonedDate, 'hh:mm a'));
                       return `${format(zonedDate, "MMM d")} • ${format(zonedDate, "hh:mm a")}`;
                     })()}
                   </div>
                 )}
 
                 {isPublished && post.publishedAt && (
-                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-500/5 text-emerald-600 text-[11px] font-bold border border-emerald-500/10">
-                    <CheckCircle2 className="w-3 h-3" />
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/5 text-emerald-600 text-xs font-black border border-emerald-500/10 shadow-sm">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
                     Published {(() => {
                       const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                       const zonedDate = toZonedTime(post.publishedAt!, userTimezone);
-                      // console.log('[UI DEBUG] Raw Published (UTC):', post.publishedAt);
                       return format(zonedDate, "MMM d");
                     })()}
                   </div>
                 )}
 
                 {isDraft && (
-                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-[11px] font-bold">
-                    <FileEdit className="w-3 h-3" />
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400 text-xs font-black border border-border/50 shadow-sm">
+                    <FileEdit className="w-3.5 h-3.5" />
                     Draft
                   </div>
                 )}
 
                 {post.status === "FAILED" && (
-                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-red-500/5 text-red-600 text-[11px] font-bold border border-red-500/10">
-                    <AlertCircle className="w-3 h-3" />
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-red-500/5 text-red-600 text-xs font-black border border-red-500/10 shadow-sm">
+                    <AlertCircle className="w-3.5 h-3.5" />
                     Failed
                   </div>
                 )}
@@ -410,8 +468,8 @@ function PostCard({ post, index }: { post: Post, index: number }) {
 
             <div className="flex items-center gap-1 shrink-0">
               <Link href={`/posts/new?id=${post.id}`} prefetch={false}>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-primary/10 hover:text-primary transition-colors">
-                  {isPublished ? <ArrowUpRight className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl hover:bg-primary hover:text-white transition-all duration-300 group/btn shadow-none hover:shadow-lg hover:shadow-primary/20">
+                  {isPublished ? <ArrowUpRight className="w-5 h-5 transition-transform group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5" /> : <Plus className="w-5 h-5 transition-transform group-hover/btn:scale-110" />}
                 </Button>
               </Link>
             </div>
