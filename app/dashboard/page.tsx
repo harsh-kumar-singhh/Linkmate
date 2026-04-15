@@ -409,7 +409,7 @@ function PostCard({ post, index }: { post: Post, index: number }) {
             </div>
 
             <div className="flex items-center gap-1 shrink-0">
-              <Link href={isPublished ? `/stats` : `/posts/new?id=${post.id}`} prefetch={false}>
+              <Link href={`/posts/new?id=${post.id}`} prefetch={false}>
                 <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-primary/10 hover:text-primary transition-colors">
                   {isPublished ? <ArrowUpRight className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
                 </Button>
