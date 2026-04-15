@@ -33,7 +33,9 @@ export async function checkAndIncrementAIQuota(
   limit: number;
 }> {
   const userPlan = (plan?.toUpperCase() === "PRO" ? "pro" : "free") as keyof typeof PLAN_LIMITS;
-  const limit = PLAN_LIMITS[userPlan].aiPostsPerDay;
+  const limit = type === AIUsageType.AI_CONTENT_COACH 
+    ? PLAN_LIMITS[userPlan].aiCoachMessagesPerDay 
+    : PLAN_LIMITS[userPlan].aiPostsPerDay;
   const today = getUTCStartOfDay();
 
   try {

@@ -21,6 +21,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { usePathname } from "next/navigation"
 import { useCallback } from "react"
+import { Plus } from "lucide-react"
 
 // Fix for Framer Motion version 12 type errors on Vercel
 const MotionDiv = motion.div as any
@@ -59,85 +60,170 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
     const [isOpen, setIsOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const [response, setResponse] = useState<CoachResponse | null>(null)
-    const [chatHistory, setChatHistory] = useState<{ role: "user" | "coach", content: string | CoachResponse }[]>([])
+    const [chatHistory, setChatHistory] = useState<{ role: "user" | "coach", content: string | CoachResponse, isStreaming?: boolean }[]>([])
     const [inputValue, setInputValue] = useState("")
+    const [sessionId, setSessionId] = useState<string | null>(null);
+    const [isLimitReached, setIsLimitReached] = useState(false);
     const pathname = usePathname()
     const scrollRef = useRef<HTMLDivElement>(null)
     const isUserMessageRef = useRef(false)
 
-    const fetchAdvice = useCallback(async (query?: string) => {
-        setIsLoading(true)
-        if (query) {
-            isUserMessageRef.current = true
-            setChatHistory(prev => [...prev, { role: "user", content: query }])
+    // Load active session on mount
+    const loadSession = useCallback(async () => {
+        try {
+            const res = await fetch("/api/coach");
+            if (res.ok) {
+                const data = await res.json();
+                if (data.success) {
+                    setSessionId(data.sessionId);
+                    if (data.messages && data.messages.length > 0) {
+                        setChatHistory(data.messages);
+                        const lastMsg = data.messages[data.messages.length - 1];
+                        if (lastMsg.role === "coach") {
+                            setResponse(lastMsg.content);
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.error("Failed to load session:", err);
         }
+    }, []);
+
+    const fetchAdvice = useCallback(async (query?: string) => {
+        if (isLimitReached) return;
+
+        setIsLoading(true)
+        setResponse(null)
+        
+        let displayQuery = query || "Give me a quick update and some coach advice.";
+        
+        // Add user message to history immediately
+        const newUserMessage = { role: "user" as const, content: displayQuery };
+        setChatHistory(prev => [...prev, newUserMessage]);
+        
+        const placeholderCoachMessage: { role: "coach", content: any, isStreaming?: boolean } = { 
+            role: "coach", 
+            content: { reply: "" },
+            isStreaming: true 
+        };
+        
+        setChatHistory(prev => [...prev, placeholderCoachMessage]);
+        isUserMessageRef.current = true;
 
         try {
             const res = await fetch("/api/coach", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                credentials: 'include',
                 body: JSON.stringify({
                     page: pathname,
                     draftContent,
-                    userQuery: query
+                    userQuery: query,
+                    sessionId
                 })
             })
 
-            if (res.ok) {
-                const envelope: CoachEnvelope = await res.json()
-
-                if (envelope.success && envelope.reply) {
-                    const mappedResponse: CoachResponse = {
-                        reply: envelope.reply,
-                        insights: envelope.data?.insights || [],
-                        suggestions: envelope.data?.suggestions || [],
-                        quickActions: envelope.data?.quickActions || []
-                    }
-                    setResponse(mappedResponse)
-                    setChatHistory(prev => [...prev, { role: "coach", content: mappedResponse }])
-                } else {
-                    // Business logic error (e.g. quota, auth)
-                    const errorMsg = envelope.message || "We had trouble generating a response. Please try again."
-                    setChatHistory(prev => [...prev, {
+            if (res.status === 429) {
+                setIsLimitReached(true);
+                const data = await res.json();
+                setChatHistory(prev => {
+                    const newHistory = [...prev];
+                    newHistory[newHistory.length - 1] = {
                         role: "coach",
-                        content: {
-                            reply: errorMsg,
-                            insights: [],
-                            suggestions: []
-                        }
-                    }])
-                }
-            } else {
-                // HTTP error or malformed response
-                const envelope: CoachEnvelope = await res.json().catch(() => ({
-                    success: false,
-                    message: "The AI Coach is temporarily unavailable. Please try again in a moment."
-                }))
-
-                setChatHistory(prev => [...prev, {
-                    role: "coach",
-                    content: {
-                        reply: envelope.message || "The AI Coach is temporarily unavailable. Please try again in a moment.",
-                        insights: [],
-                        suggestions: []
-                    }
-                }])
+                        content: { reply: data.message || "Limit reached", insights: [], suggestions: [] },
+                    };
+                    return newHistory;
+                });
+                return;
             }
-        } catch (err) {
-            console.error("Coach fetch error:", err)
-            setChatHistory(prev => [...prev, {
-                role: "coach",
-                content: {
-                    reply: "I encountered a technical glitch. I'm ready to try again if you are!",
-                    insights: [],
-                    suggestions: []
+
+            if (!res.ok) throw new Error("Failed to fetch advice");
+
+            const reader = res.body?.getReader();
+            const decoder = new TextDecoder();
+            let accumulatedText = "";
+
+            if (!reader) throw new Error("No reader available");
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value);
+                accumulatedText += chunk;
+
+                let partialReply = "";
+                const replyMatch = accumulatedText.match(/"reply":\s*"([^"]*)"/);
+                if (replyMatch) {
+                    partialReply = replyMatch[1];
+                } else {
+                    const partialMatch = accumulatedText.match(/"reply":\s*"([^"]*$)/);
+                    if (partialMatch) partialReply = partialMatch[1];
                 }
-            }])
+
+                setChatHistory(prev => {
+                    const newHistory = [...prev];
+                    const lastIndex = newHistory.length - 1;
+                    if (newHistory[lastIndex].role === "coach") {
+                        newHistory[lastIndex] = {
+                            ...newHistory[lastIndex],
+                            content: { 
+                                ...(newHistory[lastIndex].content as CoachResponse),
+                                reply: partialReply 
+                            }
+                        };
+                    }
+                    return newHistory;
+                });
+            }
+
+            try {
+                const finalData = JSON.parse(accumulatedText);
+                const mappedResponse: CoachResponse = {
+                    reply: finalData.reply,
+                    insights: finalData.insights || [],
+                    suggestions: finalData.suggestions || [],
+                    quickActions: finalData.quickActions || []
+                };
+                
+                setResponse(mappedResponse);
+                setChatHistory(prev => {
+                    const newHistory = [...prev];
+                    newHistory[newHistory.length - 1] = {
+                        role: "coach",
+                        content: mappedResponse,
+                        isStreaming: false
+                    };
+                    return newHistory;
+                });
+            } catch (e) {}
+
+        } catch (err) {
+            setChatHistory(prev => {
+                const newHistory = [...prev];
+                newHistory[newHistory.length - 1] = {
+                    role: "coach",
+                    content: { reply: "Technical glitch. Ready to try again!", insights: [], suggestions: [] }
+                };
+                return newHistory;
+            })
         } finally {
             setIsLoading(false)
         }
-    }, [pathname, draftContent])
+    }, [pathname, draftContent, sessionId, isLimitReached])
+
+    const startNewChat = async () => {
+        try {
+            await fetch("/api/coach", { method: "DELETE" });
+            setChatHistory([]);
+            setResponse(null);
+            setSessionId(null);
+            setIsLimitReached(false);
+            fetchAdvice();
+        } catch (err) {
+            console.error("Failed to start new chat:", err);
+        }
+    }
 
     useEffect(() => {
         const handleOpen = () => setIsOpen(true);
@@ -147,21 +233,33 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
 
     // Initial fetch when opened
     useEffect(() => {
-        if (isOpen && chatHistory.length === 0) {
-            fetchAdvice()
+        if (isOpen) {
+            if (chatHistory.length === 0) {
+                loadSession();
+            }
         }
-    }, [isOpen, chatHistory.length, fetchAdvice])
+    }, [isOpen, chatHistory.length, loadSession]);
+
+    // If chat was empty after load, trigger first advice
+    useEffect(() => {
+        if (isOpen && chatHistory.length === 0 && !isLoading) {
+            fetchAdvice();
+        }
+    }, [isOpen, chatHistory.length, isLoading, fetchAdvice]);
 
     // Scroll to bottom
     useEffect(() => {
-        if (scrollRef.current && isUserMessageRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-            isUserMessageRef.current = false
+        if (scrollRef.current) {
+            const isAtBottom = scrollRef.current.scrollHeight - scrollRef.current.scrollTop <= scrollRef.current.clientHeight + 100;
+            if (isUserMessageRef.current || isAtBottom) {
+                scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+                if (isUserMessageRef.current) isUserMessageRef.current = false;
+            }
         }
     }, [chatHistory])
 
     const handleSend = () => {
-        if (!inputValue.trim()) return
+        if (!inputValue.trim() || isLimitReached) return
         fetchAdvice(inputValue)
         setInputValue("")
     }
@@ -190,23 +288,53 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                         initial={{ x: "100%" }}
                         animate={{ x: 0 }}
                         exit={{ x: "100%" }}
-                        transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                        className="fixed inset-y-0 right-0 top-0 h-[100dvh] w-full md:w-[500px] bg-white dark:bg-zinc-950 z-[9999] shadow-2xl flex flex-col border-l border-zinc-200 dark:border-zinc-800"
+                        transition={{ type: "spring", damping: 30, stiffness: 200 }}
+                        className="fixed inset-y-0 right-0 top-0 h-[100dvh] w-full md:w-[500px] bg-white dark:bg-zinc-950 z-[9999] shadow-[0_0_100px_rgba(0,0,0,0.1)] dark:shadow-[0_0_100px_rgba(0,0,0,0.5)] flex flex-col border-l border-zinc-200 dark:border-white/5 overflow-hidden"
                     >
+                        {/* Background Depth Layers */}
+                        <div className="absolute inset-0 bg-gradient-to-b from-zinc-50 via-white to-zinc-100/50 dark:from-zinc-900 dark:via-zinc-950 dark:to-black pointer-events-none" />
+                        <div className="absolute inset-0 noise-bg opacity-[0.05] dark:opacity-[0.03] pointer-events-none" />
+                        <div className="absolute inset-0 vignette opacity-[0.03] dark:opacity-40 pointer-events-none" />
+
                         {/* Header */}
-                        <div className="p-5 border-b border-zinc-100 dark:border-zinc-900 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/50">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-zinc-900 dark:bg-zinc-100 flex items-center justify-center">
-                                    <Sparkles className="w-5 h-5 text-amber-400" />
+                        <div className="relative p-6 mb-2 flex items-center justify-between z-10">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-2xl bg-zinc-900 dark:bg-white/5 border border-zinc-200 dark:border-white/10 flex items-center justify-center shadow-lg dark:shadow-2xl relative group overflow-hidden">
+                                    <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <Sparkles className="w-6 h-6 text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]" />
                                 </div>
-                                <div>
-                                    <h2 className="text-lg font-bold tracking-tight">AI Content Coach</h2>
-                                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-widest">Personal Strategist</p>
+                                <div className="flex flex-col">
+                                    <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white">AI Coach</h2>
+                                    <div className="flex items-center gap-2">
+                                        <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                        <p className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 underline underline-offset-4 decoration-zinc-200 dark:decoration-zinc-800 uppercase tracking-[0.2em]">Strategist Active</p>
+                                    </div>
                                 </div>
                             </div>
-                            <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="rounded-full hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50">
-                                <X className="w-5 h-5" />
-                            </Button>
+                            
+                            <div className="flex items-center gap-2">
+                                <MotionDiv whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                                    <button 
+                                        onClick={startNewChat}
+                                        className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black text-amber-600 dark:text-amber-500/80 hover:text-amber-500 dark:hover:text-amber-400 bg-amber-500/10 dark:bg-amber-500/5 hover:bg-amber-500/20 dark:hover:bg-amber-500/10 border border-amber-500/20 dark:border-amber-500/10 uppercase tracking-[0.1em] transition-all"
+                                    >
+                                        <Plus className="w-3 h-3" />
+                                        New Session
+                                    </button>
+                                </MotionDiv>
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    onClick={() => setIsOpen(false)} 
+                                    className="rounded-xl hover:bg-zinc-100 dark:hover:bg-white/5 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                                >
+                                    <X className="w-5 h-5" />
+                                </Button>
+                            </div>
+
+                            {/* Header Glow Line */}
+                            <div className="absolute bottom-0 left-6 right-6 h-[1px] bg-gradient-to-r from-transparent via-zinc-200 dark:via-white/10 to-transparent" />
+                            <div className="absolute bottom-[-1px] left-1/2 -translate-x-1/2 w-1/3 h-[1px] bg-gradient-to-r from-transparent via-amber-500/30 to-transparent blur-[1px]" />
                         </div>
 
                         {/* Chat Content */}
@@ -217,67 +345,116 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                                     item.role === "user" ? "items-end" : "items-start"
                                 )}>
                                     {item.role === "user" ? (
-                                        <div className="bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 px-4 py-3 rounded-2xl rounded-tr-sm text-sm font-medium max-w-[85%] shadow-sm">
+                                        <MotionDiv 
+                                            initial={{ opacity: 0, x: 20, scale: 0.95 }}
+                                            animate={{ opacity: 1, x: 0, scale: 1 }}
+                                            className="bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 px-5 py-3.5 rounded-2xl rounded-tr-sm text-sm font-medium max-w-[85%] shadow-xl border border-white/5"
+                                        >
                                             {item.content as string}
-                                        </div>
+                                        </MotionDiv>
                                     ) : (
-                                        <div className="space-y-4 max-w-[95%]">
-                                            <div className="bg-zinc-100 dark:bg-zinc-900 p-4 rounded-2xl rounded-tl-sm text-sm leading-relaxed text-foreground/90 border border-zinc-200/50 dark:border-zinc-800/50">
-                                                {(item.content as CoachResponse).reply}
-                                            </div>
+                                        <div className="space-y-6 max-w-[95%] w-full">
+                                            <MotionDiv 
+                                                initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                className="relative group w-full"
+                                            >
+                                                {/* Soft Glow behind AI Message */}
+                                                <div className="absolute -inset-1 bg-gradient-to-br from-amber-500/10 via-primary/5 to-transparent rounded-3xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
+                                                
+                                                <div className="relative bg-white dark:bg-zinc-900/80 backdrop-blur-md p-5 rounded-3xl rounded-tl-sm text-[15px] leading-relaxed text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-white/10 shadow-xl dark:shadow-2xl">
+                                                    {(item.content as CoachResponse).reply}
+                                                    {item.isStreaming && (
+                                                        <div className="inline-flex gap-1 ml-2 align-middle">
+                                                            <div className="typing-dot" />
+                                                            <div className="typing-dot" />
+                                                            <div className="typing-dot" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </MotionDiv>
 
                                             {/* Insights */}
-                                            {(item.content as CoachResponse).insights && (
+                                            {(item.content as CoachResponse).insights && (item.content as CoachResponse).insights!.length > 0 && (
                                                 <div className="grid gap-3">
                                                     {(item.content as CoachResponse).insights?.map((insight, idx) => (
                                                         <MotionDiv
                                                             initial={{ opacity: 0, y: 10 }}
                                                             animate={{ opacity: 1, y: 0 }}
-                                                            transition={{ delay: idx * 0.1 }}
+                                                            transition={{ delay: 0.1 + idx * 0.1 }}
                                                             key={idx}
                                                             className={cn(
-                                                                "p-4 rounded-2xl border flex items-start gap-3",
-                                                                insight.type === "trend" ? "bg-blue-50/30 border-blue-100 dark:bg-blue-900/10 dark:border-blue-900/30 text-blue-700 dark:text-blue-400" :
-                                                                    insight.type === "warning" ? "bg-amber-50/30 border-amber-100 dark:bg-amber-900/10 dark:border-amber-900/30 text-amber-700 dark:text-amber-400" :
-                                                                        "bg-emerald-50/30 border-emerald-100 dark:bg-emerald-900/10 dark:border-emerald-900/30 text-emerald-700 dark:text-emerald-400"
+                                                                "p-4 rounded-2xl border flex items-start gap-4 transition-all duration-300 hover:scale-[1.02]",
+                                                                insight.type === "trend" ? "bg-blue-500/5 border-blue-500/20 text-blue-400" :
+                                                                    insight.type === "warning" ? "bg-amber-500/5 border-amber-500/20 text-amber-400" :
+                                                                        "bg-emerald-500/5 border-emerald-500/20 text-emerald-400"
                                                             )}
                                                         >
-                                                            {insight.type === "trend" ? <TrendingUp className="w-4 h-4 shrink-0 mt-0.5" /> :
-                                                                insight.type === "warning" ? <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /> :
-                                                                    <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />}
-                                                            <p className="text-[13px] font-semibold">{insight.text}</p>
+                                                            <div className={cn(
+                                                                "w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-lg",
+                                                                insight.type === "trend" ? "bg-blue-500/20" :
+                                                                    insight.type === "warning" ? "bg-amber-500/20" : "bg-emerald-500/20"
+                                                            )}>
+                                                                {insight.type === "trend" ? <TrendingUp className="w-4 h-4" /> :
+                                                                    insight.type === "warning" ? <AlertCircle className="w-4 h-4" /> :
+                                                                        <CheckCircle2 className="w-4 h-4" />}
+                                                            </div>
+                                                            <p className="text-[13px] font-semibold leading-relaxed py-1">{insight.text}</p>
                                                         </MotionDiv>
                                                     ))}
                                                 </div>
                                             )}
 
                                             {/* Suggestions */}
-                                            {(item.content as CoachResponse).suggestions && (
-                                                <div className="space-y-3">
-                                                    <div className="flex items-center gap-2 px-1">
-                                                        <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Suggested Post Ideas</span>
+                                            {(item.content as CoachResponse).suggestions && (item.content as CoachResponse).suggestions!.length > 0 && (
+                                                <div className="space-y-4 pt-2">
+                                                    <div className="flex items-center gap-3 px-1">
+                                                        <div className="h-[1px] flex-1 bg-zinc-200 dark:bg-white/5" />
+                                                        <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-[0.2em] whitespace-nowrap">Suggested Ideas</span>
+                                                        <div className="h-[1px] flex-1 bg-zinc-200 dark:bg-white/5" />
                                                     </div>
-                                                    {(item.content as CoachResponse).suggestions?.map((suggestion, idx) => (
-                                                        <Card key={idx} className="rounded-2xl border-border/50 overflow-hidden hover:border-primary/20 transition-all">
-                                                            <CardContent className="p-4 space-y-3">
-                                                                <div className="flex justify-between items-start">
-                                                                    <h4 className="text-sm font-bold leading-tight">{suggestion.title}</h4>
-                                                                </div>
-                                                                <div className="bg-zinc-50 dark:bg-zinc-900/80 p-3 rounded-xl border border-zinc-100 dark:border-zinc-800">
-                                                                    <p className="text-[12px] italic text-muted-foreground">&quot;{suggestion.hook}&quot;</p>
-                                                                </div>
-                                                                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                                                    <span className="font-bold text-foreground">Why:</span> {suggestion.why}
-                                                                </p>
-                                                                <Button size="sm" className="w-full rounded-xl gap-2 text-[11px] font-bold" onClick={() => {
-                                                                    window.location.href = `/posts/new?context=${encodeURIComponent(suggestion.title)}`
-                                                                }}>
-                                                                    Use This Idea <ChevronRight className="w-3 h-3" />
-                                                                </Button>
-                                                            </CardContent>
-                                                        </Card>
-                                                    ))}
+                                                    <div className="grid gap-4">
+                                                        {(item.content as CoachResponse).suggestions?.map((suggestion, idx) => (
+                                                            <MotionDiv
+                                                                key={idx}
+                                                                initial={{ opacity: 0, y: 10 }}
+                                                                animate={{ opacity: 1, y: 0 }}
+                                                                transition={{ delay: 0.3 + idx * 0.1 }}
+                                                                whileHover={{ y: -5 }}
+                                                                className="relative group"
+                                                            >
+                                                                <div className="absolute -inset-[1px] bg-gradient-to-r from-amber-500/30 via-primary/20 to-zinc-800/50 rounded-[2rem] blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                                
+                                                                <Card className="relative rounded-[2rem] border-zinc-200 dark:border-white/10 bg-white/80 dark:bg-zinc-900/40 backdrop-blur-xl overflow-hidden shadow-lg dark:shadow-2xl transition-all duration-300 group-hover:bg-zinc-50 dark:group-hover:bg-zinc-900/60">
+                                                                    <CardContent className="p-6 space-y-4">
+                                                                        <div className="flex justify-between items-start">
+                                                                            <h4 className="text-base font-bold text-zinc-900 dark:text-white tracking-tight leading-tight">{suggestion.title}</h4>
+                                                                        </div>
+                                                                        <div className="relative p-4 rounded-2xl bg-zinc-50 dark:bg-white/5 border border-zinc-100 dark:border-white/5 group-hover:border-zinc-200 dark:group-hover:border-white/10 transition-colors">
+                                                                            <p className="text-[13px] italic text-zinc-600 dark:text-zinc-400 font-medium leading-relaxed">&quot;{suggestion.hook}&quot;</p>
+                                                                            <div className="absolute top-2 right-2 opacity-20 group-hover:opacity-40 transition-opacity">
+                                                                                <Sparkles className="w-3 h-3 text-amber-500" />
+                                                                            </div>
+                                                                        </div>
+                                                                        <p className="text-[12px] text-zinc-500 leading-relaxed font-medium">
+                                                                            <span className="text-amber-600 dark:text-amber-500/80 uppercase text-[9px] font-black tracking-widest mr-1.5">Strategy:</span> {suggestion.why}
+                                                                        </p>
+                                                                        <MotionDiv whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                                                                            <Button 
+                                                                                size="sm" 
+                                                                                className="w-full rounded-2xl py-6 gap-3 text-xs font-black uppercase tracking-widest bg-gradient-to-r from-zinc-900 to-zinc-800 dark:from-amber-600 dark:to-amber-500 hover:from-black hover:to-zinc-900 dark:hover:from-amber-500 dark:hover:to-amber-400 text-white dark:text-black shadow-lg dark:shadow-[0_4px_20px_rgba(245,158,11,0.2)] border-0 transition-all duration-300" 
+                                                                                onClick={() => {
+                                                                                    window.location.href = `/posts/new?context=${encodeURIComponent(suggestion.title)}`
+                                                                                }}
+                                                                            >
+                                                                                Use This Concept <ArrowRight className="w-4 h-4" />
+                                                                            </Button>
+                                                                        </MotionDiv>
+                                                                    </CardContent>
+                                                                </Card>
+                                                            </MotionDiv>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -293,36 +470,57 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                         </div>
 
                         {/* Input & Quick Actions */}
-                        <div className="p-6 border-t border-zinc-100 dark:border-zinc-900 space-y-4">
-                            {response?.quickActions && !isLoading && (
-                                <div className="flex overflow-x-auto scrollbar-hide gap-2 pb-2 -mx-1 px-1">
+                        <div className="relative p-6 bg-white/80 dark:bg-zinc-900/40 backdrop-blur-2xl border-t border-zinc-200 dark:border-white/5 space-y-5 z-10">
+                            {response?.quickActions && !isLoading && !isLimitReached && (
+                                <div className="flex overflow-x-auto scrollbar-hide gap-3 pb-2 -mx-2 px-2">
                                     {response.quickActions.map((action, i) => (
-                                        <button
-                                            key={i}
-                                            onClick={() => fetchAdvice(action)}
-                                            className="text-[11px] font-bold px-4 py-2 rounded-full bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 transition-colors whitespace-nowrap shadow-sm"
-                                        >
-                                            {action}
-                                        </button>
+                                        <MotionDiv key={i} whileHover={{ y: -2 }} whileTap={{ scale: 0.95 }}>
+                                            <button
+                                                onClick={() => fetchAdvice(action)}
+                                                className="text-[10px] font-black px-5 py-2.5 rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-white/5 hover:border-zinc-300 dark:hover:border-white/10 transition-all whitespace-nowrap shadow-sm dark:shadow-xl uppercase tracking-widest"
+                                            >
+                                                {action}
+                                            </button>
+                                        </MotionDiv>
                                     ))}
                                 </div>
                             )}
-                            <div className="relative group">
-                                <input
-                                    type="text"
-                                    placeholder="Ask your coach anything..."
-                                    className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-5 h-12 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 group-hover:border-primary/20 transition-all font-medium pr-12"
-                                    value={inputValue}
-                                    onChange={(e) => setInputValue(e.target.value)}
-                                    onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                                />
-                                <button
-                                    onClick={handleSend}
-                                    disabled={!inputValue.trim() || isLoading}
-                                    className="absolute right-2 top-2 h-8 w-8 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 flex items-center justify-center hover:scale-110 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100"
+                            
+                            <div className="relative group/input">
+                                <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-amber-500 rounded-[1.5rem] blur opacity-0 group-focus-within/input:opacity-20 group-hover/input:opacity-10 transition-all duration-500" />
+                                
+                                <MotionDiv
+                                    animate={{ 
+                                        scale: inputValue.length > 0 ? 1.01 : 1,
+                                    }}
+                                    className="relative flex items-center"
                                 >
-                                    <Send className="w-4 h-4" />
-                                </button>
+                                    <input
+                                        type="text"
+                                        disabled={isLimitReached}
+                                        placeholder={isLimitReached ? "Daily limit reached. Upgrade to Pro!" : "Ask your coach anything..."}
+                                        className={cn(
+                                            "w-full bg-zinc-50 dark:bg-black/60 border border-zinc-200 dark:border-white/10 rounded-[1.5rem] px-6 h-14 text-sm focus:outline-none focus:ring-0 focus:border-primary/50 transition-all font-medium pr-14 placeholder:text-zinc-400 text-zinc-900 dark:text-white",
+                                            isLimitReached && "opacity-50 cursor-not-allowed"
+                                        )}
+                                        value={inputValue}
+                                        onChange={(e) => setInputValue(e.target.value)}
+                                        onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                                    />
+                                    <MotionDiv
+                                        whileHover={{ scale: 1.1 }}
+                                        whileTap={{ scale: 0.9 }}
+                                        className="absolute right-2.5"
+                                    >
+                                        <button
+                                            onClick={handleSend}
+                                            disabled={!inputValue.trim() || isLoading || isLimitReached}
+                                            className="h-10 w-10 rounded-2xl bg-zinc-900 dark:bg-white text-white dark:text-black flex items-center justify-center hover:bg-black dark:hover:bg-amber-400 transition-colors disabled:opacity-20 disabled:grayscale shadow-lg dark:shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+                                        >
+                                            <Send className="w-4 h-4 fill-current" />
+                                        </button>
+                                    </MotionDiv>
+                                </MotionDiv>
                             </div>
                         </div>
                     </MotionDiv>

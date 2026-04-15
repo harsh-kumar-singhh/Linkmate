@@ -4,11 +4,19 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: ["error"],
-  })
+export const prisma = (() => {
+  const instance = globalForPrisma.prisma ?? new PrismaClient({ log: ["error"] });
+  
+  // ROBUSTNESS: If new models were added but the singleton is stale, force re-instantiation
+  if (process.env.NODE_ENV !== "production") {
+    if (!(instance as any).chatSession && (instance as any).user) {
+      console.log("[PRISMA] Stale client detected (missing models). Re-instantiating...");
+      return new PrismaClient({ log: ["error"] });
+    }
+  }
+  
+  return instance;
+})();
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma

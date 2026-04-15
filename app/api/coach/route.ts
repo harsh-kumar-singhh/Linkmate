@@ -10,6 +10,61 @@ import { generateWithFallback, getCoachErrorResponse, AIError } from "@/lib/open
 import { checkAndIncrementAIQuota } from "@/lib/usage";
 import { AIUsageType } from "@prisma/client";
 
+import { prisma } from "@/lib/prisma";
+
+// --- GET: Fetch active session and messages ---
+export async function GET(req: Request) {
+    try {
+        const session = await auth();
+        const user = await resolveUser(session);
+        if (!user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+
+        // Find latest active session
+        let chatSession = await prisma.chatSession.findFirst({
+            where: { userId: user.id, active: true },
+            include: { messages: { orderBy: { createdAt: "asc" } } }
+        });
+
+        // If no session, create one
+        if (!chatSession) {
+            chatSession = await prisma.chatSession.create({
+                data: { userId: user.id, active: true },
+                include: { messages: true }
+            });
+        }
+
+        return NextResponse.json({
+            success: true,
+            sessionId: chatSession.id,
+            messages: chatSession.messages.map(m => ({
+                role: m.role,
+                content: m.content
+            }))
+        });
+    } catch (error) {
+        console.error("[COACH_GET] Error:", error);
+        return NextResponse.json({ success: false, message: "Failed to load chat" }, { status: 500 });
+    }
+}
+
+// --- DELETE: "New Chat" (Deactivate current session) ---
+export async function DELETE(req: Request) {
+    try {
+        const session = await auth();
+        const user = await resolveUser(session);
+        if (!user) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+
+        await prisma.chatSession.updateMany({
+            where: { userId: user.id, active: true },
+            data: { active: false }
+        });
+
+        return NextResponse.json({ success: true, message: "New session started" });
+    } catch (error) {
+        return NextResponse.json({ success: false, message: "Failed to reset chat" }, { status: 500 });
+    }
+}
+
 export async function POST(req: Request) {
     try {
         const session = await auth();
@@ -17,21 +72,15 @@ export async function POST(req: Request) {
         const user = await resolveUser(session);
         if (!user) {
             return NextResponse.json(
-                {
-                    success: false,
-                    errorCode: AI_CORE_CONFIG.ERROR_CATEGORIES.AUTH_MISSING,
-                    message: "Your session expired. Please refresh the page."
-                },
+                { success: false, message: "Your session expired. Please refresh the page." },
                 { status: 401 }
             );
         }
 
         const userId = user.id;
+        const { page, draftContent, userQuery, sessionId: providedSessionId } = await req.json();
 
-        const { page, draftContent, userQuery } = await req.json();
-
-        // --- ENFORCE DAILY QUOTA (COACH) ---
-        // Short-circuit: Check quota BEFORE calling AI or doing heavy DB work
+        // 1. Quota Check (Daily Message Limit for Coach)
         const plan = user.plan || "free";
         const quota = await checkAndIncrementAIQuota(userId, AIUsageType.AI_CONTENT_COACH, plan);
         if (!quota.allowed) {
@@ -39,143 +88,175 @@ export async function POST(req: Request) {
                 {
                     success: false,
                     errorCode: AI_CORE_CONFIG.ERROR_CATEGORIES.QUOTA_EXCEEDED,
-                    message: AI_CORE_CONFIG.ERROR_MESSAGES.quota_exceeded_coach
+                    message: "You've reached your daily limit for the AI Coach. Upgrade to Pro for unlimited advice!"
                 },
                 { status: 429 }
             );
         }
 
-        const context = await getCoachContext(userId);
+        // 2. Session Management
+        let chatSession;
+        if (providedSessionId) {
+            chatSession = await prisma.chatSession.findUnique({
+                where: { id: providedSessionId },
+                include: { messages: { orderBy: { createdAt: "desc" }, take: 10 } }
+            });
+        }
 
-        let systemPrompt = `Role: LinkMate AI Content Coach (Elite LinkedIn Strategist)
-Purpose: ${AI_CORE_CONFIG.AI_COACH.purpose}
+        if (!chatSession) {
+            chatSession = await prisma.chatSession.findFirst({
+                where: { userId: userId, active: true },
+                include: { messages: { orderBy: { createdAt: "desc" }, take: 10 } }
+            });
+        }
 
-GLOBAL RULES:
-${AI_CORE_CONFIG.GLOBAL_RULES.hard_constraints.map(c => `- ${c}`).join('\n')}
-${AI_CORE_CONFIG.GLOBAL_RULES.prohibited_behavior.map(b => `- ${b}`).join('\n')}
+        if (!chatSession) {
+            chatSession = await prisma.chatSession.create({
+                data: { userId: userId, active: true },
+                include: { messages: true }
+            });
+        }
 
-Response Style:
-${AI_CORE_CONFIG.AI_COACH.response_style.map(s => `- ${s}`).join('\n')}
+        // 3. Save User Message
+        if (userQuery) {
+            await prisma.chatMessage.create({
+                data: {
+                    sessionId: chatSession.id,
+                    role: "user",
+                    content: userQuery as any
+                }
+            });
+        }
 
-User Context:
-- Recent Posts & Performance: ${JSON.stringify(context.recentPerformance)}
-- Scheduled Posts: ${JSON.stringify(context.scheduledPosts)}
+        // 4. Context Retrieval (Personalized)
+        const context = await getCoachContext(userId) as any;
+        const pastPosts = context.rawRecentContent || [];
+        const formattedPosts = pastPosts.length > 0 
+            ? pastPosts.map((p: string, i: number) => `Post ${i+1}: ${p}`).join("\n\n---\n\n")
+            : "No past posts available yet.";
+
+        // 5. System Prompt Construction
+        const systemPrompt = `You are an expert LinkedIn growth strategist and content coach for Linkmate.
+Your goal is to provide highly personalized, non-generic advice based on the user's content behavior.
+
+User's Past Content Context:
+${formattedPosts}
+
+Current Activity Context:
+- Scheduled: ${JSON.stringify(context.scheduledPosts)}
 - Current Page: ${page}
-${draftContent ? `- Current Draft Content: "${draftContent}"` : ""}
+${draftContent ? `- Current Draft Under Review: "${draftContent}"` : ""}
 
-Coach Guidelines:
-- FUTURE FOCUS: 80% of your response must be about WHAT TO DO NEXT.
-- DO NOT dwell on past performance unless it directly informs the next step.
-- DO NOT HALLUCINATE metrics. You do NOT have access to views, likes, or comments.
-- If user asks about views/likes, say: "I only track your posting habits and consistency, not external engagement yet."
-- Avoid generic advice like "be consistent". Instead, say "Post tomorrow to save your streak."
-- If analyzing a draft, focus on the "Hook" (first 2 lines), tone, and clarity.
+AI COACH BEHAVIOR RULES:
+- BE SPECIFIC: Avoid generic advice like "be consistent" or "share value".
+- ANALYZE PATTERNS: Identify the user's common topics, tone, and structure.
+- ACTIONABLE NEXT STEPS: Suggest exactly what they should post next.
+- REFERENCE DATA: Mention their actual past content when making points.
 
-Response Format (JSON):
+OUTPUT FORMAT (STRICT):
+You must output a JSON object with this structure:
 {
-  "message": "Start with a 1-sentence reflection on consistency (if data exists). Then immediately pivot to the future.",
-  "insights": [
-    { "type": "trend", "text": "Short observation on consistency/streak." }
-  ],
-  "suggestions": [
-     // THESE ARE REQUIRED
-    { "title": "Next Post Idea", "hook": "Concrete hook...", "why": "Why this works now..." },
-    { "title": "Consistency Action", "hook": "Actionable step...", "why": "To maintain streak..." }
-  ],
-  "quickActions": ["What should I post tomorrow?", "How do I improve my hook?", "Give me a template"]
+  "reply": "...",
+  "insights": [{ "type": "trend" | "success" | "warning", "text": "..." }],
+  "suggestions": [{ "title": "...", "hook": "...", "why": "..." }],
+  "quickActions": ["Action 1", "Action 2"]
 }`;
 
-        let userPrompt = userQuery || "Give me a quick update and some advice.";
+        // 6. Build Conversation History
+        const conversationHistory = chatSession.messages
+            .reverse() // Put in chronological order
+            .map(m => ({
+                role: m.role === "coach" ? "assistant" : "user",
+                content: typeof m.content === "string" ? m.content : JSON.stringify((m.content as any).reply || m.content)
+            }));
 
-        // Add specific instruction based on page if no query
-        if (!userQuery) {
-            if (page === "/posts/new" && draftContent) {
-                userPrompt = "Analyze my current draft and suggest improvements.";
-            } else if (page === "/stats") {
-                userPrompt = "Explain my recent performance trends.";
-            } else {
-                userPrompt = "What should I focus on today?";
-            }
-        }
-
+        const currentQuery = userQuery || "Give me a quick update and some coach advice.";
+        
         const messages = [
             { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt }
+            ...conversationHistory.slice(-6), // Last 6 messages for context
+            { role: "user", content: currentQuery }
         ];
 
-        try {
-            console.log(`[AI_COACH] Generating advice with OpenRouter fallback system`);
-            const text = await generateWithFallback(messages, {
-                temperature: 0.7,
-                response_format: { type: 'json_object' }
-            });
+        // 7. Call OpenRouter with Streaming
+        const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                model: "google/gemini-2.0-flash-001",
+                messages,
+                temperature: 0.6,
+                stream: true,
+                response_format: { type: "json_object" }
+            }),
+        });
 
-            if (text) {
-                // Try to parse the AI output as JSON first
+        if (!response.ok) throw new Error(`OpenRouter API failed`);
+
+        // 8. Stream the response and Save to DB at the end
+        let fullAIResponse = "";
+        const stream = new ReadableStream({
+            async start(controller) {
+                const reader = response.body?.getReader();
+                const decoder = new TextDecoder();
+                
+                if (!reader) return controller.close();
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split("\n").filter(line => line.trim() !== "");
+
+                    for (const line of lines) {
+                        if (line.includes("[DONE]")) continue;
+                        if (line.startsWith("data: ")) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                const content = data.choices?.[0]?.delta?.content || "";
+                                if (content) {
+                                    fullAIResponse += content;
+                                    controller.enqueue(new TextEncoder().encode(content));
+                                }
+                            } catch (e) {}
+                        }
+                    }
+                }
+
+                // SAVE AI MESSAGE TO DB
                 try {
-                    const cleanedText = text.replace(/```json/g, "").replace(/```/g, "").trim();
-                    const parsedData = JSON.parse(cleanedText);
-                    return NextResponse.json({
-                        success: true,
-                        reply: parsedData.message || "I've analyzed your content.",
+                    const parsed = JSON.parse(fullAIResponse);
+                    await prisma.chatMessage.create({
                         data: {
-                            insights: parsedData.insights || [],
-                            suggestions: parsedData.suggestions || [],
-                            quickActions: parsedData.quickActions || []
+                            sessionId: chatSession!.id,
+                            role: "coach",
+                            content: parsed as any
                         }
                     });
-                } catch (parseError) {
-                    console.warn(`[AI_COACH] AI returned non-JSON text, wrapping in reply:`, text.substring(0, 100));
-                    // Fallback: If AI returns raw text, treat it as a reply string
-                    return NextResponse.json({
-                        success: true,
-                        reply: text,
-                        data: { insights: [], suggestions: [], quickActions: [] }
-                    });
+                } catch (e) {
+                    console.error("Failed to save AI message to DB:", e);
                 }
-            }
-        } catch (aiError: any) {
-            console.error(`[AI_COACH] AI Fallback failed:`, aiError);
-            const { error: msg, code } = getCoachErrorResponse(aiError);
-            let status = 503;
-            if (code === AI_CORE_CONFIG.ERROR_CATEGORIES.AUTH_MISSING) status = 401;
-            else if (code === AI_CORE_CONFIG.ERROR_CATEGORIES.QUOTA_EXCEEDED) status = 429;
-            else if (code === AI_CORE_CONFIG.ERROR_CATEGORIES.UNKNOWN_INTERNAL) status = 500;
 
-            return NextResponse.json({
-                success: false,
-                errorCode: code,
-                message: msg
-            }, { status });
-        }
+                controller.close();
+            },
+        });
 
-        throw new AIError("Empty response from AI Coach", "MODEL_FAILURE");
+        return new Response(stream, {
+            headers: {
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+            },
+        });
 
     } catch (error: any) {
-        console.error("[AI_COACH] API Error:", error);
-
-        // --- SPECIFIC DATABASE ERROR HANDLING ---
-        if (error.code?.startsWith('P') || error.message?.includes('Prisma')) {
-            return NextResponse.json({
-                success: false,
-                errorCode: AI_CORE_CONFIG.ERROR_CATEGORIES.MODEL_FAILURE,
-                message: "The assistant is temporarily unavailable. Please try again in a moment."
-            }, { status: 503 });
-        }
-
-        if (error instanceof AIError) {
-            const { error: msg, code } = getCoachErrorResponse(error);
-            return NextResponse.json({
-                success: false,
-                errorCode: code,
-                message: msg
-            }, { status: 500 });
-        }
-
-        return NextResponse.json({
-            success: false,
-            errorCode: AI_CORE_CONFIG.ERROR_CATEGORIES.UNKNOWN_INTERNAL,
-            message: AI_CORE_CONFIG.ERROR_MESSAGES.unknown_internal
-        }, { status: 500 });
+        console.error("[AI_COACH] Error:", error);
+        return NextResponse.json({ success: false, message: "Internal server error" }, { status: 500 });
     }
 }
+

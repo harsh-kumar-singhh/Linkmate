@@ -49,7 +49,7 @@ export async function getCoachContext(userId: string) {
             const comments = post.comments || 0;
             return {
                 id: post.id,
-                content: post.content.substring(0, 250) + "...",
+                content: post.content, // Return full content for analysis
                 views,
                 likes,
                 comments,
@@ -64,7 +64,9 @@ export async function getCoachContext(userId: string) {
             recentPerformance: postsWithStats,
             scheduledPosts: scheduled,
             drafts: drafts,
-            totalPublished: publishedPosts.length
+            totalPublished: publishedPosts.length,
+            // Add raw content for deeper pattern analysis
+            rawRecentContent: publishedPosts.map(p => p.content)
         };
     } catch (error) {
         console.error("Coach Context Error:", error);

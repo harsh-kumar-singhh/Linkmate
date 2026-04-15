@@ -4,12 +4,14 @@ import { startOfDay } from "date-fns"
 export const PLAN_LIMITS = {
   free: {
     aiPostsPerDay: 2,
+    aiCoachMessagesPerDay: 3, // Add this
     writingStyles: 1,
     scheduledPostsPerMonth: 10,
     autopilot: false,
   },
   pro: {
     aiPostsPerDay: Infinity,
+    aiCoachMessagesPerDay: Infinity, // Add this
     writingStyles: Infinity,
     scheduledPostsPerMonth: Infinity,
     autopilot: true,
