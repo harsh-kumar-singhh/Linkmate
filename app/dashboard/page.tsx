@@ -97,7 +97,8 @@ export default function DashboardPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id])
 
   // Update isConnected from user object
   useEffect(() => {
@@ -360,7 +361,7 @@ function CoachSuggestionCard({ postCount }: { postCount: number }) {
   )
 }
 
-const StatCard = React.memo(({ label, value, icon, color }: { label: string, value: string | number, icon: React.ReactNode, color: string }) => {
+const StatCard = React.memo(function StatCard({ label, value, icon, color }: { label: string, value: string | number, icon: React.ReactNode, color: string }) {
   const isStreak = label === "Posting Streak";
   const isPublished = label === "Posts Published";
   const isQueued = label === "Posts Queued";
@@ -403,7 +404,7 @@ const StatCard = React.memo(({ label, value, icon, color }: { label: string, val
   )
 });
 
-const PostSection = React.memo(({ title, children, icon }: { title: string, children: React.ReactNode, icon: React.ReactNode }) => {
+const PostSection = React.memo(function PostSection({ title, children, icon }: { title: string, children: React.ReactNode, icon: React.ReactNode }) {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3 pl-1">
@@ -419,7 +420,7 @@ const PostSection = React.memo(({ title, children, icon }: { title: string, chil
   )
 });
 
-const PostCard = React.memo(({ post, index }: { post: Post, index: number }) => {
+const PostCard = React.memo(function PostCard({ post, index }: { post: Post, index: number }) {
   const isScheduled = post.status === "SCHEDULED"
   const isPublished = post.status === "PUBLISHED"
   const isDraft = post.status === "DRAFT"
