@@ -10,7 +10,7 @@ export function DashboardHeader() {
     const { data: session } = useSession()
 
     return (
-        <header className="h-20 border-b border-border bg-site-bg px-4 md:px-8 flex items-center justify-between sticky top-0 z-40 transition-colors">
+        <header className="h-16 md:h-20 border-b border-border bg-site-bg px-4 md:px-8 flex items-center justify-between sticky top-0 z-40 transition-colors">
             <div className="flex-1 flex items-center">
                 <div className="md:hidden mr-4">
                     <MobileNav />

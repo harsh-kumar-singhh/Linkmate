@@ -146,7 +146,7 @@ export default function DashboardPage() {
         <div className="absolute inset-0 vignette opacity-20 dark:opacity-40" />
       </div>
 
-      <div className="relative z-10 space-y-12 max-w-2xl mx-auto py-12 px-4 md:px-0">
+      <div className="relative z-10 space-y-6 md:space-y-12 max-w-2xl mx-auto pt-2 pb-12 px-4 md:px-0 md:pt-12">
         {/* Notifications */}
         {notifications.length > 0 && (
         <div className="fixed top-24 right-4 md:right-8 z-50 w-[calc(100%-2rem)] md:w-80 space-y-4 pointer-events-none">
