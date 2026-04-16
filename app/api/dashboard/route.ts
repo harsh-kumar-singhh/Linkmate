@@ -2,11 +2,7 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import { resolveUser } from "@/lib/auth/user";
 import { prisma, withRetry } from "@/lib/prisma";
-import { subDays } from "date-fns";
-
-// Simple in-memory cache for dashboard data (15 seconds)
-const cache = new Map<string, { data: any; timestamp: number }>();
-const CACHE_TTL = 15 * 1000;
+import { subDays, startOfDay } from "date-fns";
 
 export async function GET(req: Request) {
   try {
@@ -15,31 +11,22 @@ export async function GET(req: Request) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
-    const cacheKey = user.id;
-    const cached = cache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      return NextResponse.json({ success: true, data: cached.data });
-    }
-
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
+    const today = startOfDay(new Date());
     const thirtyDaysAgo = subDays(today, 30);
     const fifteenDaysAgo = subDays(today, 14);
 
-    // Run all database queries in parallel
+    // Optimized consolidation: All dashboard data in one pass
     const [
       posts,
-      totalCount,
-      totalPublished,
-      totalScheduled,
+      counts,
       recentPublishedPosts,
       aiUsage
     ] = await Promise.all([
-      // Only fetch 5 recent posts for the dashboard
+      // 1. Fetch exactly what's needed for the UI
       withRetry(() => prisma.post.findMany({
         where: { userId: user.id },
         orderBy: { createdAt: "desc" },
-        take: 5,
+        take: 10,
         select: {
           id: true,
           content: true,
@@ -49,13 +36,15 @@ export async function GET(req: Request) {
           notified: true,
         }
       })),
-      // Total count for pagination info if needed
-      withRetry(() => prisma.post.count({ where: { userId: user.id } })),
-      // Published count
-      withRetry(() => prisma.post.count({ where: { userId: user.id, status: "PUBLISHED" } })),
-      // Scheduled count
-      withRetry(() => prisma.post.count({ where: { userId: user.id, status: "SCHEDULED" } })),
-      // Recent published for streak and stats
+      
+      // 2. Consolidate counts using groupBy
+      withRetry(() => prisma.post.groupBy({
+        by: ['status'],
+        where: { userId: user.id },
+        _count: { _all: true }
+      })),
+
+      // 3. Optimized streak query - only need dates
       withRetry(() => prisma.post.findMany({
         where: {
           userId: user.id,
@@ -65,72 +54,77 @@ export async function GET(req: Request) {
         select: { publishedAt: true },
         orderBy: { publishedAt: "desc" }
       })),
-      // AI usage
+
+      // 4. AI usage consolidation using aggregation
       withRetry(() => {
         const startOfWeek = new Date();
         startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
         startOfWeek.setHours(0, 0, 0, 0);
-        return prisma.aIUsage.findMany({
+        return prisma.aIUsage.aggregate({
           where: { userId: user.id, date: { gte: startOfWeek } },
-          select: { count: true }
+          _sum: { count: true }
         });
       })
     ]);
 
-    // Calculate Streak
+    // Process counts efficiently
+    const statusCounts: Record<string, number> = { PUBLISHED: 0, SCHEDULED: 0, DRAFT: 0, FAILED: 0, total: 0 };
+    counts.forEach(curr => {
+      statusCounts[curr.status] = curr._count._all;
+      statusCounts.total += curr._count._all;
+    });
+
+    // Efficient Streak Calculation
     let streak = 0;
     if (recentPublishedPosts.length > 0) {
-      const daysWithPosts = Array.from(new Set(
-        recentPublishedPosts.map(p => {
-          const d = new Date(p.publishedAt!);
-          d.setUTCHours(0, 0, 0, 0);
-          return d.getTime();
-        })
+      const uniqueDays = Array.from(new Set(
+        recentPublishedPosts.map(p => startOfDay(new Date(p.publishedAt!)).getTime())
       )).sort((a, b) => b - a);
 
-      const mostRecentPostDay = daysWithPosts[0];
-      if ((today.getTime() - mostRecentPostDay) / (1000 * 60 * 60 * 24) <= 1) {
+      const mostRecentPostDay = uniqueDays[0];
+      const diffInDays = (today.getTime() - mostRecentPostDay) / (1000 * 60 * 60 * 24);
+
+      if (diffInDays <= 1) {
         streak = 1;
-        for (let i = 0; i < daysWithPosts.length - 1; i++) {
-          if (Math.round((daysWithPosts[i] - daysWithPosts[i+1]) / (1000 * 60 * 60 * 24)) === 1) {
+        for (let i = 0; i < uniqueDays.length - 1; i++) {
+          const dayDiff = Math.round((uniqueDays[i] - uniqueDays[i+1]) / (1000 * 60 * 60 * 24));
+          if (dayDiff === 1) {
             streak++;
           } else break;
         }
       }
     }
 
-    // Calculate Consistency
-    const uniqueDaysWithPostsLast15 = new Set(
+    // Consistency Score Calculation
+    const uniqueDaysLast15 = new Set(
       recentPublishedPosts
         .filter(p => p.publishedAt && new Date(p.publishedAt) >= fifteenDaysAgo)
-        .map(p => {
-          const d = new Date(p.publishedAt!);
-          d.setUTCHours(0, 0, 0, 0);
-          return d.getTime();
-        })
+        .map(p => startOfDay(new Date(p.publishedAt!)).getTime())
     ).size;
-    const consistencyScore = Math.round((uniqueDaysWithPostsLast15 / 15) * 100);
+    const consistencyScore = Math.round((uniqueDaysLast15 / 15) * 100);
 
     const dashboardData = {
       posts,
       stats: {
         postingStreak: streak,
-        totalPostsPublished: totalPublished,
-        postsQueued: totalScheduled,
-        aiUsageThisWeek: aiUsage.reduce((sum, u) => sum + u.count, 0),
+        totalPostsPublished: statusCounts.PUBLISHED,
+        postsQueued: statusCounts.SCHEDULED,
+        aiUsageThisWeek: aiUsage._sum.count || 0,
         consistencyScore,
-        totalCount
+        totalCount: statusCounts.total
       }
     };
 
-    // Update cache
-    cache.set(cacheKey, { data: dashboardData, timestamp: Date.now() });
-
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       data: dashboardData,
       message: "Dashboard data loaded successfully"
     });
+
+    // Add explicit cache headers for CDN/Browser (10s fresh, 60s stale)
+    response.headers.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=50');
+
+    return response;
   } catch (error: any) {
     console.error("Dashboard API Error:", error);
     return NextResponse.json({

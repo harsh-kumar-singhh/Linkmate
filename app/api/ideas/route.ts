@@ -12,6 +12,12 @@ export async function GET(request: Request) {
     const ideas = await withRetry(() => prisma.idea.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: 'desc' },
+      take: 50,
+      select: {
+          id: true,
+          content: true,
+          createdAt: true
+      }
     }));
 
     return NextResponse.json({

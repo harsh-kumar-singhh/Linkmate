@@ -1,7 +1,8 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, useContext, useMemo } from "react";
 import { useSession } from "next-auth/react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface User {
     id: string;
@@ -33,62 +34,49 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
     const { status } = useSession();
-    const [user, setUser] = useState<User | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isDatabaseWaking, setIsDatabaseWaking] = useState(false);
-    const isFetchingRef = React.useRef(false);
+    const queryClient = useQueryClient();
 
-    const refreshUser = useCallback(async () => {
-        if (status !== "authenticated" || isFetchingRef.current) return;
-        
-        isFetchingRef.current = true;
-        try {
+    const { 
+        data: user, 
+        isLoading, 
+        error 
+    } = useQuery({
+        queryKey: ["user"],
+        queryFn: async () => {
+            if (status !== "authenticated") return null;
             const response = await fetch("/api/user/me");
-            
-            if (response.status === 503) {
-                setIsDatabaseWaking(true);
-                // Retry after a short delay if it's a cold start
-                setTimeout(() => {
-                    isFetchingRef.current = false;
-                    refreshUser();
-                }, 2000);
-                return;
+            if (!response.ok) {
+                if (response.status === 503) throw new Error("WAKING_UP");
+                throw new Error("UNAUTHORIZED");
             }
+            const data = await response.json();
+            return data.user as User;
+        },
+        enabled: status === "authenticated",
+        staleTime: 10 * 60 * 1000, // 10 minutes cache
+        gcTime: 15 * 60 * 1000,
+        retry: (failureCount, error: any) => {
+            if (error.message === "WAKING_UP") return failureCount < 5;
+            return false;
+        },
+        retryDelay: (attempt) => Math.min(attempt * 2000, 10000),
+    });
 
-            if (response.ok) {
-                const data = await response.json();
-                if (data.user) {
-                    setUser(data.user);
-                    setIsDatabaseWaking(false);
-                }
-            }
-        } catch (error) {
-            console.error("Failed to fetch user data:", error);
-        } finally {
-            setIsLoading(false);
-            isFetchingRef.current = false;
-        }
-    }, [status]);
+    const isDatabaseWaking = error instanceof Error && error.message === "WAKING_UP";
 
-    useEffect(() => {
-        if (status === "authenticated") {
-            refreshUser();
-        } else if (status === "unauthenticated") {
-            setUser(null);
-            setIsLoading(false);
-            setIsDatabaseWaking(false);
-        }
-    }, [status, refreshUser]);
+    const refreshUser = async () => {
+        await queryClient.invalidateQueries({ queryKey: ["user"] });
+    };
 
-    const isPro = user?.plan?.toUpperCase() === "PRO";
+    const isPro = useMemo(() => user?.plan?.toUpperCase() === "PRO", [user?.plan]);
 
-    const value = React.useMemo(() => ({
-        user,
+    const value = useMemo(() => ({
+        user: user || null,
         isPro,
-        isLoading,
+        isLoading: isLoading && status === "authenticated",
         isDatabaseWaking,
         refreshUser
-    }), [user, isPro, isLoading, isDatabaseWaking, refreshUser]);
+    }), [user, isPro, isLoading, status, isDatabaseWaking]);
 
     return (
         <UserContext.Provider value={value}>
