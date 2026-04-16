@@ -60,37 +60,37 @@ export default function DashboardPage() {
     }
   }, [isUserLoading, user, router])
 
-  // fetchData wrapped in useCallback
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (isBackground = false) => {
     try {
-      setIsLoading(true)
+      if (!isBackground) setIsLoading(true)
 
-      const [postsRes, statsRes] = await Promise.all([
-        fetch("/api/posts"),
-        fetch("/api/activity")
-      ])
+      const response = await fetch("/api/dashboard")
+      if (response.ok) {
+        const result = await response.json()
+        const data = result.data
+        
+        // Update posts and stats simultaneously
+        setPosts(data.posts || [])
+        setStats({ stats: data.stats })
 
-      if (postsRes.ok) {
-        const result = await postsRes.json()
-        const fetchedPosts: Post[] = result.data?.posts || result.posts || []
-        setPosts(fetchedPosts)
+        // Cache for next time
+        localStorage.setItem(`dashboard_cache_${user?.id}`, JSON.stringify({
+           data,
+           timestamp: Date.now()
+        }));
 
-        const unnotified = fetchedPosts.filter(
-          (p) => p.status === "PUBLISHED" && p.notified === false
+        // Handle notifications for newly published posts
+        const unnotified = (data.posts || []).filter(
+          (p: Post) => p.status === "PUBLISHED" && p.notified === false
         )
 
         if (unnotified.length > 0) {
           setNotifications(prev => {
             const existingIds = prev.map(n => n.id);
-            const newNotifications = unnotified.filter(n => !existingIds.includes(n.id));
+            const newNotifications = unnotified.filter((n: Post) => !existingIds.includes(n.id));
             return [...prev, ...newNotifications];
           })
         }
-      }
-
-      if (statsRes.ok) {
-        const data = await statsRes.json()
-        setStats(data)
       }
     } catch (err) {
       console.error("Dashboard fetch error:", err)
@@ -106,11 +106,29 @@ export default function DashboardPage() {
     }
   }, [user]);
 
-  // Fetch data on mount
+  // Initialize from cache if available for instant render
   useEffect(() => {
-    if (!user) return
-    fetchData()
-  }, [user, fetchData])
+    if (!user?.id) return;
+    const cachedData = localStorage.getItem(`dashboard_cache_${user.id}`);
+    if (cachedData) {
+      try {
+        const parsed = JSON.parse(cachedData);
+        if (parsed && Date.now() - parsed.timestamp < 3600000) { // 1 hour client cache
+          setPosts(parsed.data.posts || []);
+          setStats({ stats: parsed.data.stats });
+          setIsLoading(false);
+          // Trigger background fetch without showing skeletons
+          fetchData(true);
+        }
+      } catch (e) {
+        console.error("Cache parsing error", e);
+      }
+    } else {
+      fetchData();
+    }
+  }, [user?.id, fetchData]);
+
+  // Removed manual fetchData call here as it's now handled by the cache logic to avoid double-fetching
 
   // Track dashboard view only once
   useEffect(() => {
@@ -342,7 +360,7 @@ function CoachSuggestionCard({ postCount }: { postCount: number }) {
   )
 }
 
-function StatCard({ label, value, icon, color }: { label: string, value: string | number, icon: React.ReactNode, color: string }) {
+const StatCard = React.memo(({ label, value, icon, color }: { label: string, value: string | number, icon: React.ReactNode, color: string }) => {
   const isStreak = label === "Posting Streak";
   const isPublished = label === "Posts Published";
   const isQueued = label === "Posts Queued";
@@ -383,9 +401,9 @@ function StatCard({ label, value, icon, color }: { label: string, value: string 
       </CardContent>
     </Card>
   )
-}
+});
 
-function PostSection({ title, children, icon }: { title: string, children: React.ReactNode, icon: React.ReactNode }) {
+const PostSection = React.memo(({ title, children, icon }: { title: string, children: React.ReactNode, icon: React.ReactNode }) => {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3 pl-1">
@@ -399,9 +417,9 @@ function PostSection({ title, children, icon }: { title: string, children: React
       </div>
     </div>
   )
-}
+});
 
-function PostCard({ post, index }: { post: Post, index: number }) {
+const PostCard = React.memo(({ post, index }: { post: Post, index: number }) => {
   const isScheduled = post.status === "SCHEDULED"
   const isPublished = post.status === "PUBLISHED"
   const isDraft = post.status === "DRAFT"
@@ -478,7 +496,7 @@ function PostCard({ post, index }: { post: Post, index: number }) {
       </Card>
     </AnimatedCard>
   )
-}
+});
 
 function EmptyState() {
   return (
