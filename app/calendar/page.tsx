@@ -29,6 +29,7 @@ import { AutopilotSetupWizard } from "@/components/calendar/AutopilotSetupWizard
 import { toggleAutopilot } from "@/lib/actions/autopilot"
 import { useUser } from "@/context/UserContext"
 import { WeeklyFocusCard } from "@/components/autopilot/WeeklyFocusCard"
+import { DayPostsModal } from "@/components/calendar/DayPostsModal"
 
 const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate()
 const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay()
@@ -117,6 +118,8 @@ export default function CalendarPage() {
     const [selectedCellRect, setSelectedCellRect] = useState<DOMRect | null>(null)
     const [monthDirection, setMonthDirection] = useState<"left" | "right" | null>(null)
     const [isTransitioning, setIsTransitioning] = useState(false)
+    const [isDayModalOpen, setIsDayModalOpen] = useState(false)
+    const [activeDatePosts, setActiveDatePosts] = useState<any[]>([])
 
     const currentYear = viewDate.getFullYear()
     const currentMonth = viewDate.getMonth()
@@ -193,13 +196,30 @@ export default function CalendarPage() {
     const nextMonth = () => changeMonth("right")
     const prevMonth = () => changeMonth("left")
 
-    const handleCellClick = (e: React.MouseEvent<HTMLDivElement>, cellDate: Date) => {
+    const handleCellClick = (e: React.MouseEvent<HTMLDivElement>, cellDate: Date, dayPosts: any[]) => {
         e.stopPropagation()
         const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
+        
+        // If there are posts, open the view modal
+        if (dayPosts.length > 0) {
+            setSelectedDate(cellDate)
+            setActiveDatePosts(dayPosts)
+            setIsDayModalOpen(true)
+        } else {
+            // Otherwise open quick action popup for creation
+            setSelectedCellRect(rect)
+            setSelectedDate(prev =>
+                prev?.toDateString() === cellDate.toDateString() ? null : cellDate
+            )
+        }
+    }
+
+    const openQuickAction = (e: React.MouseEvent, cellDate: Date) => {
+        e.stopPropagation()
+        const rect = (e.currentTarget.parentElement?.parentElement as HTMLDivElement).getBoundingClientRect()
         setSelectedCellRect(rect)
-        setSelectedDate(prev =>
-            prev?.toDateString() === cellDate.toDateString() ? null : cellDate
-        )
+        setSelectedDate(cellDate)
+        setIsDayModalOpen(false) // Close day modal if open
     }
 
     return (
@@ -482,7 +502,7 @@ export default function CalendarPage() {
                             return (
                                 <div
                                     key={i}
-                                    onClick={date && cellDate ? (e) => handleCellClick(e, cellDate) : undefined}
+                                    onClick={date && cellDate ? (e) => handleCellClick(e, cellDate, datePosts) : undefined}
                                     className={cn(
                                         "day-cell min-h-[80px] md:min-h-[120px] border-r border-b border-border p-2 md:p-3 relative group cursor-pointer",
                                         (i + 1) % 7 === 0 && "border-r-0",
@@ -512,12 +532,13 @@ export default function CalendarPage() {
                                                 </span>
 
                                                 {/* Add post hint on hover */}
-                                                <Link href={`/posts/new?date=${cellDate?.toISOString()}`} prefetch={false} onClick={(e) => e.stopPropagation()}>
-                                                <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center gap-1 text-[9px] font-bold text-primary/70 hover:text-primary">
-                                                        <Plus className="w-3 h-3" />
-                                                        <span className="hidden md:inline">Add</span>
-                                                    </div>
-                                                </Link>
+                                                <div 
+                                                    onClick={(e) => openQuickAction(e, cellDate!)}
+                                                    className="opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center gap-1 text-[9px] font-bold text-primary/70 hover:text-primary"
+                                                >
+                                                    <Plus className="w-3 h-3" />
+                                                    <span className="hidden md:inline">Add</span>
+                                                </div>
                                             </div>
 
                                             {/* Post previews */}
@@ -541,7 +562,13 @@ export default function CalendarPage() {
                                                     </Link>
                                                 ))}
                                                 {datePosts.length > 2 && (
-                                                    <div className="text-[9px] font-bold text-blue-400/60 pl-1">
+                                                    <div 
+                                                        className="text-[9px] font-bold text-blue-400/60 pl-1 hover:text-blue-500 transition-colors"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleCellClick(e as any, cellDate!, datePosts);
+                                                        }}
+                                                    >
                                                         +{datePosts.length - 2} more
                                                     </div>
                                                 )}
@@ -571,6 +598,13 @@ export default function CalendarPage() {
                         cellRect={selectedCellRect}
                     />
                 )}
+
+                <DayPostsModal 
+                    isOpen={isDayModalOpen} 
+                    onClose={() => setIsDayModalOpen(false)} 
+                    date={selectedDate} 
+                    posts={activeDatePosts} 
+                />
 
                 <UpgradeModal isOpen={isUpgradeModalOpen} onClose={() => setIsUpgradeModalOpen(false)} />
                 <AutopilotSetupWizard

@@ -26,8 +26,9 @@ import {
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { toZonedTime } from "date-fns-tz"
-import { AICoach } from "@/components/ai/AICoach"
+const AICoach = React.lazy(() => import("@/components/ai/AICoach").then(m => ({ default: m.AICoach })))
 import { StatSkeleton, PostSkeleton, WelcomeSkeleton } from "@/components/dashboard/DashboardSkeletons"
+import { Suspense } from "react"
 
 interface Post {
   id: string
@@ -80,14 +81,19 @@ export default function DashboardPage() {
     }
   }, [isUserLoading, user, router])
 
-  // Handle notifications when data changes
+  // Handle notifications when data changes with deduplication
   useEffect(() => {
     if (data?.posts) {
       const unnotified = data.posts.filter(p => p.status === "PUBLISHED" && !p.notified)
       if (unnotified.length > 0) {
+        // Deduplicate using localStorage
+        const dismissedIds = JSON.parse(localStorage.getItem('dismissed_notifications') || '[]')
+        
         setNotifications(prev => {
           const existingIds = new Set(prev.map(n => n.id))
-          const newOnes = unnotified.filter(n => !existingIds.has(n.id))
+          const newOnes = unnotified.filter(n => !existingIds.has(n.id) && !dismissedIds.includes(n.id))
+          
+          if (newOnes.length === 0) return prev
           return [...prev, ...newOnes]
         })
       }
@@ -100,6 +106,12 @@ export default function DashboardPage() {
 
   const dismissNotification = async (postId: string) => {
     try {
+      // Optimitic update: Save to localStorage immediately to prevent flicker on refetch
+      const dismissedIds = JSON.parse(localStorage.getItem('dismissed_notifications') || '[]')
+      if (!dismissedIds.includes(postId)) {
+        localStorage.setItem('dismissed_notifications', JSON.stringify([...dismissedIds, postId]))
+      }
+      
       await fetch(`/api/posts/${postId}/notified`, { method: "PATCH" })
       setNotifications(prev => prev.filter(n => n.id !== postId))
     } catch (err) {
@@ -194,7 +206,7 @@ export default function DashboardPage() {
               Post Manager
               <div className="h-1 w-1 rounded-full bg-primary" />
             </h2>
-            <Link href="/posts/new" prefetch={false}>
+            <Link href="/posts/new" prefetch={false} className="hidden md:block">
               <Button className="rounded-2xl h-11 px-6 gap-2 font-black shadow-xl shadow-primary/30 transition-all hover:scale-105 active:scale-95 bg-gradient-to-r from-primary to-blue-600 border-none group">
                 <Plus className="w-5 h-5 transition-transform group-hover:rotate-90" />
                 Create Post
@@ -202,36 +214,49 @@ export default function DashboardPage() {
             </Link>
           </div>
 
-          {isLoading ? (
-            <PostSkeleton />
-          ) : posts.length === 0 ? (
-            <EmptyState />
-          ) : (
-            <div className="space-y-10">
-              {scheduledPosts.length === 0 && <CoachSuggestionCard postCount={stats?.totalCount || 0} />}
-              
-              {scheduledPosts.length > 0 && (
-                <PostSection title="Scheduled Posts" icon={<Clock className="w-4 h-4 text-primary" />}>
-                  {scheduledPosts.map((p, i) => <PostCard key={p.id} post={p} index={i} />)}
-                </PostSection>
-              )}
+          <Suspense fallback={<PostSkeleton />}>
+            {isLoading ? (
+              <PostSkeleton />
+            ) : posts.length === 0 ? (
+              <EmptyState />
+            ) : (
+              <div className="space-y-10">
+                {scheduledPosts.length === 0 && <CoachSuggestionCard postCount={stats?.totalCount || 0} />}
+                
+                {scheduledPosts.length > 0 && (
+                  <PostSection title="Scheduled Posts" icon={<Clock className="w-4 h-4 text-primary" />}>
+                    {scheduledPosts.map((p, i) => <PostCard key={p.id} post={p} index={i} />)}
+                  </PostSection>
+                )}
 
-              {publishedPosts.length > 0 && (
-                <PostSection title="Recently Published" icon={<CheckCircle2 className="w-4 h-4 text-emerald-500" />}>
-                  {publishedPosts.map((p, i) => <PostCard key={p.id} post={p} index={i} />)}
-                </PostSection>
-              )}
+                {publishedPosts.length > 0 && (
+                  <PostSection title="Recently Published" icon={<CheckCircle2 className="w-4 h-4 text-emerald-500" />}>
+                    {publishedPosts.map((p, i) => <PostCard key={p.id} post={p} index={i} />)}
+                  </PostSection>
+                )}
 
-              {drafts.length > 0 && (
-                <PostSection title="Drafts" icon={<FileEdit className="w-4 h-4 text-zinc-500" />}>
-                  {drafts.map((p, i) => <PostCard key={p.id} post={p} index={i} />)}
-                </PostSection>
-              )}
-            </div>
-          )}
+                {drafts.length > 0 && (
+                  <PostSection title="Drafts" icon={<FileEdit className="w-4 h-4 text-zinc-500" />}>
+                    {drafts.map((p, i) => <PostCard key={p.id} post={p} index={i} />)}
+                  </PostSection>
+                )}
+              </div>
+            )}
+          </Suspense>
         </div>
 
-        <AICoach />
+        <Suspense fallback={null}>
+          <AICoach />
+        </Suspense>
+
+        {/* Mobile FAB */}
+        <div className="md:hidden fixed bottom-24 right-6 z-50">
+          <Link href="/posts/new" prefetch={false}>
+            <Button size="icon" className="h-14 w-14 rounded-full shadow-2xl shadow-primary/50 bg-gradient-to-br from-primary via-blue-600 to-indigo-600 border-none animate-in slide-in-from-bottom-10 duration-500">
+              <Plus className="w-7 h-7" />
+            </Button>
+          </Link>
+        </div>
       </div>
     </div>
   )

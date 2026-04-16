@@ -26,7 +26,7 @@ export function Sidebar() {
             <div className="p-8 flex flex-col h-full">
                 <div className="flex items-center gap-3 mb-12 relative group">
                     <span className="font-bold text-xl tracking-tight uppercase">Linkmate</span>
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600 absolute -right-3 top-1 animate-pulse" />
+                    <span className="hidden md:block w-1.5 h-1.5 rounded-full bg-blue-600 absolute -right-3 top-1 animate-pulse" />
                 </div>
 
                 <nav className="space-y-1 flex-1">
