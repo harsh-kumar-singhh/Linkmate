@@ -201,13 +201,13 @@ export default function DashboardPage() {
 
         {/* Post Manager Section */}
         <div className="space-y-8 pt-2">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <h2 className="text-2xl font-black tracking-tight flex items-center gap-3">
               Post Manager
               <div className="h-1 w-1 rounded-full bg-primary" />
             </h2>
-            <Link href="/posts/new" prefetch={false} className="hidden md:block">
-              <Button className="rounded-2xl h-11 px-6 gap-2 font-black shadow-xl shadow-primary/30 transition-all hover:scale-105 active:scale-95 bg-gradient-to-r from-primary to-blue-600 border-none group">
+            <Link href="/posts/new" prefetch={false}>
+              <Button className="w-full md:w-auto rounded-2xl h-11 px-6 gap-2 font-black shadow-xl shadow-primary/30 transition-all hover:scale-105 active:scale-95 bg-gradient-to-r from-primary to-blue-600 border-none group">
                 <Plus className="w-5 h-5 transition-transform group-hover:rotate-90" />
                 Create Post
               </Button>
@@ -248,15 +248,6 @@ export default function DashboardPage() {
         <Suspense fallback={null}>
           <AICoach />
         </Suspense>
-
-        {/* Mobile FAB */}
-        <div className="md:hidden fixed bottom-24 right-6 z-50">
-          <Link href="/posts/new" prefetch={false}>
-            <Button size="icon" className="h-14 w-14 rounded-full shadow-2xl shadow-primary/50 bg-gradient-to-br from-primary via-blue-600 to-indigo-600 border-none animate-in slide-in-from-bottom-10 duration-500">
-              <Plus className="w-7 h-7" />
-            </Button>
-          </Link>
-        </div>
       </div>
     </div>
   )
