@@ -50,6 +50,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
                 throw new Error("UNAUTHORIZED");
             }
             const data = await response.json();
+            
+            // 7. Warm Cache on Login: Prefetch dashboard data immediately after user is resolved
+            queryClient.prefetchQuery({
+                queryKey: ["dashboard"],
+                queryFn: async () => {
+                    const res = await fetch("/api/dashboard");
+                    if (!res.ok) return null;
+                    const d = await res.json();
+                    return d.data;
+                },
+                staleTime: 5 * 60 * 1000,
+            });
+
             return data.user as User;
         },
         enabled: status === "authenticated",

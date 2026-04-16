@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { resolveUser } from "@/lib/auth/user";
 import { prisma, withRetry } from "@/lib/prisma";
 import { publishToLinkedIn } from "@/lib/linkedin";
+import { dashboardCache } from "@/lib/cache-server";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -119,6 +120,9 @@ export async function POST(req: Request) {
         );
       }
     }
+
+    // Invalidate dashboard cache for this user
+    dashboardCache.delete(`dashboard:${user.id}`);
 
     return NextResponse.json({
         success: true,
