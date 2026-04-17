@@ -1,7 +1,7 @@
 "use client"
 
 import { format } from "date-fns"
-import { X, Clock, CheckCircle2, FileEdit, ArrowRight } from "lucide-react"
+import { Clock, CheckCircle2, FileEdit, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -38,12 +38,7 @@ export function DayPostsModal({ isOpen, onClose, date, posts }: DayPostsModalPro
           <DialogTitle className="text-xl font-bold tracking-tight">
             Posts for {format(date, "MMMM d, yyyy")}
           </DialogTitle>
-          <button 
-            onClick={onClose}
-            className="absolute right-6 top-6 rounded-full w-8 h-8 flex items-center justify-center hover:bg-secondary transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
+
         </DialogHeader>
 
         <div className="p-6 max-h-[60vh] overflow-y-auto space-y-4 scrollbar-hide">

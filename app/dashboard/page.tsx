@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import React, { useEffect, useState, useMemo } from "react"
+import React, { useEffect, useState, useMemo, Suspense } from "react"
 import { useRouter } from "next/navigation"
 import { useUser } from "@/context/UserContext"
 import { useTrialTrigger } from "@/context/TrialTriggerContext"
@@ -26,9 +26,8 @@ import {
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { toZonedTime } from "date-fns-tz"
-const AICoach = React.lazy(() => import("@/components/ai/AICoach").then(m => ({ default: m.AICoach })))
+import { AICoach } from "@/components/ai/AICoach"
 import { StatSkeleton, PostSkeleton, WelcomeSkeleton } from "@/components/dashboard/DashboardSkeletons"
-import { Suspense } from "react"
 
 interface Post {
   id: string
@@ -245,9 +244,7 @@ export default function DashboardPage() {
           </Suspense>
         </div>
 
-        <Suspense fallback={null}>
-          <AICoach />
-        </Suspense>
+        <AICoach />
       </div>
     </div>
   )

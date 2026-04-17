@@ -21,7 +21,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { usePathname } from "next/navigation"
 import { useCallback } from "react"
-import { Plus } from "lucide-react"
+import { Plus, Maximize2, Minimize2, Sparkle } from "lucide-react"
 
 // Fix for Framer Motion version 12 type errors on Vercel
 const MotionDiv = motion.div as any
@@ -39,6 +39,11 @@ interface Suggestion {
 
 interface CoachResponse {
     reply: string
+    structuredReply?: {
+        insight: string
+        strategy: string
+        action: string
+    }
     insights?: Insight[]
     suggestions?: Suggestion[]
     quickActions?: string[]
@@ -209,6 +214,12 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
             })
         } finally {
             setIsLoading(false)
+            // Small delay to ensure smooth transition
+            setTimeout(() => {
+                if (scrollRef.current) {
+                    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+                }
+            }, 100);
         }
     }, [pathname, draftContent, sessionId, isLimitReached])
 
@@ -285,11 +296,11 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
 
                     {/* Panel */}
                     <MotionDiv
-                        initial={{ x: "100%" }}
-                        animate={{ x: 0 }}
-                        exit={{ x: "100%" }}
-                        transition={{ type: "spring", damping: 30, stiffness: 200 }}
-                        className="fixed inset-y-0 right-0 top-0 h-[100dvh] w-full md:w-[500px] bg-white dark:bg-zinc-950 z-[9999] shadow-[0_0_100px_rgba(0,0,0,0.1)] dark:shadow-[0_0_100px_rgba(0,0,0,0.5)] flex flex-col border-l border-zinc-200 dark:border-white/5 overflow-hidden"
+                        initial={{ x: "100%", opacity: 0 }}
+                        animate={{ x: 0, opacity: 1 }}
+                        exit={{ x: "100%", opacity: 0 }}
+                        transition={{ type: "spring", damping: 25, stiffness: 180 }}
+                        className="fixed inset-y-0 right-0 top-0 h-[100dvh] w-full md:w-[500px] bg-zinc-950 z-[9999] shadow-[0_0_100px_rgba(0,0,0,0.5)] flex flex-col border-l border-white/5 overflow-hidden"
                     >
                         {/* Background Depth Layers */}
                         <div className="absolute inset-0 bg-gradient-to-b from-zinc-50 via-white to-zinc-100/50 dark:from-zinc-900 dark:via-zinc-950 dark:to-black pointer-events-none" />
@@ -338,7 +349,25 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                         </div>
 
                         {/* Chat Content */}
-                        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
+                        <div 
+                            ref={scrollRef} 
+                            className="flex-1 overflow-y-auto px-4 md:px-6 py-4 space-y-6 scrollbar-hide overscroll-contain"
+                            style={{ 
+                                paddingBottom: '120px', // Extra padding for bottom input
+                                paddingTop: 'env(safe-area-inset-top, 20px)' 
+                            }}
+                        >
+                            {chatHistory.length === 0 && isLoading && (
+                                <div className="space-y-6">
+                                    {[1, 2, 3].map((i) => (
+                                        <div key={i} className="flex flex-col gap-2 animate-pulse">
+                                            <div className="h-4 w-1/3 bg-zinc-200 dark:bg-zinc-800 rounded-lg" />
+                                            <div className="h-20 w-full bg-zinc-100 dark:bg-zinc-900 rounded-2xl" />
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
                             {chatHistory.map((item, i) => (
                                 <div key={i} className={cn(
                                     "flex flex-col gap-2",
@@ -363,12 +392,34 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                                                 <div className="absolute -inset-1 bg-gradient-to-br from-amber-500/10 via-primary/5 to-transparent rounded-3xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
                                                 
                                                 <div className="relative bg-white dark:bg-zinc-900/80 backdrop-blur-md p-5 rounded-3xl rounded-tl-sm text-[15px] leading-relaxed text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-white/10 shadow-xl dark:shadow-2xl">
-                                                    {(item.content as CoachResponse).reply}
+                                                    {(() => {
+                                                        const content = item.content as CoachResponse;
+                                                        if (content.structuredReply) {
+                                                            return (
+                                                                <div className="space-y-4">
+                                                                    <div className="space-y-1">
+                                                                        <div className="text-[10px] font-black uppercase tracking-tighter text-blue-500">The Insight</div>
+                                                                        <p className="text-zinc-800 dark:text-zinc-100">{content.structuredReply.insight}</p>
+                                                                    </div>
+                                                                    <div className="space-y-1">
+                                                                        <div className="text-[10px] font-black uppercase tracking-tighter text-amber-500">The Strategy</div>
+                                                                        <p className="text-zinc-800 dark:text-zinc-100">{content.structuredReply.strategy}</p>
+                                                                    </div>
+                                                                    <div className="space-y-1">
+                                                                        <div className="text-[10px] font-black uppercase tracking-tighter text-emerald-500">The Action</div>
+                                                                        <p className="font-bold text-zinc-900 dark:text-white">{content.structuredReply.action}</p>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        // Fallback to cleaned reply
+                                                        return content.reply?.replace(/[\*#_]/g, '') || "";
+                                                    })()}
                                                     {item.isStreaming && (
-                                                        <div className="inline-flex gap-1 ml-2 align-middle">
-                                                            <div className="typing-dot" />
-                                                            <div className="typing-dot" />
-                                                            <div className="typing-dot" />
+                                                        <div className="flex gap-1.5 mt-3 items-center">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_0ms]" />
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_200ms]" />
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_400ms]" />
                                                         </div>
                                                     )}
                                                 </div>
@@ -470,7 +521,7 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                         </div>
 
                         {/* Input & Quick Actions */}
-                        <div className="relative p-6 bg-white/80 dark:bg-zinc-900/40 backdrop-blur-2xl border-t border-zinc-200 dark:border-white/5 space-y-5 z-10">
+                        <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-white/80 dark:bg-zinc-900/90 backdrop-blur-2xl border-t border-zinc-200 dark:border-white/5 space-y-4 z-20 pb-[env(safe-area-inset-bottom, 24px)]">
                             {response?.quickActions && !isLoading && !isLimitReached && (
                                 <div className="flex overflow-x-auto scrollbar-hide gap-3 pb-2 -mx-2 px-2">
                                     {response.quickActions.map((action, i) => (
