@@ -214,12 +214,6 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
             })
         } finally {
             setIsLoading(false)
-            // Small delay to ensure smooth transition
-            setTimeout(() => {
-                if (scrollRef.current) {
-                    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-                }
-            }, 100);
         }
     }, [pathname, draftContent, sessionId, isLimitReached])
 
@@ -308,17 +302,17 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                         <div className="absolute inset-0 vignette opacity-[0.03] dark:opacity-40 pointer-events-none" />
 
                         {/* Header */}
-                        <div className="relative p-6 mb-2 flex items-center justify-between z-10">
+                        <div className="shrink-0 relative p-6 mb-2 flex items-center justify-between z-10 border-b border-zinc-200 dark:border-white/10">
                             <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 rounded-2xl bg-zinc-900 dark:bg-white/5 border border-zinc-200 dark:border-white/10 flex items-center justify-center shadow-lg dark:shadow-2xl relative group overflow-hidden">
                                     <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                                     <Sparkles className="w-6 h-6 text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]" />
                                 </div>
                                 <div className="flex flex-col">
-                                    <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white">AI Coach</h2>
+                                    <h2 className="text-xl font-bold tracking-tight text-white">AI Coach</h2>
                                     <div className="flex items-center gap-2">
                                         <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                        <p className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 underline underline-offset-4 decoration-zinc-200 dark:decoration-zinc-800 uppercase tracking-[0.2em]">Strategist Active</p>
+                                        <p className="text-[10px] font-bold text-zinc-400 underline underline-offset-4 decoration-zinc-800 uppercase tracking-[0.2em]">Strategist Active</p>
                                     </div>
                                 </div>
                             </div>
@@ -327,7 +321,7 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                                 <MotionDiv whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                                     <button 
                                         onClick={startNewChat}
-                                        className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black text-amber-600 dark:text-amber-500/80 hover:text-amber-500 dark:hover:text-amber-400 bg-amber-500/10 dark:bg-amber-500/5 hover:bg-amber-500/20 dark:hover:bg-amber-500/10 border border-amber-500/20 dark:border-amber-500/10 uppercase tracking-[0.1em] transition-all"
+                                        className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black text-amber-500/80 hover:text-amber-400 bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/10 uppercase tracking-[0.1em] transition-all"
                                     >
                                         <Plus className="w-3 h-3" />
                                         New Session
@@ -337,25 +331,17 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                                     variant="ghost" 
                                     size="icon" 
                                     onClick={() => setIsOpen(false)} 
-                                    className="rounded-xl hover:bg-zinc-100 dark:hover:bg-white/5 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                                    className="rounded-xl hover:bg-white/5 text-zinc-400 hover:text-white transition-colors"
                                 >
                                     <X className="w-5 h-5" />
                                 </Button>
                             </div>
-
-                            {/* Header Glow Line */}
-                            <div className="absolute bottom-0 left-6 right-6 h-[1px] bg-gradient-to-r from-transparent via-zinc-200 dark:via-white/10 to-transparent" />
-                            <div className="absolute bottom-[-1px] left-1/2 -translate-x-1/2 w-1/3 h-[1px] bg-gradient-to-r from-transparent via-amber-500/30 to-transparent blur-[1px]" />
                         </div>
-
+                        
                         {/* Chat Content */}
                         <div 
                             ref={scrollRef} 
-                            className="flex-1 overflow-y-auto px-4 md:px-6 py-4 space-y-6 scrollbar-hide overscroll-contain"
-                            style={{ 
-                                paddingBottom: '120px', // Extra padding for bottom input
-                                paddingTop: 'env(safe-area-inset-top, 20px)' 
-                            }}
+                            className="flex-1 overflow-y-auto px-4 md:px-6 py-6 space-y-8 scrollbar-hide overscroll-contain"
                         >
                             {chatHistory.length === 0 && isLoading && (
                                 <div className="space-y-6">
@@ -521,7 +507,7 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                         </div>
 
                         {/* Input & Quick Actions */}
-                        <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-white/80 dark:bg-zinc-900/90 backdrop-blur-2xl border-t border-zinc-200 dark:border-white/5 space-y-4 z-20 pb-[env(safe-area-inset-bottom, 24px)]">
+                        <div className="shrink-0 p-4 md:p-6 bg-zinc-900/40 backdrop-blur-2xl border-t border-white/5 space-y-4 z-20 pb-[env(safe-area-inset-bottom, 24px)]">
                             {response?.quickActions && !isLoading && !isLimitReached && (
                                 <div className="flex overflow-x-auto scrollbar-hide gap-3 pb-2 -mx-2 px-2">
                                     {response.quickActions.map((action, i) => (
