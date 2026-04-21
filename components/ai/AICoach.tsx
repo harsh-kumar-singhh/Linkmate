@@ -74,25 +74,28 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
     const isUserMessageRef = useRef(false)
 
     // Load active session on mount
-    const loadSession = useCallback(async () => {
-        try {
-            const res = await fetch("/api/coach");
-            if (res.ok) {
-                const data = await res.json();
-                if (data.success) {
-                    setSessionId(data.sessionId);
-                    if (data.messages && data.messages.length > 0) {
-                        setChatHistory(data.messages);
-                        const lastMsg = data.messages[data.messages.length - 1];
-                        if (lastMsg.role === "coach") {
-                            setResponse(lastMsg.content);
+    useEffect(() => {
+        const loadSession = async () => {
+            try {
+                const res = await fetch("/api/coach");
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success) {
+                        setSessionId(data.sessionId);
+                        if (data.messages && data.messages.length > 0) {
+                            setChatHistory(data.messages);
+                            const lastMsg = data.messages[data.messages.length - 1];
+                            if (lastMsg.role === "coach") {
+                                setResponse(lastMsg.content);
+                            }
                         }
                     }
                 }
+            } catch (err) {
+                console.error("Failed to load session:", err);
             }
-        } catch (err) {
-            console.error("Failed to load session:", err);
-        }
+        };
+        loadSession();
     }, []);
 
     const fetchAdvice = useCallback(async (query?: string) => {
@@ -236,16 +239,7 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
         return () => window.removeEventListener('open-ai-coach', handleOpen);
     }, []);
 
-    // Initial fetch when opened
-    useEffect(() => {
-        if (isOpen) {
-            if (chatHistory.length === 0) {
-                loadSession();
-            }
-        }
-    }, [isOpen, chatHistory.length, loadSession]);
-
-    // If chat was empty after load, trigger first advice
+    // Initial advice if needed
     useEffect(() => {
         if (isOpen && chatHistory.length === 0 && !isLoading) {
             fetchAdvice();
@@ -296,13 +290,12 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                         transition={{ type: "spring", damping: 25, stiffness: 180 }}
                         className="fixed inset-y-0 right-0 top-0 h-[100dvh] w-full md:w-[500px] bg-zinc-950 z-[9999] shadow-[0_0_100px_rgba(0,0,0,0.5)] flex flex-col border-l border-white/5 overflow-hidden"
                     >
-                        {/* Background Depth Layers */}
-                        <div className="absolute inset-0 bg-gradient-to-b from-zinc-50 via-white to-zinc-100/50 dark:from-zinc-900 dark:via-zinc-950 dark:to-black pointer-events-none" />
-                        <div className="absolute inset-0 noise-bg opacity-[0.05] dark:opacity-[0.03] pointer-events-none" />
-                        <div className="absolute inset-0 vignette opacity-[0.03] dark:opacity-40 pointer-events-none" />
-
+                        {/* Background Depth Layers - SOLID DARK BG ONLY */}
+                        <div className="absolute inset-0 bg-zinc-950 pointer-events-none" />
+                        <div className="absolute inset-0 noise-bg opacity-[0.03] pointer-events-none" />
+                        
                         {/* Header */}
-                        <div className="shrink-0 relative p-6 mb-2 flex items-center justify-between z-10 border-b border-zinc-200 dark:border-white/10">
+                        <div className="shrink-0 relative h-20 px-6 flex items-center justify-between z-10 border-b border-white/5">
                             <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 rounded-2xl bg-zinc-900 dark:bg-white/5 border border-zinc-200 dark:border-white/10 flex items-center justify-center shadow-lg dark:shadow-2xl relative group overflow-hidden">
                                     <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -377,35 +370,76 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                                                 {/* Soft Glow behind AI Message */}
                                                 <div className="absolute -inset-1 bg-gradient-to-br from-amber-500/10 via-primary/5 to-transparent rounded-3xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
                                                 
-                                                <div className="relative bg-white dark:bg-zinc-900/80 backdrop-blur-md p-5 rounded-3xl rounded-tl-sm text-[15px] leading-relaxed text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-white/10 shadow-xl dark:shadow-2xl">
+                                                <div className="relative bg-zinc-900/50 backdrop-blur-md p-5 rounded-3xl rounded-tl-sm text-[15px] leading-relaxed text-zinc-200 border border-white/5 shadow-2xl overflow-hidden">
                                                     {(() => {
                                                         const content = item.content as CoachResponse;
                                                         if (content.structuredReply) {
                                                             return (
-                                                                <div className="space-y-4">
+                                                                <div className="space-y-4 max-w-full">
                                                                     <div className="space-y-1">
-                                                                        <div className="text-[10px] font-black uppercase tracking-tighter text-blue-500">The Insight</div>
-                                                                        <p className="text-zinc-800 dark:text-zinc-100">{content.structuredReply.insight}</p>
+                                                                        <div className="text-[10px] font-black uppercase tracking-tighter text-amber-500/80">The Insight</div>
+                                                                        <p className="text-zinc-100">{content.structuredReply.insight}</p>
                                                                     </div>
                                                                     <div className="space-y-1">
-                                                                        <div className="text-[10px] font-black uppercase tracking-tighter text-amber-500">The Strategy</div>
-                                                                        <p className="text-zinc-800 dark:text-zinc-100">{content.structuredReply.strategy}</p>
+                                                                        <div className="text-[10px] font-black uppercase tracking-tighter text-blue-500/80">The Strategy</div>
+                                                                        <p className="text-zinc-100">{content.structuredReply.strategy}</p>
                                                                     </div>
                                                                     <div className="space-y-1">
-                                                                        <div className="text-[10px] font-black uppercase tracking-tighter text-emerald-500">The Action</div>
-                                                                        <p className="font-bold text-zinc-900 dark:text-white">{content.structuredReply.action}</p>
+                                                                        <div className="text-[10px] font-black uppercase tracking-tighter text-emerald-500/80">The Action</div>
+                                                                        <p className="font-bold text-white">{content.structuredReply.action}</p>
                                                                     </div>
                                                                 </div>
                                                             );
                                                         }
-                                                        // Fallback to cleaned reply
-                                                        return content.reply?.replace(/[\*#_]/g, '') || "";
+                                                        
+                                                        // Render as structured blocks
+                                                        const rawReply = typeof item.content === 'string' ? item.content : (item.content as CoachResponse).reply || "";
+                                                        
+                                                        // Split into paragraphs and strip markdown
+                                                        const paragraphs = rawReply
+                                                            .split(/\n\n+/)
+                                                            .map(p => p.replace(/[\*#_]/g, '').trim())
+                                                            .filter(p => p.length > 0);
+
+                                                        return (
+                                                            <div className="space-y-4 max-w-full overflow-hidden">
+                                                                {paragraphs.map((p, idx) => {
+                                                                    // Check if it's a bullet point
+                                                                    if (p.startsWith('-') || p.startsWith('•')) {
+                                                                        const bulletItems = p.split(/\n/).map(b => b.replace(/^[-•]\s*/, '').trim());
+                                                                        return (
+                                                                            <ul key={idx} className="space-y-2">
+                                                                                {bulletItems.map((bi, bIdx) => (
+                                                                                    <li key={bIdx} className="flex gap-2 text-zinc-300">
+                                                                                        <span className="text-amber-500 shrink-0">•</span>
+                                                                                        <span>{bi}</span>
+                                                                                    </li>
+                                                                                ))}
+                                                                            </ul>
+                                                                        );
+                                                                    }
+                                                                    
+                                                                    // Check for section headers (capitalized words at start)
+                                                                    const sectionMatch = p.match(/^([A-Z][A-Za-z\s]{2,20}):\s*(.*)/);
+                                                                    if (sectionMatch) {
+                                                                        return (
+                                                                            <div key={idx} className="space-y-1">
+                                                                                <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500">{sectionMatch[1]}</div>
+                                                                                <p className="text-zinc-100">{sectionMatch[2]}</p>
+                                                                            </div>
+                                                                        );
+                                                                    }
+
+                                                                    return <p key={idx} className="text-zinc-200">{p}</p>;
+                                                                })}
+                                                            </div>
+                                                        );
                                                     })()}
                                                     {item.isStreaming && (
-                                                        <div className="flex gap-1.5 mt-3 items-center">
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_0ms]" />
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_200ms]" />
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-[bounce_1s_infinite_400ms]" />
+                                                        <div className="flex gap-1.5 mt-4 items-center">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-amber-500/50 animate-pulse" />
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-amber-500/50 animate-pulse delay-75" />
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-amber-500/50 animate-pulse delay-150" />
                                                         </div>
                                                     )}
                                                 </div>
@@ -507,14 +541,14 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                         </div>
 
                         {/* Input & Quick Actions */}
-                        <div className="shrink-0 p-4 md:p-6 bg-zinc-900/40 backdrop-blur-2xl border-t border-white/5 space-y-4 z-20 pb-[env(safe-area-inset-bottom, 24px)]">
+                        <div className="shrink-0 p-4 md:p-6 bg-zinc-900 border-t border-white/5 space-y-4 z-20 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
                             {response?.quickActions && !isLoading && !isLimitReached && (
                                 <div className="flex overflow-x-auto scrollbar-hide gap-3 pb-2 -mx-2 px-2">
                                     {response.quickActions.map((action, i) => (
                                         <MotionDiv key={i} whileHover={{ y: -2 }} whileTap={{ scale: 0.95 }}>
                                             <button
                                                 onClick={() => fetchAdvice(action)}
-                                                className="text-[10px] font-black px-5 py-2.5 rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-white/5 hover:border-zinc-300 dark:hover:border-white/10 transition-all whitespace-nowrap shadow-sm dark:shadow-xl uppercase tracking-widest"
+                                                className="text-[10px] font-black px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white border border-white/5 hover:border-white/10 transition-all whitespace-nowrap shadow-xl uppercase tracking-widest"
                                             >
                                                 {action}
                                             </button>

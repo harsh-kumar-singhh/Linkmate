@@ -26,7 +26,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
 
     if (showSidebar) {
         return (
-            <div className="flex h-screen bg-slate-50 dark:bg-[#020617] transition-colors duration-300">
+            <div className="flex h-screen bg-white dark:bg-[#09090b] transition-colors duration-300">
                 <Sidebar />
                 <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative pb-16 md:pb-0">
                     <UpgradeBanner />

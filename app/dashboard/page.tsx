@@ -130,12 +130,12 @@ export default function DashboardPage() {
 
   return (
     <div className="relative min-h-screen bg-transparent">
-      {/* Background Depth Layers */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] dark:bg-primary/5" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/10 rounded-full blur-[120px] dark:bg-blue-600/5" />
-        <div className="absolute inset-0 noise-bg opacity-[0.03] dark:opacity-[0.05]" />
-        <div className="absolute inset-0 vignette opacity-20 dark:opacity-40" />
+      {/* Background Depth Layers - CLEAN SOLID SYSTEM */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-site-bg">
+        {/* Subtle glows ONLY, no white/bright gradients */}
+        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-primary/5 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-blue-600/5 rounded-full blur-[120px]" />
+        <div className="absolute inset-0 noise-bg opacity-[0.02]" />
       </div>
 
       <div className="relative z-10 space-y-6 md:space-y-12 max-w-2xl mx-auto pt-2 pb-12 px-4 md:px-0 md:pt-12">
@@ -144,7 +144,7 @@ export default function DashboardPage() {
           <div className="fixed top-24 right-4 md:right-8 z-50 w-[calc(100%-2rem)] md:w-80 space-y-4 pointer-events-none">
             {notifications.map(n => (
               <AnimatedCard key={n.id} animation="slide-up">
-                <div className="bg-white dark:bg-zinc-900 border border-emerald-500/20 shadow-2xl p-5 rounded-2xl relative pointer-events-auto overflow-hidden">
+                <div className="bg-site-bg border border-emerald-500/20 shadow-2xl p-5 rounded-2xl relative pointer-events-auto overflow-hidden">
                   <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500" />
                   <button onClick={() => dismissNotification(n.id)} className="absolute top-3 right-3 text-muted-foreground hover:text-foreground">
                     <X className="w-4 h-4" />
@@ -255,10 +255,10 @@ function CoachSuggestionCard({ postCount }: { postCount: number }) {
   return (
     <AnimatedCard animation="fade-in-up" className="relative group">
       <div className="absolute -inset-0.5 bg-gradient-to-r from-amber-500 to-primary rounded-2xl blur opacity-20 group-hover:opacity-30 transition duration-1000" />
-      <Card className="relative rounded-2xl border-primary/20 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm">
+      <Card className="relative rounded-2xl border-primary/20 bg-site-bg backdrop-blur-sm">
         <CardContent className="p-6">
           <div className="flex flex-col sm:flex-row items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-zinc-900 dark:bg-zinc-100 flex items-center justify-center shrink-0">
+            <div className="w-12 h-12 rounded-xl bg-site-bg border border-white/5 flex items-center justify-center shrink-0">
               <Sparkles className="w-6 h-6 text-amber-400" />
             </div>
             <div className="space-y-4 flex-1">

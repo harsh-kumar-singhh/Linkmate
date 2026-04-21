@@ -21,7 +21,7 @@ export function Sidebar() {
     return (
         <AnimatedCard
             animation="slide-right"
-            className="hidden md:flex flex-col w-64 border-r border-border bg-site-bg h-screen sticky top-0 transition-colors"
+            className="hidden md:flex flex-col w-64 border-r border-border bg-site-bg h-screen sticky top-0 z-[100] transition-colors"
         >
             <div className="p-8 flex flex-col h-full">
                 <div className="flex items-center gap-3 mb-12 relative group">
