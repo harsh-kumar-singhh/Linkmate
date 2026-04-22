@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export function RefreshTrigger() {
+function RefreshTriggerContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const refreshedRef = useRef(false);
@@ -23,4 +23,12 @@ export function RefreshTrigger() {
     }, [success, router]);
 
     return null;
+}
+
+export function RefreshTrigger() {
+    return (
+        <Suspense fallback={null}>
+            <RefreshTriggerContent />
+        </Suspense>
+    );
 }

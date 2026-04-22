@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   Dialog,
@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Sparkles, CheckCircle2, Rocket } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-export function UpgradeSuccessModal() {
+function UpgradeSuccessModalContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
@@ -91,5 +91,13 @@ export function UpgradeSuccessModal() {
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+export function UpgradeSuccessModal() {
+  return (
+    <Suspense fallback={null}>
+      <UpgradeSuccessModalContent />
+    </Suspense>
   );
 }

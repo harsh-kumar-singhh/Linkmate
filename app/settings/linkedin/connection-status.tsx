@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ShieldCheck, Zap, Loader2 } from "lucide-react";
 import { ConnectLinkedInButton } from "./connect-button";
@@ -9,7 +9,7 @@ interface LinkedInConnectionStatusProps {
     initialIsConnected: boolean;
 }
 
-export function LinkedInConnectionStatus({ initialIsConnected }: LinkedInConnectionStatusProps) {
+function LinkedInConnectionStatusContent({ initialIsConnected }: LinkedInConnectionStatusProps) {
     const [isConnected, setIsConnected] = useState(initialIsConnected);
     const [isVerifying, setIsVerifying] = useState(false);
 
@@ -87,5 +87,15 @@ export function LinkedInConnectionStatus({ initialIsConnected }: LinkedInConnect
                 </div>
             </div>
         </div>
+    );
+}
+
+export function LinkedInConnectionStatus(props: LinkedInConnectionStatusProps) {
+    return (
+        <Suspense fallback={<div className="bg-secondary/30 rounded-[40px] p-10 flex items-center justify-center min-h-[200px]">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>}>
+            <LinkedInConnectionStatusContent {...props} />
+        </Suspense>
     );
 }
