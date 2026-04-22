@@ -10,6 +10,7 @@ import { DashboardHeader } from "./header";
 import { UpgradeBanner } from "@/components/upgrade/UpgradeBanner";
 import { TrialModal } from "@/components/upgrade/TrialModal";
 import { LockedFeatureModal } from "@/components/upgrade/LockedFeatureModal";
+import { UpgradeSuccessModal } from "@/components/upgrade/UpgradeSuccessModal";
 import { DatabaseStatus } from "@/components/shared/database-status";
 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
@@ -41,6 +42,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
                     <MobileNav />
                     <TrialModal />
                     <LockedFeatureModal />
+                    <UpgradeSuccessModal />
                     <DatabaseStatus />
                 </div>
             </div>
@@ -55,6 +57,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
                 <>
                     <TrialModal />
                     <LockedFeatureModal />
+                    <UpgradeSuccessModal />
                 </>
             )}
         </>

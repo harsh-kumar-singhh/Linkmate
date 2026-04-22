@@ -70,8 +70,8 @@ export function TrialTriggerProvider({ children }: { children: React.ReactNode }
         setActionsSinceDismissal(s => s + 1);
       }
 
-      // Rule 1: First Value Trigger (First post generated)
-      if (!hasShownInSessionRef.current && action === "generate_post") {
+      // Rule 1: First Value Trigger (First post generated or scheduled)
+      if (!hasShownInSessionRef.current && (action === "generate_post" || action === "schedule_post")) {
         setShowTrialModal(true);
         setHasShownInSession(true);
         setActionsSinceDismissal(0);
@@ -80,12 +80,6 @@ export function TrialTriggerProvider({ children }: { children: React.ReactNode }
       // Rule 2: Cooldown check (Wait for 3 meaningful actions)
       else if (hasShownInSessionRef.current && action === "schedule_post" && actionsSinceDismissal >= 3) {
         setShowTrialModal(true);
-        setActionsSinceDismissal(0);
-      }
-      // Condition 3 (Legacy/Fallback): First threshold
-      else if (!hasShownInSessionRef.current && newCount >= 2) {
-        setShowTrialModal(true);
-        setHasShownInSession(true);
         setActionsSinceDismissal(0);
       }
 
