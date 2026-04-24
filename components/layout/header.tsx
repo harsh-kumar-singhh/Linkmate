@@ -5,6 +5,7 @@ import { Bell, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ModeToggle } from "@/components/mode-toggle"
 import { MobileNav } from "./mobile-nav"
+import { NotificationBell } from "./notification-bell"
 
 export function DashboardHeader() {
     const { data: session } = useSession()
@@ -25,6 +26,7 @@ export function DashboardHeader() {
             </div>
 
             <div className="flex items-center gap-4">
+                <NotificationBell />
                 <ModeToggle />
 
                 <div className="h-6 w-px bg-border mx-2" />

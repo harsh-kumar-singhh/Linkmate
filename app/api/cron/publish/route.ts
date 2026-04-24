@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { publishToLinkedIn } from "@/lib/linkedin";
 import { maintainAutopilotPipeline } from "@/lib/autopilot/maintenance";
+import { triggerPostPublishedNotification, sendPushNotification } from "@/lib/notifications";
 
 export async function POST(req: Request) {
     const now = new Date();
@@ -107,10 +108,17 @@ export async function POST(req: Request) {
                         status: "PUBLISHED",
                         publishedAt: new Date(),
                         linkedinPostId: publishResult.linkedinPostId,
-                        notified: false,
+                        notified: true,
                         failureReason: null
                     }
                 });
+
+                // Trigger notification
+                try {
+                    await triggerPostPublishedNotification(post.userId, post.content, post.id);
+                } catch (notifyError) {
+                    console.error(`[CRON] Failed to notify user for post ${post.id}:`, notifyError);
+                }
 
                 console.log(`[CRON] Post ${post.id}: Published successfully.`);
                 results.push({ id: post.id, status: "SUCCESS" });
@@ -126,6 +134,18 @@ export async function POST(req: Request) {
                         failureReason: errorMessage
                     }
                 });
+
+                // Trigger failure notification
+                try {
+                    await sendPushNotification(post.userId, {
+                        title: 'Publishing Failed ⚠️',
+                        body: `We couldn't publish your post. Error: ${errorMessage.substring(0, 50)}...`,
+                        url: `/posts/${post.id}`,
+                        type: 'POST_FAILED',
+                    });
+                } catch (notifyError) {
+                    console.error(`[CRON] Failed to notify user for post failure ${post.id}:`, notifyError);
+                }
 
                 results.push({ id: post.id, status: "FAILED", error: errorMessage });
             }

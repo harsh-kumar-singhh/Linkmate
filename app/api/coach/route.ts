@@ -9,6 +9,7 @@ import { AI_CORE_CONFIG } from "@/lib/ai/config";
 import { generateWithFallback, getCoachErrorResponse, AIError } from "@/lib/openrouter";
 import { checkAndIncrementAIQuota } from "@/lib/usage";
 import { AIUsageType } from "@prisma/client";
+import { triggerAICoachFollowUp, triggerUpgradePrompt } from "@/lib/notifications";
 
 import { prisma } from "@/lib/prisma";
 
@@ -84,6 +85,11 @@ export async function POST(req: Request) {
         const plan = user.plan || "free";
         const quota = await checkAndIncrementAIQuota(userId, AIUsageType.AI_CONTENT_COACH, plan);
         if (!quota.allowed) {
+            // Trigger upgrade notification in background
+            triggerUpgradePrompt(userId, "AI Coach").catch(e => 
+                console.error("[COACH] Notification failed:", e)
+            );
+
             return NextResponse.json(
                 {
                     success: false,
@@ -184,7 +190,7 @@ You must output a JSON object with this structure:
         // 6. Build Conversation History
         const conversationHistory = chatSession.messages
             .reverse() // Put in chronological order
-            .map(m => ({
+            .map((m: any) => ({
                 role: m.role === "coach" ? "assistant" : "user",
                 content: typeof m.content === "string" ? m.content : JSON.stringify((m.content as any).reply || m.content)
             }));
@@ -273,6 +279,13 @@ You must output a JSON object with this structure:
                                 content: parsed as any
                             }
                         });
+
+                        // Trigger follow-up notification if it's a briefing or significant update
+                        if (parsed.reply) {
+                            triggerAICoachFollowUp(userId, parsed.reply).catch(e => 
+                                console.error("[COACH] Notification failed:", e)
+                            );
+                        }
                     }
                 } catch (e) {
                     console.error("Failed to save AI message to DB:", e, fullAIResponse);

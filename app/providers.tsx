@@ -4,6 +4,7 @@ import { SessionProvider } from "next-auth/react"
 import { ThemeProvider } from "next-themes"
 import { UserProvider } from "@/context/UserContext"
 import { TrialTriggerProvider } from "@/context/TrialTriggerContext"
+import { NotificationProvider } from "@/context/NotificationContext"
 import { QueryProvider } from "@/components/providers/query-provider"
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -13,7 +14,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <QueryProvider>
           <UserProvider>
             <TrialTriggerProvider>
-              {children}
+              <NotificationProvider>
+                {children}
+              </NotificationProvider>
             </TrialTriggerProvider>
           </UserProvider>
         </QueryProvider>

@@ -6,6 +6,7 @@ import React, { useEffect, useState, useMemo, Suspense } from "react"
 import { useRouter } from "next/navigation"
 import { useUser } from "@/context/UserContext"
 import { useTrialTrigger } from "@/context/TrialTriggerContext"
+import { PushPermissionPrompt } from "@/components/layout/push-permission-prompt"
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
 import { AnimatedCard } from "@/components/animated/AnimatedCard"
@@ -220,6 +221,7 @@ export default function DashboardPage() {
               <EmptyState />
             ) : (
               <div className="space-y-10">
+                <PushPermissionPrompt />
                 {scheduledPosts.length === 0 && <CoachSuggestionCard postCount={stats?.totalCount || 0} />}
                 
                 {scheduledPosts.length > 0 && (

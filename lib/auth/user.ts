@@ -33,6 +33,8 @@ export const resolveUser = cache(async (providedSession?: Session | null) => {
         aboutYou: true,
         autopilotCurrentFocus: true,
         autopilotWritingStyleId: true,
+        lastActiveAt: true,
+        engagementSegment: true,
         // Legacy fields for backward compatibility
         writingStyle: true,
         customStyles: true,
@@ -70,6 +72,18 @@ export const resolveUser = cache(async (providedSession?: Session | null) => {
         } catch (error) {
             console.error(`[AUTH] Failed to auto-heal user: ${error}`)
             return null
+        }
+    }
+
+    // 4. Update last active time (background)
+    if (user) {
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+        if (!user.lastActiveAt || user.lastActiveAt < fiveMinutesAgo) {
+            // Update in background to not block the request
+            withRetry(() => prisma.user.update({
+                where: { id: user.id },
+                data: { lastActiveAt: new Date() }
+            })).catch(console.error);
         }
     }
 

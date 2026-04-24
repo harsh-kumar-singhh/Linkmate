@@ -9,6 +9,7 @@ import { generateWithFallback, getPublicErrorMessage } from "@/lib/openrouter";
 import { checkAndIncrementAIQuota } from "@/lib/usage";
 import { AIUsageType } from "@prisma/client";
 import { AI_CORE_CONFIG } from "@/lib/ai/config";
+import { triggerUpgradePrompt } from "@/lib/notifications";
 
 const TONE_GUIDELINES = AI_CORE_CONFIG.TONE_MAPPING;
 
@@ -44,6 +45,11 @@ export async function POST(req: Request) {
         const plan = (session.user.plan || "FREE").toUpperCase();
         const quota = await checkAndIncrementAIQuota(userId, AIUsageType.AI_POST_GENERATION, plan);
         if (!quota.allowed) {
+            // Trigger upgrade notification in background
+            triggerUpgradePrompt(userId, "AI Post Generation").catch(e => 
+                console.error("[GENERATE] Notification failed:", e)
+            );
+
             return NextResponse.json(
                 {
                     error: AI_CORE_CONFIG.ERROR_MESSAGES.quota_exceeded_post,
