@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Cron job to downgrade users whose PRO plan has expired.
  * This should be called regularly (e.g., daily).
