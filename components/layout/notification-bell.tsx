@@ -92,7 +92,7 @@ export function NotificationBell() {
                       <Bell className="w-8 h-8 text-slate-300 dark:text-slate-600" />
                     </div>
                     <p className="text-slate-500 dark:text-slate-400 font-medium">No notifications yet</p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">When you get updates, they'll show up here.</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">When you get updates, they&apos;ll show up here.</p>
                   </div>
                 ) : (
                   <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
