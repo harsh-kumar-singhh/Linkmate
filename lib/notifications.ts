@@ -203,7 +203,7 @@ export async function triggerPostPublishedNotification(userId: string, postConte
   await sendPushNotification(userId, {
     title,
     body,
-    url: `/posts/${postId}`,
+    url: '/dashboard',
     type: 'POST_PUBLISHED',
   }, true); // bypass intelligence for publishing
 }

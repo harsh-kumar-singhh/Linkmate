@@ -140,7 +140,7 @@ export async function POST(req: Request) {
                     await sendPushNotification(post.userId, {
                         title: 'Publishing Failed ⚠️',
                         body: `We couldn't publish your post. Error: ${errorMessage.substring(0, 50)}...`,
-                        url: `/posts/${post.id}`,
+                        url: '/dashboard',
                         type: 'POST_FAILED',
                     });
                 } catch (notifyError) {

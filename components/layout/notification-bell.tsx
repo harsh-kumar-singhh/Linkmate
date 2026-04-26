@@ -118,19 +118,7 @@ export function NotificationBell() {
                             {notification.body}
                           </p>
                           <div className="mt-3 flex items-center gap-4">
-                            {notification.link && (
-                              <Link
-                                href={notification.link}
-                                onClick={() => {
-                                  markAsClicked(notification.id);
-                                  setIsOpen(false);
-                                }}
-                                className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1.5 hover:underline py-1"
-                              >
-                                View details
-                                <ExternalLink className="w-3 h-3" />
-                              </Link>
-                            )}
+
                             {!notification.read && (
                               <button
                                 onClick={() => markAsRead(notification.id)}
