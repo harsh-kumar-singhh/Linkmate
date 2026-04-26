@@ -169,22 +169,22 @@ const SuggestionCard = memo(function SuggestionCard({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay }}
             whileHover={{ y: -4 }}
-            className="relative group"
+            className="relative group flex-1 min-w-[240px] max-w-[300px]"
         >
-            <div className="absolute -inset-[1px] bg-gradient-to-r from-amber-500/30 via-primary/20 to-zinc-800/50 rounded-[2rem] blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity" />
-            <Card className="relative rounded-[2rem] border-zinc-200 dark:border-white/10 bg-white/80 dark:bg-zinc-900/40 backdrop-blur-xl overflow-hidden shadow-lg dark:shadow-2xl transition-all duration-300 group-hover:bg-zinc-50 dark:group-hover:bg-zinc-900/60">
-                <CardContent className="p-6 space-y-4">
-                    <h4 className="text-base font-bold text-zinc-900 dark:text-white tracking-tight leading-tight">
+            <div className="absolute -inset-[1px] bg-gradient-to-r from-amber-500/30 via-primary/20 to-zinc-800/50 rounded-2xl blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity" />
+            <Card className="relative rounded-2xl border-zinc-200 dark:border-white/10 bg-white/80 dark:bg-zinc-900/40 backdrop-blur-xl overflow-hidden shadow-lg dark:shadow-2xl transition-all duration-300 group-hover:bg-zinc-50 dark:group-hover:bg-zinc-900/60">
+                <CardContent className="p-4 space-y-3">
+                    <h4 className="text-sm font-bold text-zinc-900 dark:text-white tracking-tight leading-tight line-clamp-1">
                         {suggestion.title}
                     </h4>
-                    <div className="relative p-4 rounded-2xl bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/5 shadow-sm">
-                        <p className="text-[13px] italic text-zinc-600 dark:text-zinc-400 font-medium leading-relaxed">
+                    <div className="relative p-3 rounded-xl bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/5 shadow-sm">
+                        <p className="text-[12px] italic text-zinc-600 dark:text-zinc-400 font-medium leading-relaxed line-clamp-2">
                             &quot;{suggestion.hook}&quot;
                         </p>
                         <Sparkles className="absolute top-2 right-2 w-3 h-3 text-amber-500 opacity-20 group-hover:opacity-40 transition-opacity" />
                     </div>
-                    <p className="text-[12px] text-zinc-500 leading-relaxed font-medium">
-                        <span className="text-amber-600 dark:text-amber-500/80 uppercase text-[9px] font-black tracking-widest mr-1.5">
+                    <p className="text-[11px] text-zinc-500 leading-relaxed font-medium line-clamp-2">
+                        <span className="text-amber-600 dark:text-amber-500/80 uppercase text-[8px] font-black tracking-widest mr-1.5">
                             Strategy:
                         </span>
                         {suggestion.why}
@@ -192,14 +192,14 @@ const SuggestionCard = memo(function SuggestionCard({
                     <MotionDiv whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                         <Button
                             size="sm"
-                            className="w-full rounded-2xl py-6 gap-3 text-xs font-black uppercase tracking-widest bg-gradient-to-r from-zinc-900 to-zinc-800 dark:from-amber-600 dark:to-amber-500 hover:from-black hover:to-zinc-900 dark:hover:from-amber-500 dark:hover:to-amber-400 text-white dark:text-black shadow-lg border-0 transition-all duration-300"
+                            className="w-full rounded-xl h-9 gap-2 text-[10px] font-black uppercase tracking-widest bg-gradient-to-r from-zinc-900 to-zinc-800 dark:from-amber-600 dark:to-amber-500 hover:from-black hover:to-zinc-900 dark:hover:from-amber-500 dark:hover:to-amber-400 text-white dark:text-black shadow-lg border-0 transition-all duration-300"
                             onClick={() => {
                                 window.location.href = `/posts/new?context=${encodeURIComponent(
                                     suggestion.title
                                 )}`
                             }}
                         >
-                            Use This Concept <ArrowRight className="w-4 h-4" />
+                            Use This <ArrowRight className="w-3 h-3" />
                         </Button>
                     </MotionDiv>
                 </CardContent>
@@ -397,7 +397,7 @@ const ChatRow = memo(function ChatRow({ item }: { item: ChatMessage }) {
                             </span>
                             <div className="h-[1px] flex-1 bg-zinc-100 dark:bg-white/5" />
                         </div>
-                        <div className="grid gap-4">
+                        <div className="flex flex-wrap gap-3">
                             {coachContent.suggestions.map((s, idx) => (
                                 <SuggestionCard
                                     key={idx}
@@ -411,6 +411,14 @@ const ChatRow = memo(function ChatRow({ item }: { item: ChatMessage }) {
         </div>
     )
 })
+
+const INITIAL_PROMPTS = [
+    "What should I post next based on my content?",
+    "Analyze my recent posts and suggest improvements",
+    "How can I increase engagement on my posts?",
+    "Give me 3 high-performing post ideas for my niche",
+    "What mistakes am I making in my content strategy?",
+]
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
@@ -426,8 +434,10 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
     // Latest quickActions for the input bar (derived from last coach message)
     const lastCoachMsg = [...chatHistory].reverse().find((m) => m.role === "coach")
     const quickActions =
-        !isLoading && !isLimitReached && lastCoachMsg
-            ? (lastCoachMsg.content as CoachResponse).quickActions ?? []
+        !isLoading && !isLimitReached
+            ? lastCoachMsg
+                ? (lastCoachMsg.content as CoachResponse).quickActions ?? INITIAL_PROMPTS
+                : INITIAL_PROMPTS
             : []
 
     const pathname = usePathname()
@@ -787,7 +797,7 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                         <div className="relative shrink-0 z-20 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-white/5 px-4 md:px-6 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] space-y-3">
                             {/* Quick action pills */}
                             {quickActions.length > 0 && (
-                                <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1 -mx-1 px-1">
+                                <div className="flex flex-wrap gap-2 pb-1">
                                     {quickActions.map((action, i) => (
                                         <MotionDiv
                                             key={i}
@@ -797,7 +807,7 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                                             <button
                                                 onClick={() => fetchAdvice(action)}
                                                 disabled={isLoading}
-                                                className="text-[10px] font-black px-4 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-white/5 transition-all whitespace-nowrap uppercase tracking-widest disabled:opacity-40"
+                                                className="text-[10px] font-black px-4 py-2 rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200 dark:border-white/5 transition-all uppercase tracking-widest disabled:opacity-40"
                                             >
                                                 {action}
                                             </button>
