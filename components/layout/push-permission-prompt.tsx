@@ -14,9 +14,9 @@ export function PushPermissionPrompt() {
     // Show prompt after a short delay, but only if permission is default and not subscribed
     if (permissionStatus === 'default' && !isSubscribed) {
       const timer = setTimeout(() => {
-        // Check local storage to see if user dismissed it recently
+        // Check local storage to see if user dismissed it
         const dismissed = localStorage.getItem('push_prompt_dismissed');
-        if (!dismissed || Date.now() - parseInt(dismissed) > 7 * 24 * 60 * 60 * 1000) {
+        if (dismissed !== 'true') {
           setIsVisible(true);
         }
       }, 3000);
@@ -25,15 +25,19 @@ export function PushPermissionPrompt() {
   }, [permissionStatus, isSubscribed]);
 
   const handleEnable = async () => {
+    localStorage.setItem('push_prompt_dismissed', 'true');
     const success = await subscribeToPush();
     if (success) {
+      setIsVisible(false);
+    } else {
+      // If they deny the native prompt, we should still hide the custom one
       setIsVisible(false);
     }
   };
 
   const handleDismiss = () => {
     setIsVisible(false);
-    localStorage.setItem('push_prompt_dismissed', Date.now().toString());
+    localStorage.setItem('push_prompt_dismissed', 'true');
   };
 
   return (
