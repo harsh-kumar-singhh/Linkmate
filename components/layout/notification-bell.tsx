@@ -48,104 +48,116 @@ export function NotificationBell() {
 
       <AnimatePresence>
         {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
-            className="absolute right-0 mt-2 w-80 sm:w-96 max-h-[500px] bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden z-[100]"
-          >
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-              <h3 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                Notifications
+          <>
+            {/* Mobile Overlay */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[90] sm:hidden"
+              onClick={() => setIsOpen(false)}
+            />
+            {/* Dropdown / Bottom Sheet */}
+            <motion.div
+              initial={{ opacity: 0, y: 50, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 50, scale: 0.95 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="fixed inset-x-0 bottom-0 z-[100] rounded-t-3xl sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[380px] sm:rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[500px]"
+            >
+              <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                <h3 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2 text-lg sm:text-base">
+                  Notifications
+                  {unreadCount > 0 && (
+                    <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-400 font-medium">
+                      {unreadCount} new
+                    </span>
+                  )}
+                </h3>
                 {unreadCount > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-400 font-medium">
-                    {unreadCount} new
-                  </span>
+                  <button
+                    onClick={markAllAsRead}
+                    className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 px-2 py-1 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                  >
+                    <Check className="w-3 h-3" />
+                    Mark all read
+                  </button>
                 )}
-              </h3>
-              {unreadCount > 0 && (
-                <button
-                  onClick={markAllAsRead}
-                  className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
-                >
-                  <Check className="w-3 h-3" />
-                  Mark all read
-                </button>
-              )}
-            </div>
+              </div>
 
-            <div className="overflow-y-auto max-h-[400px]">
-              {notifications.length === 0 ? (
-                <div className="p-12 text-center">
-                  <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Bell className="w-6 h-6 text-slate-300" />
-                  </div>
-                  <p className="text-slate-500 text-sm">No notifications yet</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {notifications.map((notification) => (
-                    <div
-                      key={notification.id}
-                      className={`p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex gap-3 ${!notification.read ? 'bg-blue-50/30 dark:bg-blue-900/5' : ''}`}
-                    >
-                      <div className={`mt-1 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${!notification.read ? 'bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700' : 'opacity-60'}`}>
-                        {getIcon(notification.type)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className={`text-sm font-medium truncate ${!notification.read ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>
-                            {notification.title}
-                          </p>
-                          <span className="text-[10px] text-slate-400 whitespace-nowrap flex items-center gap-1">
-                            <Clock className="w-2.5 h-2.5" />
-                            {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
-                          </span>
-                        </div>
-                        <p className={`text-xs mt-0.5 line-clamp-2 ${!notification.read ? 'text-slate-600 dark:text-slate-400' : 'text-slate-400 dark:text-slate-500'}`}>
-                          {notification.body}
-                        </p>
-                        <div className="mt-2 flex items-center gap-3">
-                          {notification.link && (
-                            <Link
-                              href={notification.link}
-                              onClick={() => {
-                                markAsClicked(notification.id);
-                                setIsOpen(false);
-                              }}
-                              className="text-[11px] font-semibold text-blue-600 flex items-center gap-1 hover:underline"
-                            >
-                              View details
-                              <ExternalLink className="w-2.5 h-2.5" />
-                            </Link>
-                          )}
-                          {!notification.read && (
-                            <button
-                              onClick={() => markAsRead(notification.id)}
-                              className="text-[11px] font-semibold text-slate-500 hover:text-slate-700"
-                            >
-                              Mark read
-                            </button>
-                          )}
-                        </div>
-                      </div>
+              <div className="overflow-y-auto flex-1">
+                {notifications.length === 0 ? (
+                  <div className="p-12 text-center flex flex-col items-center justify-center h-full">
+                    <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800/50 rounded-full flex items-center justify-center mb-4">
+                      <Bell className="w-8 h-8 text-slate-300 dark:text-slate-600" />
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                    <p className="text-slate-500 dark:text-slate-400 font-medium">No notifications yet</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">When you get updates, they'll show up here.</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                    {notifications.map((notification) => (
+                      <div
+                        key={notification.id}
+                        className={`p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex gap-3 ${!notification.read ? 'bg-blue-50/30 dark:bg-blue-900/10' : ''}`}
+                      >
+                        <div className={`mt-1 w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${!notification.read ? 'bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 shadow-sm' : 'opacity-60 bg-slate-50 dark:bg-slate-800/50'}`}>
+                          {getIcon(notification.type)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className={`text-sm font-semibold truncate ${!notification.read ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-300'}`}>
+                              {notification.title}
+                            </p>
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 whitespace-nowrap flex items-center gap-1 font-medium bg-slate-50 dark:bg-slate-800/50 px-1.5 py-0.5 rounded-md">
+                              <Clock className="w-3 h-3" />
+                              {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                            </span>
+                          </div>
+                          <p className={`text-sm mt-1 leading-snug line-clamp-2 ${!notification.read ? 'text-slate-600 dark:text-slate-400' : 'text-slate-500 dark:text-slate-500'}`}>
+                            {notification.body}
+                          </p>
+                          <div className="mt-3 flex items-center gap-4">
+                            {notification.link && (
+                              <Link
+                                href={notification.link}
+                                onClick={() => {
+                                  markAsClicked(notification.id);
+                                  setIsOpen(false);
+                                }}
+                                className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1.5 hover:underline py-1"
+                              >
+                                View details
+                                <ExternalLink className="w-3 h-3" />
+                              </Link>
+                            )}
+                            {!notification.read && (
+                              <button
+                                onClick={() => markAsRead(notification.id)}
+                                className="text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 py-1 transition-colors"
+                              >
+                                Mark as read
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
-            <div className="p-3 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800 text-center">
-              <Link
-                href="/activity"
-                onClick={() => setIsOpen(false)}
-                className="text-xs font-semibold text-slate-500 hover:text-slate-700"
-              >
-                View all activity
-              </Link>
-            </div>
-          </motion.div>
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/30 border-t border-slate-200 dark:border-slate-800 text-center flex-shrink-0 sm:pb-3 pb-8">
+                <Link
+                  href="/activity"
+                  onClick={() => setIsOpen(false)}
+                  className="text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                >
+                  View all activity
+                </Link>
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </div>

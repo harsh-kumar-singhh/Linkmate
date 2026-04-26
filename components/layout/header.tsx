@@ -25,19 +25,19 @@ export function DashboardHeader() {
                 </div>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 md:gap-4">
                 <NotificationBell />
                 <ModeToggle />
 
-                <div className="h-6 w-px bg-border mx-2" />
+                <div className="h-6 w-px bg-border mx-1 md:mx-2 hidden sm:block" />
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 md:gap-3">
                     <div className="text-right hidden sm:block">
                         <p className="text-[12px] font-bold tracking-tight text-site-fg leading-none">
                             {session?.user?.name || "User"}
                         </p>
                     </div>
-                    <div className="w-8 h-8 rounded-full bg-secondary border border-border flex items-center justify-center text-[11px] font-bold text-site-fg">
+                    <div className="w-8 h-8 rounded-full bg-secondary border border-border flex items-center justify-center text-[11px] font-bold text-site-fg shrink-0">
                         {session?.user?.name?.[0] || session?.user?.email?.[0]?.toUpperCase() || "U"}
                     </div>
                 </div>
