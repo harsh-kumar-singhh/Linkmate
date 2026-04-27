@@ -485,7 +485,6 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                 const reader = res.body?.getReader()
                 const decoder = new TextDecoder()
                 if (!reader) throw new Error("No readable stream")
-
                 while (true) {
                     const { done, value } = await reader.read()
                     if (done) break
