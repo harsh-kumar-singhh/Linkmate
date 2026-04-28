@@ -237,7 +237,7 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
               Post Manager
               <div className="h-1 w-1 rounded-full bg-primary" />
             </h2>
-            <Link href="/posts/new" prefetch={false}>
+            <Link href="/posts/new" >
               <Button className="w-full md:w-auto rounded-2xl h-11 px-6 gap-2 font-black shadow-xl shadow-primary/30 transition-all hover:scale-105 active:scale-95 bg-gradient-to-r from-primary to-blue-600 border-none group">
                 <Plus className="w-5 h-5 transition-transform group-hover:rotate-90" />
                 Create Post
@@ -437,7 +437,7 @@ const PostCard = React.memo(function PostCard({
                 )}
               </div>
             </div>
-            <Link href={`/posts/new?id=${post.id}`} prefetch={false}>
+            <Link href={`/posts/new?id=${post.id}`} >
               <Button
                 variant="ghost"
                 size="icon"
@@ -472,7 +472,7 @@ function EmptyState() {
           Create your first post to get started.
         </p>
       </div>
-      <Link href="/posts/new" prefetch={false}>
+      <Link href="/posts/new" >
         <Button variant="outline" className="rounded-full mt-2">
           Create Post
         </Button>

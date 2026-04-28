@@ -53,7 +53,6 @@ export function MobileNav() {
                         <Link
                             key={link.label}
                             href={link.href}
-                            prefetch={false}
                             className={cn(
                                 "flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors relative",
                                 isActive

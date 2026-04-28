@@ -61,13 +61,13 @@ function QuickActionPopup({
                 <div className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border/40 mb-1">
                     {format(date, "MMMM d")}
                 </div>
-                <Link href={`/posts/new?date=${isoDate}`} prefetch={false} onClick={onClose}>
+                <Link href={`/posts/new?date=${isoDate}`}  onClick={onClose}>
                     <button className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-foreground hover:bg-blue-500/10 hover:text-blue-400 transition-colors">
                         <CalendarPlus className="w-4 h-4 text-blue-400" />
                         Schedule Post
                     </button>
                 </Link>
-                <Link href={`/posts/new?date=${isoDate}&draft=true`} prefetch={false} onClick={onClose}>
+                <Link href={`/posts/new?date=${isoDate}&draft=true`}  onClick={onClose}>
                     <button className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-foreground hover:bg-blue-500/10 hover:text-blue-400 transition-colors">
                         <FileText className="w-4 h-4 text-blue-300" />
                         Quick Draft
@@ -363,7 +363,7 @@ export default function CalendarPage() {
                                 <ChevronRight className="w-4 h-4" />
                             </Button>
                         </div>
-                        <Link href="/posts/new" prefetch={false}>
+                        <Link href="/posts/new" >
                             <Button
                                 size="sm"
                                 className="h-10 px-4 rounded-xl shadow-sm gap-2 schedule-btn-glow"
@@ -544,7 +544,7 @@ export default function CalendarPage() {
                                             {/* Post previews */}
                                             <div className="space-y-1">
                                                 {datePosts.slice(0, 2).map((post) => (
-                                                    <Link key={post.id} href={`/posts/new?id=${post.id}`} prefetch={false} onClick={(e) => e.stopPropagation()}>
+                                                    <Link key={post.id} href={`/posts/new?id=${post.id}`}  onClick={(e) => e.stopPropagation()}>
                                                         <div className={cn(
                                                             "post-chip px-1.5 py-1 rounded-md text-[9px] font-bold truncate flex items-center gap-1.5 cursor-pointer",
                                                             post.status === "PUBLISHED"
