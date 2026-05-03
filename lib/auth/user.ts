@@ -40,7 +40,7 @@ export const resolveUser = cache(async (providedSession?: Session | null) => {
         customStyles: true,
     }
 
-    // 1. Primary lookup by ID (with retry for Neon cold starts)
+    // 1. Primary lookup by ID (with retry for serverless database connections)
     let user = await withRetry(() => prisma.user.findUnique({
         where: { id: session.user.id },
         select: userSelect

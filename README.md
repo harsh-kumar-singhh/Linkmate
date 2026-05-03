@@ -55,12 +55,13 @@ npm install
 
 ### 2. Set Up Database
 
-1. Create a PostgreSQL database (use Neon, Supabase, or local PostgreSQL)
+1. Create a PostgreSQL database (use Supabase or local PostgreSQL)
 2. Copy `.env.example` to `.env.local`
-3. Update `DATABASE_URL` in `.env.local`:
+3. Update `DATABASE_URL` and `DIRECT_URL` in `.env.local`:
 
 ```env
-DATABASE_URL="postgresql://user:password@host:5432/dbname?schema=public"
+DATABASE_URL="postgresql://user:password@host:6543/dbname?pgbouncer=true&connection_limit=1"
+DIRECT_URL="postgresql://user:password@host:5432/dbname"
 ```
 
 ### 3. Run Database Migrations
@@ -81,7 +82,8 @@ Create `.env.local` file with:
 
 ```env
 # Database
-DATABASE_URL="your-database-url"
+DATABASE_URL="your-database-pooler-url"
+DIRECT_URL="your-direct-database-url"
 
 # NextAuth
 NEXTAUTH_URL="http://localhost:3000"

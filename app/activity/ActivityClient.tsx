@@ -17,26 +17,28 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { AICoach } from "@/components/ai/AICoach"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, keepPreviousData } from "@tanstack/react-query"
 import type { ActivityData } from "@/lib/data/activity"
+import { ActivityMetricSkeleton, ActivityChartSkeleton } from "@/components/dashboard/DashboardSkeletons"
 
 interface ActivityClientProps {
-  initialData: ActivityData
+  initialData: ActivityData | null
 }
 
 export default function ActivityClient({ initialData }: ActivityClientProps) {
-  // initialData pre-populates the cache — no loading state on first render.
-  // React Query silently refetches in the background after 60s.
-  const { data } = useQuery<ActivityData>({
+  // ─── Data Fetching ─────────────────────────────────────────────────────────
+  const { data, isLoading } = useQuery<ActivityData>({
     queryKey: ["activity"],
     queryFn: async () => {
       const res = await fetch("/api/activity")
       if (!res.ok) throw new Error("Failed to fetch activity")
       return res.json()
     },
-    initialData,
-    staleTime: 60_000,
-    refetchOnWindowFocus: true,
+    initialData: initialData ?? undefined,
+    staleTime: 5 * 60_000,
+    gcTime: 15 * 60_000,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
   })
 
   const stats = data?.stats
@@ -80,8 +82,23 @@ export default function ActivityClient({ initialData }: ActivityClientProps) {
   const chartLabels = data?.chartData?.labels ?? []
   const maxCount = Math.max(...chartValues, 1)
 
+  // ── Loading State (Skeletons) ──────────────────────────────────────────────
+  if (isLoading && !data) {
+    return (
+      <div className="relative z-10 max-w-4xl mx-auto py-8 px-4 md:px-0 space-y-10 pb-24">
+        <div className="space-y-1">
+          <div className="h-9 w-48 bg-zinc-200 dark:bg-zinc-800 animate-pulse rounded-lg" />
+          <div className="h-4 w-64 bg-zinc-100 dark:bg-zinc-900 animate-pulse rounded" />
+        </div>
+        <ActivityMetricSkeleton />
+        <ActivityChartSkeleton />
+      </div>
+    )
+  }
+
+  // ── Main Render ────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4 md:px-0 space-y-10 pb-24">
+    <div className="relative z-10 max-w-4xl mx-auto py-8 px-4 md:px-0 space-y-10 pb-24">
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div className="space-y-1">
@@ -99,7 +116,7 @@ export default function ActivityClient({ initialData }: ActivityClientProps) {
           <AnimatedCard
             key={i}
             animation="fade-in-up"
-            className="bg-card border border-border/60 rounded-2xl p-5 shadow-sm space-y-4"
+            className="bg-card/50 backdrop-blur-md border border-border/40 rounded-3xl p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 space-y-4"
           >
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
@@ -124,7 +141,7 @@ export default function ActivityClient({ initialData }: ActivityClientProps) {
       {/* ── Bar chart ───────────────────────────────────────────────────────── */}
       <AnimatedCard
         animation="fade-in-up"
-        className="bg-card border border-border/60 rounded-3xl p-6 md:p-8 shadow-sm space-y-6"
+        className="bg-card/50 backdrop-blur-md border border-border/40 rounded-[2rem] p-6 md:p-8 shadow-sm space-y-8"
       >
         <div className="flex items-center justify-between">
           <h3 className="text-xl font-bold tracking-tight">

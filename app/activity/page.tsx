@@ -17,9 +17,7 @@ export default async function ActivityPage() {
     redirect("/login")
   }
 
-  // Runs on the server — cached via unstable_cache in getActivityData.
-  // First hit: DB queries fire. Subsequent hits within 60s: served from cache.
-  const initialData = await getActivityData(session.user.id)
-
-  return <ActivityClient initialData={initialData} />
+  // We no longer await data here to ensure the UI renders instantly.
+  // The client will fetch data via TanStack Query + Skeletons.
+  return <ActivityClient initialData={null} />
 }

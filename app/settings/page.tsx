@@ -36,7 +36,7 @@ export default async function SettingsPage() {
     const userPlan = (user?.plan || "FREE").toUpperCase();
 
     return (
-        <div className="max-w-4xl mx-auto py-8 md:py-12 px-4 md:px-6 space-y-12">
+        <div className="max-w-4xl mx-auto py-8 md:py-12 px-4 md:px-6 space-y-12 relative z-10">
             <div className="space-y-4">
                 <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">Settings</h1>
                 <p className="text-muted-foreground text-lg">Manage your account and preferences</p>

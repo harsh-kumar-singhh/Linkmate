@@ -30,12 +30,9 @@
     "framer-motion": "^12.38.0",
     "lru-cache": "^11.3.5",
     "lucide-react": "^0.562.0",
-    "next": "^14.2.0",
     "next-auth": "^5.0.0-beta.25",
     "next-themes": "^0.4.6",
     "razorpay": "^2.9.6",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
     "react-hook-form": "^7.53.0",
     "react-textarea-autosize": "^8.5.9",
     "tailwind-merge": "^3.5.0",
@@ -48,13 +45,25 @@
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.0",
-    "eslint": "^8.57.0",
-    "eslint-config-next": "^14.2.0",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^14.2.35",
+    "next": "^14.2.35",
     "postcss": "^8.4.0",
     "prisma": "^5.20.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "tailwindcss": "^3.4.0",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.5.0"
+  },
+  "overrides": {
+    "rimraf": "^4.0.0",
+    "glob": "^10.0.0",
+    "eslint": {
+      "@humanwhocodes/config-array": "npm:@eslint/config-array@^0.13.0",
+      "@humanwhocodes/object-schema": "npm:@eslint/object-schema@^2.0.3"
+    },
+    "inflight": "npm:lru-cache@^11.0.0"
   }
 }

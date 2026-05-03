@@ -284,7 +284,7 @@ export default function CalendarPage() {
                 }
             `}</style>
 
-            <div className="max-w-7xl mx-auto h-full flex flex-col py-6 md:py-8 gap-8">
+            <div className="relative z-10 max-w-7xl mx-auto h-full flex flex-col py-6 md:py-8 gap-8">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 px-4 md:px-0">
                     <div className="space-y-1">

@@ -3,13 +3,16 @@
 ## Database Configuration
 
 > [!IMPORTANT]
-> `DATABASE_URL` is **MANDATORY** for the application to function in production. The project has been updated to use **PostgreSQL** (compatible with Neon).
+> `DATABASE_URL` and `DIRECT_URL` are **MANDATORY** for the application to function in production. The project has been updated to use **Supabase** (PostgreSQL) with connection pooling.
 
 1. Open your Vercel dashboard and navigate to **Project Settings → Environment Variables**.
 2. Add a new variable:
    - **Key**: `DATABASE_URL`
-   - **Value**: Your PostgreSQL connection string.
-   - **Neon Note**: If using Neon, ensure the connection string includes `?sslmode=require`. Example: `postgresql://user:pass@host/db?sslmode=require`.
+   - **Value**: Your PostgreSQL connection string (Transaction Pooler, port 6543, with `?pgbouncer=true`).
+3. Add another variable for direct connections:
+   - **Key**: `DIRECT_URL`
+   - **Value**: Your direct PostgreSQL connection string (Session Pooler/Direct, port 5432).
+   - **Supabase Note**: If using Supabase, use the connection strings provided in your database settings for pooling and direct connection.
 3. Set the **Environment** to **Production**, **Preview**, and **Development**.
 4. Click **Save** and redeploy.
 

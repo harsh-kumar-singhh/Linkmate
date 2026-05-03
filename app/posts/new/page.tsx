@@ -428,14 +428,29 @@ function EditorContent() {
 
     if (isLoading || isInitialLoading) {
         return (
-            <div className="flex items-center justify-center min-h-screen">
-                <div className="w-12 h-12 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <div className="max-w-6xl mx-auto px-4 md:px-8 pt-8 md:pt-12 space-y-8 animate-pulse">
+                <div className="flex items-start justify-between">
+                    <div className="space-y-2">
+                        <div className="h-9 w-48 bg-zinc-200 dark:bg-zinc-800 rounded-lg" />
+                        <div className="h-4 w-64 bg-zinc-100 dark:bg-zinc-900 rounded" />
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                    <div className="space-y-6">
+                        <div className="h-12 w-64 bg-zinc-200 dark:bg-zinc-800 rounded-xl" />
+                        <div className="h-[400px] w-full bg-zinc-100 dark:bg-zinc-900 rounded-2xl" />
+                    </div>
+                    <div className="space-y-6">
+                        <div className="h-8 w-32 bg-zinc-200 dark:bg-zinc-800 rounded-lg" />
+                        <div className="h-[400px] w-full bg-zinc-100 dark:bg-zinc-900 rounded-2xl" />
+                    </div>
+                </div>
             </div>
         )
     }
 
     return (
-        <div className="bg-background min-h-screen">
+        <div className="bg-transparent min-h-screen relative z-10">
             {/* Scrollable Content Area */}
             <main className="max-w-6xl mx-auto px-4 md:px-8 pt-8 md:pt-12 pb-[160px]">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">

@@ -13,6 +13,8 @@ import { LockedFeatureModal } from "@/components/upgrade/LockedFeatureModal";
 import { UpgradeSuccessModal } from "@/components/upgrade/UpgradeSuccessModal";
 import { DatabaseStatus } from "@/components/shared/database-status";
 
+import { SiteBackground } from "./site-background";
+
 export function ClientLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const { data: session } = useSession();
@@ -27,14 +29,14 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
 
     if (showSidebar) {
         return (
-            <div className="flex h-screen bg-white dark:bg-[#09090b] transition-colors duration-300">
+            <div className="flex h-screen bg-site-bg text-site-fg transition-colors duration-300">
+                <SiteBackground />
                 <Sidebar />
                 <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative pb-16 md:pb-0">
                     <UpgradeBanner />
                     <DashboardHeader />
                     <main className="flex-1 overflow-y-auto overflow-x-hidden p-0 md:p-8">
                         <AnimatedCard
-                            key={pathname}
                             animation="slide-up"
                         >
                             {children}

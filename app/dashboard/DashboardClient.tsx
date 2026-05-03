@@ -9,7 +9,7 @@ import React, { useEffect, useState, Suspense } from "react"
 import { useTrialTrigger } from "@/context/TrialTriggerContext"
 import { PushPermissionPrompt } from "@/components/layout/push-permission-prompt"
 import Link from "next/link"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query"
 import { AnimatedCard } from "@/components/animated/AnimatedCard"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { toZonedTime } from "date-fns-tz"
 import { AICoach } from "@/components/ai/AICoach"
-import { StatSkeleton, PostSkeleton } from "@/components/dashboard/DashboardSkeletons"
+import { StatSkeleton, PostSkeleton, WelcomeSkeleton } from "@/components/dashboard/DashboardSkeletons"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,7 +64,7 @@ interface SessionUser {
 
 interface DashboardClientProps {
   user: SessionUser
-  initialData: DashboardData
+  initialData: DashboardData | null
 }
 
 // ─── Main client component ────────────────────────────────────────────────────
@@ -74,10 +74,8 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
   const queryClient = useQueryClient()
   const [notifications, setNotifications] = useState<Post[]>([])
 
-  // Pre-populate the query cache with server-fetched data.
-  // This means useQuery returns data immediately — no spinner, no waterfall.
-  // After `staleTime` elapses, React Query silently revalidates in the background.
-  const { data, refetch } = useQuery<DashboardData>({
+  // ─── Data Fetching ─────────────────────────────────────────────────────────
+  const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["dashboard"],
     queryFn: async () => {
       const res = await fetch("/api/dashboard")
@@ -85,16 +83,12 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
       const result = await res.json()
       return result.data
     },
-    initialData,            // ← server data, shown immediately
-    staleTime: 60_000,      // treat server data as fresh for 60s
-    refetchOnWindowFocus: true,
+    initialData: initialData ?? undefined,
+    staleTime: 5 * 60_000, // 5 minutes cache
+    gcTime: 15 * 60_000,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
   })
-
-  // Seed the query cache on first mount so other components (e.g. post editor)
-  // that call useQuery(["dashboard"]) also get the pre-fetched data instantly.
-  useEffect(() => {
-    queryClient.setQueryData(["dashboard"], initialData)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Track page view
   useEffect(() => {
@@ -145,16 +139,28 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
   const publishedPosts = posts.filter(p => p.status === "PUBLISHED").slice(0, 5)
   const drafts = posts.filter(p => p.status === "DRAFT")
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Loading State (Skeletons) ──────────────────────────────────────────────
+  if (isLoading && !data) {
+    return (
+      <div className="relative min-h-screen bg-transparent">
+        <div className="relative z-10 space-y-6 md:space-y-12 max-w-2xl mx-auto pt-2 pb-12 px-4 md:px-0 md:pt-12">
+          <WelcomeSkeleton />
+          <StatSkeleton />
+          <div className="space-y-8 pt-2">
+            <div className="flex items-center justify-between">
+              <div className="h-8 w-48 bg-zinc-200 dark:bg-zinc-800 animate-pulse rounded-lg" />
+              <div className="h-11 w-32 bg-zinc-200 dark:bg-zinc-800 animate-pulse rounded-2xl" />
+            </div>
+            <PostSkeleton />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Main Render ────────────────────────────────────────────────────────────
   return (
     <div className="relative min-h-screen bg-transparent">
-      {/* Background depth layers */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-site-bg">
-        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-primary/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-blue-600/5 rounded-full blur-[120px]" />
-        <div className="absolute inset-0 noise-bg opacity-[0.02]" />
-      </div>
-
       <div className="relative z-10 space-y-6 md:space-y-12 max-w-2xl mx-auto pt-2 pb-12 px-4 md:px-0 md:pt-12">
 
         {/* ── Toast notifications ──────────────────────────────────────────── */}

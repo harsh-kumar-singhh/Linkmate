@@ -23,7 +23,7 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 /**
- * Utility to retry database operations, specifically to handle Neon cold starts.
+ * Utility to retry database operations, specifically to handle serverless connection drops.
  * @param fn The database operation to execute
  * @param retries Number of retries (default: 2)
  * @param delay Delay between retries in ms (default: 1000)
