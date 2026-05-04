@@ -14,6 +14,9 @@ export const resolveUser = cache(async (providedSession?: Session | null) => {
         return null
     }
 
+    console.log("AUTH USER ID:", session.user.id)
+    console.log("DATABASE_URL:", process.env.DATABASE_URL)
+
     // Selective fields needed for most operations
     const userSelect = {
         id: true,
@@ -46,10 +49,13 @@ export const resolveUser = cache(async (providedSession?: Session | null) => {
         select: userSelect
     }))
 
+    console.log("DB LOOKUP RESULT:", user ? user.id : "NOT_FOUND")
+
     // 2. Secondary lookup by email if ID lookup failed
     if (!user && typeof session.user.email === "string") {
+        const normalizedEmail = session.user.email.toLowerCase()
         user = await withRetry(() => prisma.user.findUnique({
-            where: { email: session.user.email as string },
+            where: { email: normalizedEmail },
             select: userSelect
         }))
     }
@@ -60,8 +66,10 @@ export const resolveUser = cache(async (providedSession?: Session | null) => {
         console.warn(`[AUTH] Auto-healing missing user record for: ${session.user.id}`)
 
         try {
-            user = await withRetry(() => prisma.user.create({
-                data: {
+            user = await withRetry(() => prisma.user.upsert({
+                where: { id: session.user.id },
+                update: {},
+                create: {
                     id: session.user.id,
                     email: session.user.email,
                     name: session.user.name,
