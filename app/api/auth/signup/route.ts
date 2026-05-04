@@ -22,6 +22,9 @@ export async function POST(request: Request) {
     }
 
     // Check if user already exists
+    console.log("DB_URL:", process.env.DATABASE_URL)
+    console.log("DIRECT_URL:", process.env.DIRECT_URL)
+
     const existingUser = await prisma.user.findUnique({
       where: { email },
     })
@@ -39,6 +42,7 @@ export async function POST(request: Request) {
     // Create user (Note: We'll store password in a separate table or use a different approach)
     // For now, we'll create the user and handle password separately
     // In production, you might want to use a separate Credentials model
+    console.log("Creating user in DB")
     const user = await prisma.user.create({
       data: {
         email,

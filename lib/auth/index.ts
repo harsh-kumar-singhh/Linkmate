@@ -55,5 +55,12 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       },
     }),
   ],
+  events: {
+    createUser: async (message) => {
+      console.log("DB_URL:", process.env.DATABASE_URL)
+      console.log("DIRECT_URL:", process.env.DIRECT_URL)
+      console.log("Creating user in DB (NextAuth)")
+    }
+  },
   adapter: PrismaAdapter(prisma),
 })
