@@ -23,8 +23,12 @@ export async function POST(request: Request) {
     }
 
     // Check if user already exists
-    console.log("DB_URL:", process.env.DATABASE_URL)
-    console.log("DIRECT_URL:", process.env.DIRECT_URL)
+    const dbUrl = process.env.DATABASE_URL || "";
+    const host = dbUrl.split("@")[1]?.split(":")[0] || "unknown";
+    console.log("DB DEBUG → Connected host:", host);
+    console.log("DB DEBUG → DATABASE_URL:", process.env.DATABASE_URL);
+    console.log("DB DEBUG → DIRECT_URL:", process.env.DIRECT_URL);
+    console.log("DB DEBUG → Looking up user email:", email);
 
     const existingUser = await prisma.user.findUnique({
       where: { email },
@@ -43,13 +47,14 @@ export async function POST(request: Request) {
     // Create user (Note: We'll store password in a separate table or use a different approach)
     // For now, we'll create the user and handle password separately
     // In production, you might want to use a separate Credentials model
-    console.log("Creating user in DB")
+    console.log("DB DEBUG → Creating user with email:", email)
     const user = await prisma.user.create({
       data: {
         email,
         name: name || null,
       },
     })
+    console.log("DB DEBUG → User created with ID:", user.id)
 
     // Store password hash (in production, use a separate Credentials table)
     // For MVP, we'll handle this differently - storing in Account table with type "credentials"

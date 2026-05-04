@@ -14,8 +14,12 @@ export const resolveUser = cache(async (providedSession?: Session | null) => {
         return null
     }
 
-    console.log("AUTH USER ID:", session.user.id)
-    console.log("DATABASE_URL:", process.env.DATABASE_URL)
+    const dbUrl = process.env.DATABASE_URL || "";
+    const host = dbUrl.split("@")[1]?.split(":")[0] || "unknown";
+    console.log("DB DEBUG → Connected host:", host);
+    console.log("DB DEBUG → DATABASE_URL:", process.env.DATABASE_URL);
+    console.log("DB DEBUG → DIRECT_URL:", process.env.DIRECT_URL);
+    console.log("DB DEBUG → Looking up user ID:", session.user.id);
 
     // Selective fields needed for most operations
     const userSelect = {
@@ -49,7 +53,7 @@ export const resolveUser = cache(async (providedSession?: Session | null) => {
         select: userSelect
     }))
 
-    console.log("DB LOOKUP RESULT:", user ? user.id : "NOT_FOUND")
+    console.log("DB DEBUG → Lookup result:", user ? `FOUND (${user.id})` : "NOT_FOUND");
 
     // 2. Secondary lookup by email if ID lookup failed
     if (!user && typeof session.user.email === "string") {
@@ -66,6 +70,7 @@ export const resolveUser = cache(async (providedSession?: Session | null) => {
         console.warn(`[AUTH] Auto-healing missing user record for: ${session.user.id}`)
 
         try {
+            console.log("DB DEBUG → Creating user with ID:", session.user.id)
             user = await withRetry(() => prisma.user.upsert({
                 where: { id: session.user.id },
                 update: {},
@@ -77,6 +82,7 @@ export const resolveUser = cache(async (providedSession?: Session | null) => {
                 },
                 select: userSelect
             }))
+            console.log("DB DEBUG → Auto-heal complete for ID:", session.user.id)
         } catch (error) {
             console.error(`[AUTH] Failed to auto-heal user: ${error}`)
             return null
