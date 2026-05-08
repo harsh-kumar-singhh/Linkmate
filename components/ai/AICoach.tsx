@@ -368,10 +368,14 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
     const [isOpen, setIsOpen] = useState(false)
     const [mounted, setMounted] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
+    const [isResetting, setIsResetting] = useState(false)
     const [isLimitReached, setIsLimitReached] = useState(false)
     const [inputValue, setInputValue] = useState("")
     const [sessionId, setSessionId] = useState<string | null>(null)
     const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
+
+    const abortControllerRef = useRef<AbortController | null>(null)
+    const resetPromiseRef = useRef<Promise<void> | null>(null)
 
     const lastCoachMsg = [...chatHistory].reverse().find((m) => m.role === "coach")
     const quickActions =
@@ -426,7 +430,14 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
     // ── Core fetch / stream ───────────────────────────────────────────────────
     const fetchAdvice = useCallback(
         async (query?: string) => {
-            if (isLimitReached || isLoading) return
+            if (isLimitReached || isLoading || isResetting) return
+
+            // Abort previous request if any
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort()
+            }
+            abortControllerRef.current = new AbortController()
+
             const displayQuery = query ?? "Provide a strategic update based on my recent activity."
 
             setChatHistory((prev) => [
@@ -463,6 +474,7 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ page: pathname, draftContent, userQuery: query, sessionId }),
+                    signal: abortControllerRef.current.signal,
                 })
 
                 if (res.status === 429) {
@@ -528,7 +540,8 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                         return next
                     })
                 }
-            } catch {
+            } catch (err: any) {
+                if (err.name === "AbortError") return
                 setChatHistory((prev) => {
                     const next = [...prev]
                     next[next.length - 1] = {
@@ -540,6 +553,7 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                 })
             } finally {
                 setIsLoading(false)
+                abortControllerRef.current = null
                 scrollToBottom(true)
             }
         },
@@ -548,13 +562,36 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
     )
 
     const startNewChat = useCallback(async () => {
-        try { await fetch("/api/coach", { method: "DELETE" }) } catch {}
+        if (isResetting || resetPromiseRef.current) return
+
+        // 1. Instant UI Feedback (Optimistic)
+        setIsResetting(true)
         setChatHistory([])
         setSessionId(null)
         setIsLimitReached(false)
         streamAccRef.current = ""
-        setTimeout(() => fetchAdvice(), 50)
-    }, [fetchAdvice])
+
+        // Abort any in-flight advice request
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort()
+            abortControllerRef.current = null
+        }
+
+        const performReset = async () => {
+            try {
+                await fetch("/api/coach", { method: "DELETE" })
+            } catch (err) {
+                console.error("Failed to reset chat:", err)
+            } finally {
+                setIsResetting(false)
+                resetPromiseRef.current = null
+                // Small delay to ensure state has settled before fetching fresh advice
+                setTimeout(() => fetchAdvice(), 50)
+            }
+        }
+
+        resetPromiseRef.current = performReset()
+    }, [fetchAdvice, isResetting])
 
     const handleSend = useCallback(() => {
         const q = inputValue.trim()
@@ -607,11 +644,25 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                             <div className="flex items-center gap-1.5">
                                 <button
                                     onClick={startNewChat}
-                                    disabled={isLoading}
-                                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 hover:bg-amber-100 dark:hover:bg-amber-500/15 transition-all disabled:opacity-40"
+                                    disabled={isLoading || isResetting}
+                                    className={cn(
+                                        "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all disabled:opacity-40",
+                                        isResetting 
+                                            ? "text-amber-700 bg-amber-100 border-amber-300 animate-pulse"
+                                            : "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 hover:bg-amber-100 dark:hover:bg-amber-500/15"
+                                    )}
                                 >
-                                    <Plus className="w-3 h-3" />
-                                    New
+                                    {isResetting ? (
+                                        <>
+                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                            Creating...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Plus className="w-3 h-3" />
+                                            New
+                                        </>
+                                    )}
                                 </button>
                                 <Button
                                     variant="ghost"
@@ -665,7 +716,7 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                                         <button
                                             key={i}
                                             onClick={() => fetchAdvice(action)}
-                                            disabled={isLoading}
+                                            disabled={isLoading || isResetting}
                                             className="shrink-0 text-[11.5px] font-medium px-3.5 py-1.5 rounded-full bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-white/8 transition-all whitespace-nowrap disabled:opacity-40"
                                         >
                                             {action}
@@ -678,7 +729,7 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                             <div className="relative flex items-center">
                                 <input
                                     type="text"
-                                    disabled={isLimitReached}
+                                    disabled={isLimitReached || isResetting}
                                     placeholder={
                                         isLimitReached
                                             ? "Daily limit reached — upgrade to Pro"
@@ -699,7 +750,7 @@ export function AICoach({ draftContent }: { draftContent?: string }) {
                                 />
                                 <button
                                     onClick={handleSend}
-                                    disabled={!inputValue.trim() || isLoading || isLimitReached}
+                                    disabled={!inputValue.trim() || isLoading || isLimitReached || isResetting}
                                     className="absolute right-1.5 h-9 w-9 rounded-xl bg-zinc-900 dark:bg-amber-500 text-white dark:text-black flex items-center justify-center hover:bg-zinc-700 dark:hover:bg-amber-400 transition-colors disabled:opacity-20 shadow-sm"
                                 >
                                     <Send className="w-3.5 h-3.5" />
