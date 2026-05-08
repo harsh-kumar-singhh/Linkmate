@@ -24,11 +24,18 @@ export function NotificationBell() {
 
   const getIcon = (type: string) => {
     switch (type) {
-      case 'POST_PUBLISHED': return <Send className="w-4 h-4 text-emerald-500" />;
-      case 'AI_COACH': return <Sparkles className="w-4 h-4 text-blue-500" />;
-      case 'REMINDER': return <UserCheck className="w-4 h-4 text-amber-500" />;
-      case 'UPGRADE': return <AlertTriangle className="w-4 h-4 text-rose-500" />;
-      default: return <Bell className="w-4 h-4 text-slate-500" />;
+      case 'scheduled_post_published': 
+      case 'subscription_renewed':
+        return <Send className="w-4 h-4 text-emerald-500" />;
+      case 'scheduled_post_failed':
+      case 'subscription_payment_failed':
+      case 'pro_plan_limit_reached':
+        return <AlertTriangle className="w-4 h-4 text-rose-500" />;
+      case 'pro_plan_limit_approaching':
+      case 'trial_or_plan_expiry_warning':
+        return <AlertTriangle className="w-4 h-4 text-amber-500" />;
+      default: 
+        return <Bell className="w-4 h-4 text-slate-500" />;
     }
   };
 

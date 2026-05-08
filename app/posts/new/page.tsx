@@ -140,11 +140,7 @@ function EditorContent() {
             const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             const zonedDate = toZonedTime(date, userTimezone);
             
-            console.log('[UI DEBUG] Post Editor Param - Raw Date:', date);
-            console.log('[UI DEBUG] Post Editor Param - Zoned Date:', zonedDate);
-            
             const formatted = format(zonedDate, "yyyy-MM-dd'T'HH:mm");
-            console.log('[UI DEBUG] Post Editor Param - Formatted:', formatted);
             setScheduledFor(formatted);
         }
     }, [postId, dateParam, user])

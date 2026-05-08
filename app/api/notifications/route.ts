@@ -9,9 +9,22 @@ export async function GET() {
   }
 
   try {
+    const ALLOWED_NOTIFICATION_EVENTS = [
+      'scheduled_post_published',
+      'scheduled_post_failed',
+      'pro_plan_limit_approaching',
+      'pro_plan_limit_reached',
+      'subscription_payment_failed',
+      'subscription_renewed',
+      'trial_or_plan_expiry_warning'
+    ];
+
     const notifications = await prisma.notification.findMany({
       where: {
         userId: session.user.id,
+        type: {
+          in: ALLOWED_NOTIFICATION_EVENTS
+        }
       },
       orderBy: {
         createdAt: "desc",

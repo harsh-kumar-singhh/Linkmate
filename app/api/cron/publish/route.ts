@@ -141,7 +141,7 @@ export async function POST(req: Request) {
                         title: 'Publishing Failed ⚠️',
                         body: `We couldn't publish your post. Error: ${errorMessage.substring(0, 50)}...`,
                         url: '/dashboard',
-                        type: 'POST_FAILED',
+                        type: 'scheduled_post_failed',
                     });
                 } catch (notifyError) {
                     console.error(`[CRON] Failed to notify user for post failure ${post.id}:`, notifyError);

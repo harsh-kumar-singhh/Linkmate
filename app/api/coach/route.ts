@@ -280,12 +280,8 @@ You must output a JSON object with this structure:
                             }
                         });
 
-                        // Trigger follow-up notification if it's a briefing or significant update
-                        if (parsed.reply) {
-                            triggerAICoachFollowUp(userId, parsed.reply).catch(e => 
-                                console.error("[COACH] Notification failed:", e)
-                            );
-                        }
+                        // AI Coach messages no longer trigger notifications
+
                     }
                 } catch (e) {
                     console.error("Failed to save AI message to DB:", e, fullAIResponse);
