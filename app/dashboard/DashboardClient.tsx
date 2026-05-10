@@ -88,9 +88,10 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
       return result.data
     },
     initialData: initialData ?? undefined,
-    staleTime: 5 * 60_000, // 5 minutes cache
-    gcTime: 15 * 60_000,
-    refetchOnWindowFocus: false,
+    staleTime: 0, // Always consider stale to ensure fresh data on mount/return
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: "always",
     placeholderData: keepPreviousData,
   })
 

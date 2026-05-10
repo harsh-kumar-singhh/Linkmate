@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag, revalidatePath } from "next/cache";
 export const dynamic = "force-dynamic";
 import { resolveUser } from "@/lib/auth/user";
 import { prisma, withRetry } from "@/lib/prisma";
@@ -38,7 +39,7 @@ export async function GET(req: Request) {
 
     const total = await withRetry(() => prisma.post.count({ where: { userId: user.id } }));
 
-    return NextResponse.json({ 
+    const response = NextResponse.json({ 
       success: true,
       data: {
         posts, 
@@ -51,6 +52,9 @@ export async function GET(req: Request) {
       },
       message: "Posts fetched successfully"
     });
+
+    response.headers.set("Cache-Control", "no-store, max-age=0");
+    return response;
   } catch (error: any) {
     console.error("Error fetching posts:", error);
     const message = error.name === "PrismaClientInitializationError" 
@@ -122,6 +126,9 @@ export async function POST(req: Request) {
     }
 
     // Invalidate dashboard cache for this user
+    revalidateTag(`dashboard:${user.id}`);
+    revalidateTag("dashboard");
+    revalidatePath("/dashboard");
     dashboardCache.delete(`dashboard:${user.id}`);
 
     return NextResponse.json({

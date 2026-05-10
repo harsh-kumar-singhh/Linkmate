@@ -48,7 +48,7 @@ async function fetchDashboardData(userId: string): Promise<DashboardData> {
     prisma.post.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
-      take: 10,
+      take: 50,
       select: {
         id: true,
         content: true,

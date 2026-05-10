@@ -28,6 +28,7 @@ import {
     Lightbulb
 } from "lucide-react"
 import { useSearchParams, useRouter } from "next/navigation"
+import { useQueryClient } from "@tanstack/react-query"
 import { cn } from "@/lib/utils"
 import { LinkedInPreview } from "@/components/posts/LinkedInPreview"
 import { AICoach } from "@/components/ai/AICoach"
@@ -43,6 +44,7 @@ function EditorContent() {
     const { trackAction, triggerLockedModal } = useTrialTrigger()
     const searchParams = useSearchParams()
     const router = useRouter()
+    const queryClient = useQueryClient()
     const userPlan = (user?.plan || "FREE").toUpperCase()
 
     // State
@@ -375,6 +377,8 @@ function EditorContent() {
                 throw new Error(result.error || result.message || "Failed to save post");
             }
 
+            queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+            router.refresh()
             if (statusArg !== "DRAFT") {
                 trackAction("schedule_post")
                 router.push("/calendar")
