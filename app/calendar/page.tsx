@@ -20,6 +20,7 @@ import {
     FileText,
     X
 } from "lucide-react"
+import { useQuery } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
@@ -133,12 +134,16 @@ export default function CalendarPage() {
         return day
     })
 
-    useEffect(() => {
-        fetchPosts()
-        if (user?.autopilotEnabled) {
-            setSchedulingMode("autopilot")
-        }
-    }, [user])
+    const { data: postsData, isLoading: isPostsLoading } = useQuery({
+        queryKey: ["posts"],
+        queryFn: async () => {
+            const response = await fetch("/api/posts")
+            if (!response.ok) throw new Error("Failed to fetch posts")
+            const result = await response.json()
+            return result.data?.posts || result.posts || []
+        },
+        staleTime: 0,
+    })
 
     // Close popup when clicking outside
     useEffect(() => {
@@ -149,21 +154,18 @@ export default function CalendarPage() {
         }
     }, [selectedDate])
 
-    const fetchPosts = async () => {
-        try {
-            const response = await fetch("/api/posts")
-            if (response.ok) {
-                const result = await response.json()
-                const fetchedPosts = result.data?.posts || result.posts || [];
-                console.log(`[Frontend] Fetched ${fetchedPosts.length} posts from API.`);
-                setPosts(fetchedPosts)
-            }
-        } catch (error) {
-            console.error("[Frontend] Error fetching posts:", error)
-        } finally {
+    useEffect(() => {
+        if (postsData) {
+            setPosts(postsData)
             setIsLoading(false)
         }
-    }
+    }, [postsData])
+
+    useEffect(() => {
+        if (user?.autopilotEnabled) {
+            setSchedulingMode("autopilot")
+        }
+    }, [user])
 
     const handleToggleAutopilot = async () => {
         if (!user) return;

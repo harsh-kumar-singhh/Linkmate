@@ -8,7 +8,7 @@
 
 import { prisma } from "@/lib/prisma"
 import { subDays, startOfDay } from "date-fns"
-import { dashboardCache } from "@/lib/cache-server"
+import { unstable_cache } from "next/cache"
 
 export interface DashboardPost {
   id: string
@@ -141,25 +141,15 @@ async function fetchDashboardData(userId: string): Promise<DashboardData> {
   }
 }
 
-// ── Cached version — wraps the fetcher with Next.js Data Cache ───────────────
-// revalidate: 60  → serve the same result for up to 60 seconds
-// tags: ["dashboard", `dashboard:${userId}`] → call revalidateTag() to bust it
-//
-// IMPORTANT: unstable_cache survives serverless cold starts (it uses the
-// Next.js Data Cache on the file system / CDN), unlike a plain Map which
-// resets every invocation. This is what makes the caching actually work on Vercel.
- export async function getDashboardData(userId: string): Promise<DashboardData> {
-  const cacheKey = `dashboard:${userId}`
-  
-  // Try in-memory cache first
-  const cached = dashboardCache.get(cacheKey)
-  if (cached) return cached
 
-  // Fetch fresh data
-  const data = await fetchDashboardData(userId)
-  
-  // Store in-memory
-  dashboardCache.set(cacheKey, data)
-  
-  return data
+
+export async function getDashboardData(userId: string): Promise<DashboardData> {
+  return unstable_cache(
+    async () => fetchDashboardData(userId),
+    [`dashboard-${userId}`],
+    {
+      revalidate: 3600, // 1 hour cache, but we'll bust it with tags
+      tags: ["dashboard", `dashboard:${userId}`],
+    }
+  )()
 }

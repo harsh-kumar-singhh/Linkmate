@@ -75,7 +75,7 @@ interface DashboardClientProps {
 export default function DashboardClient({ user, initialData }: DashboardClientProps) {
   const { trackAction } = useTrialTrigger()
   const queryClient = useQueryClient()
-   const [notifications, setNotifications] = useState<Post[]>([])
+  const [notifications, setNotifications] = useState<Post[]>([])
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   // ─── Data Fetching ─────────────────────────────────────────────────────────
@@ -87,12 +87,12 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
       const result = await res.json()
       return result.data
     },
-    initialData: initialData ?? undefined,
-    staleTime: 0, // Always consider stale to ensure fresh data on mount/return
+    // Only use server initialData if we don't already have optimistic client data
+    initialData: queryClient.getQueryData(["dashboard"]) ? undefined : (initialData ?? undefined),
+    staleTime: 0, // Verify against server on every mount
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: true,
-    refetchOnMount: "always",
-    placeholderData: keepPreviousData,
+    refetchOnMount: true,
   })
 
   // Track page view
@@ -118,7 +118,7 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
     })
   }, [data])
 
-   const dismissNotification = async (postId: string) => {
+  const dismissNotification = async (postId: string) => {
     // Optimistic: update localStorage + UI before API call
     const dismissedIds: string[] = JSON.parse(
       localStorage.getItem("dismissed_notifications") || "[]"
@@ -298,7 +298,7 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
               )}
 
               {scheduledPosts.length > 0 && (
-                 <PostSection
+                <PostSection
                   title="Scheduled Posts"
                   icon={<Clock className="w-4 h-4 text-primary" />}
                 >
@@ -315,7 +315,7 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
               )}
 
               {publishedPosts.length > 0 && (
-                 <PostSection
+                <PostSection
                   title="Recently Published"
                   icon={<CheckCircle2 className="w-4 h-4 text-emerald-500" />}
                 >
@@ -332,7 +332,7 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
               )}
 
               {drafts.length > 0 && (
-                 <PostSection
+                <PostSection
                   title="Drafts"
                   icon={<FileEdit className="w-4 h-4 text-zinc-500" />}
                 >
@@ -446,7 +446,7 @@ const PostSection = React.memo(function PostSection({
           {title}
         </h3>
       </div>
-       <div className="space-y-4">
+      <div className="space-y-4">
         <AnimatePresence mode="popLayout" initial={false}>
           {children}
         </AnimatePresence>
@@ -455,7 +455,7 @@ const PostSection = React.memo(function PostSection({
   )
 })
 
- const PostCard = React.memo(function PostCard({
+const PostCard = React.memo(function PostCard({
   post,
   index,
   onDelete,
@@ -472,7 +472,7 @@ const PostSection = React.memo(function PostSection({
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
 
   return (
-     <AnimatedCard 
+    <AnimatedCard 
       animation="slide-up" 
       index={index} 
       layout 

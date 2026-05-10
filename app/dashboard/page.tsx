@@ -16,9 +16,9 @@ export default async function DashboardPage() {
     redirect("/login")
   }
 
-  // ── 2. Pass session to the client shell ───────────────────────────────────
-  // We no longer await data here to ensure the UI renders instantly.
-  // The client will fetch data via TanStack Query + Skeletons.
+  // ── 2. Fetch data on the server for instant first-paint ─────────────────
+  const dashboardData = await getDashboardData(session.user.id)
+  
   return (
     <DashboardClient
       user={{
@@ -27,7 +27,7 @@ export default async function DashboardPage() {
         email: session.user.email ?? null,
         image: session.user.image ?? null,
       }}
-      initialData={null}
+      initialData={dashboardData}
     />
   )
 }
