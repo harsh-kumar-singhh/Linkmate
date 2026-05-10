@@ -87,12 +87,12 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
       const result = await res.json()
       return result.data
     },
-    // Only use server initialData if we don't already have optimistic client data
-    initialData: queryClient.getQueryData(["dashboard"]) ? undefined : (initialData ?? undefined),
-    staleTime: 0, // Verify against server on every mount
+    // Use the server snapshot only as a placeholder so it does not poison the cache.
+    placeholderData: (previousData) => previousData ?? initialData ?? undefined,
+    staleTime: 30_000,
     gcTime: 5 * 60_000,
-    refetchOnWindowFocus: true,
-    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   })
 
   // Track page view
@@ -280,7 +280,7 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
               Post Manager
               <div className="h-1 w-1 rounded-full bg-primary" />
             </h2>
-            <Link href="/posts/new" >
+            <Link href="/posts/new">
               <Button className="w-full md:w-auto rounded-2xl h-11 px-6 gap-2 font-black shadow-xl shadow-primary/30 transition-all hover:scale-105 active:scale-95 bg-gradient-to-r from-primary to-blue-600 border-none group">
                 <Plus className="w-5 h-5 transition-transform group-hover:rotate-90" />
                 Create Post
@@ -528,7 +528,7 @@ const PostCard = React.memo(function PostCard({
                   <Trash2 className="w-5 h-5" />
                 )}
               </Button>
-              <Link href={`/posts/new?id=${post.id}`} >
+              <Link href={`/posts/new?id=${post.id}`}>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -564,7 +564,7 @@ function EmptyState() {
           Create your first post to get started.
         </p>
       </div>
-      <Link href="/posts/new" >
+      <Link href="/posts/new">
         <Button variant="outline" className="rounded-full mt-2">
           Create Post
         </Button>

@@ -142,7 +142,7 @@ export default function CalendarPage() {
             const result = await response.json()
             return result.data?.posts || result.posts || []
         },
-        staleTime: 0,
+        staleTime: 10_000, // 10s freshness to allow server cache bust to propagate
     })
 
     // Close popup when clicking outside
