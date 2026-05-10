@@ -7,6 +7,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { getDashboardData } from "@/lib/data/dashboard"
 import { revalidateTag } from "next/cache"
+import { dashboardCache } from "@/lib/cache-server"
 
 export const dynamic = "force-dynamic"
 
@@ -31,7 +32,7 @@ export async function GET() {
 
     response.headers.set(
       "Cache-Control",
-      "private, max-age=60, stale-while-revalidate=300"
+      "no-store, max-age=0"
     )
 
     return response
@@ -60,6 +61,7 @@ export async function POST() {
 
     revalidateTag(`dashboard:${session.user.id}`)
     revalidateTag("dashboard")
+    dashboardCache.delete(`dashboard:${session.user.id}`)
 
     return NextResponse.json({ success: true, message: "Cache invalidated" })
   } catch (error: any) {

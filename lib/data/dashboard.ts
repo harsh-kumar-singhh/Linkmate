@@ -6,9 +6,9 @@
 // is per-user, and auto-invalidates when you call revalidateTag("dashboard").
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { unstable_cache } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import { subDays, startOfDay } from "date-fns"
+import { dashboardCache } from "@/lib/cache-server"
 
 export interface DashboardPost {
   id: string
@@ -148,13 +148,18 @@ async function fetchDashboardData(userId: string): Promise<DashboardData> {
 // IMPORTANT: unstable_cache survives serverless cold starts (it uses the
 // Next.js Data Cache on the file system / CDN), unlike a plain Map which
 // resets every invocation. This is what makes the caching actually work on Vercel.
-export function getDashboardData(userId: string): Promise<DashboardData> {
-  return unstable_cache(
-    () => fetchDashboardData(userId),
-    [`dashboard-data-${userId}`],
-    {
-      revalidate: 60,
-      tags: ["dashboard", `dashboard:${userId}`],
-    }
-  )()
+ export async function getDashboardData(userId: string): Promise<DashboardData> {
+  const cacheKey = `dashboard:${userId}`
+  
+  // Try in-memory cache first
+  const cached = dashboardCache.get(cacheKey)
+  if (cached) return cached
+
+  // Fetch fresh data
+  const data = await fetchDashboardData(userId)
+  
+  // Store in-memory
+  dashboardCache.set(cacheKey, data)
+  
+  return data
 }
