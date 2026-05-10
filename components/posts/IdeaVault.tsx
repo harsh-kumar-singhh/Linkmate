@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { X, Trash2, CheckCircle2, Sparkles, Loader2, Lightbulb, Send, Check } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,7 @@ export function IdeaVault({ isOpen, onClose, onSelectIdea }: IdeaVaultProps) {
     const [newIdea, setNewIdea] = useState("");
     const [isSaving, setIsSaving] = useState(false);
     const [successFeedback, setSuccessFeedback] = useState(false);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -79,13 +81,23 @@ export function IdeaVault({ isOpen, onClose, onSelectIdea }: IdeaVaultProps) {
 
     const handleDelete = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
+        if (deletingId) return;
+
+        const previousIdeas = [...ideas];
+        // Optimistic UI: remove immediately
+        setIdeas(ideas.filter(idea => idea.id !== id));
+        setDeletingId(id);
+
         try {
             const res = await fetch(`/api/ideas/${id}`, { method: "DELETE" });
-            if (res.ok) {
-                setIdeas(ideas.filter(idea => idea.id !== id));
-            }
+            if (!res.ok) throw new Error("Failed to delete");
         } catch (error) {
             console.error("Failed to delete idea", error);
+            // Restore on error
+            setIdeas(previousIdeas);
+            alert("Failed to delete idea. Please try again.");
+        } finally {
+            setDeletingId(null);
         }
     };
 
@@ -158,7 +170,7 @@ export function IdeaVault({ isOpen, onClose, onSelectIdea }: IdeaVaultProps) {
                 </div>
 
                 {/* List Area */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
                     {isLoading ? (
                         <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
                             <Loader2 className="w-6 h-6 animate-spin text-primary/50" />
@@ -171,42 +183,56 @@ export function IdeaVault({ isOpen, onClose, onSelectIdea }: IdeaVaultProps) {
                             <p className="text-sm">Capture your first thought 👀</p>
                         </div>
                     ) : (
-                        ideas.map((idea) => (
-                            <div 
-                                key={idea.id}
-                                onClick={() => handleSelect(idea)}
-                                className={cn(
-                                    "p-4 rounded-xl border border-border/60 bg-background/50 hover:bg-secondary/40 cursor-pointer group transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-primary/30 flex items-start justify-between gap-3",
-                                    idea.used && "opacity-60 grayscale hover:grayscale-0"
-                                )}
-                            >
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap line-clamp-3">
-                                        {idea.content}
-                                    </p>
-                                    <div className="flex items-center gap-3 mt-2">
-                                        <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
-                                            {formatDistanceToNow(new Date(idea.createdAt), { addSuffix: true })}
-                                        </span>
-                                        {idea.used && (
-                                            <span className="flex items-center gap-1 text-[10px] text-emerald-500 font-medium">
-                                                <CheckCircle2 className="w-3 h-3" /> Used
+                        <AnimatePresence mode="popLayout" initial={false}>
+                            {ideas.map((idea) => (
+                                <motion.div 
+                                    key={idea.id}
+                                    layout
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
+                                    onClick={() => handleSelect(idea)}
+                                    className={cn(
+                                        "p-4 rounded-xl border border-border/60 bg-background/50 hover:bg-secondary/40 cursor-pointer group transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-primary/30 flex items-start justify-between gap-3",
+                                        idea.used && "opacity-60 grayscale hover:grayscale-0",
+                                        deletingId === idea.id && "opacity-50 pointer-events-none"
+                                    )}
+                                >
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap line-clamp-3">
+                                            {idea.content}
+                                        </p>
+                                        <div className="flex items-center gap-3 mt-2">
+                                            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                                                {formatDistanceToNow(new Date(idea.createdAt), { addSuffix: true })}
                                             </span>
-                                        )}
+                                            {idea.used && (
+                                                <span className="flex items-center gap-1 text-[10px] text-emerald-500 font-medium">
+                                                    <CheckCircle2 className="w-3 h-3" /> Used
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="flex flex-col items-end gap-2">
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={(e) => handleDelete(e, idea.id)}
-                                        className="w-8 h-8 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                        ))
+                                    <div className="flex flex-col items-end gap-2">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={(e) => handleDelete(e, idea.id)}
+                                            className={cn(
+                                                "w-8 h-8 rounded-lg transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10",
+                                                deletingId !== idea.id && "opacity-0 group-hover:opacity-100"
+                                            )}
+                                        >
+                                            {deletingId === idea.id ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                                <Trash2 className="w-4 h-4" />
+                                            )}
+                                        </Button>
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </AnimatePresence>
                     )}
                 </div>
             </div>

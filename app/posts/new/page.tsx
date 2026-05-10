@@ -53,6 +53,7 @@ function EditorContent() {
     const [scheduledFor, setScheduledFor] = useState<string>("")
     const [isInitialLoading, setIsInitialLoading] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
     const [imageUrl, setImageUrl] = useState<string | null>(null)
     const [imageData, setImageData] = useState<string | null>(null)
     const [isUploading, setIsUploading] = useState(false)
@@ -393,21 +394,22 @@ function EditorContent() {
     }
 
     const handleDelete = async () => {
-        if (!postId || !confirm("Are you sure you want to delete this post?")) return
+        if (!postId || isDeleting) return
 
+        setIsDeleting(true)
         try {
             const response = await fetch(`/api/posts/${postId}`, { method: "DELETE" })
             if (response.ok) {
+                router.push("/dashboard")
+            } else {
                 const result = await response.json();
-                if (result.success !== false) {
-                    router.push("/dashboard")
-                } else {
-                    alert(result.message || "Failed to delete post")
-                }
+                alert(result.message || "Failed to delete post")
+                setIsDeleting(false)
             }
         } catch (error) {
             console.error("Error deleting post:", error)
             alert("Failed to delete post")
+            setIsDeleting(false)
         }
     }
 
@@ -461,8 +463,17 @@ function EditorContent() {
                                 <p className="text-muted-foreground mt-1">Smart LinkedIn content generation</p>
                             </div>
                             {postId && (
-                                <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10" onClick={handleDelete}>
-                                    <Trash2 className="w-5 h-5" />
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className={cn(
+                                        "text-destructive hover:bg-destructive/10 transition-all",
+                                        isDeleting && "opacity-50 cursor-not-allowed"
+                                    )} 
+                                    onClick={handleDelete}
+                                    disabled={isDeleting}
+                                >
+                                    {isDeleting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
                                 </Button>
                             )}
                         </div>

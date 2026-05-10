@@ -11,6 +11,7 @@ import { PushPermissionPrompt } from "@/components/layout/push-permission-prompt
 import Link from "next/link"
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query"
 import { AnimatedCard } from "@/components/animated/AnimatedCard"
+import { motion, AnimatePresence } from "framer-motion"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -23,6 +24,8 @@ import {
   Zap,
   Sparkles,
   X,
+  Trash2,
+  Loader2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
@@ -72,7 +75,8 @@ interface DashboardClientProps {
 export default function DashboardClient({ user, initialData }: DashboardClientProps) {
   const { trackAction } = useTrialTrigger()
   const queryClient = useQueryClient()
-  const [notifications, setNotifications] = useState<Post[]>([])
+   const [notifications, setNotifications] = useState<Post[]>([])
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   // ─── Data Fetching ─────────────────────────────────────────────────────────
   const { data, isLoading } = useQuery<DashboardData>({
@@ -113,7 +117,7 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
     })
   }, [data])
 
-  const dismissNotification = async (postId: string) => {
+   const dismissNotification = async (postId: string) => {
     // Optimistic: update localStorage + UI before API call
     const dismissedIds: string[] = JSON.parse(
       localStorage.getItem("dismissed_notifications") || "[]"
@@ -130,6 +134,37 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
       await fetch(`/api/posts/${postId}/notified`, { method: "PATCH" })
     } catch (err) {
       console.error("Dismiss notification error:", err)
+    }
+  }
+
+  const handleDeletePost = async (postId: string) => {
+    if (deletingId) return
+
+    // Optimistic Update
+    const previousData = queryClient.getQueryData<DashboardData>(["dashboard"])
+    if (previousData) {
+      queryClient.setQueryData(["dashboard"], {
+        ...previousData,
+        posts: previousData.posts.filter(p => p.id !== postId)
+      })
+    }
+
+    setDeletingId(postId)
+    try {
+      const res = await fetch(`/api/posts/${postId}`, { method: "DELETE" })
+      if (!res.ok) throw new Error("Delete failed")
+      
+      // Success - invalidate to ensure server state is synced
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+    } catch (err) {
+      console.error("Delete post error:", err)
+      // Rollback on error
+      if (previousData) {
+        queryClient.setQueryData(["dashboard"], previousData)
+      }
+      alert("Failed to delete post")
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -261,34 +296,52 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
               )}
 
               {scheduledPosts.length > 0 && (
-                <PostSection
+                 <PostSection
                   title="Scheduled Posts"
                   icon={<Clock className="w-4 h-4 text-primary" />}
                 >
                   {scheduledPosts.map((p, i) => (
-                    <PostCard key={p.id} post={p} index={i} />
+                    <PostCard 
+                      key={p.id} 
+                      post={p} 
+                      index={i} 
+                      onDelete={handleDeletePost} 
+                      isDeleting={deletingId === p.id} 
+                    />
                   ))}
                 </PostSection>
               )}
 
               {publishedPosts.length > 0 && (
-                <PostSection
+                 <PostSection
                   title="Recently Published"
                   icon={<CheckCircle2 className="w-4 h-4 text-emerald-500" />}
                 >
                   {publishedPosts.map((p, i) => (
-                    <PostCard key={p.id} post={p} index={i} />
+                    <PostCard 
+                      key={p.id} 
+                      post={p} 
+                      index={i} 
+                      onDelete={handleDeletePost} 
+                      isDeleting={deletingId === p.id} 
+                    />
                   ))}
                 </PostSection>
               )}
 
               {drafts.length > 0 && (
-                <PostSection
+                 <PostSection
                   title="Drafts"
                   icon={<FileEdit className="w-4 h-4 text-zinc-500" />}
                 >
                   {drafts.map((p, i) => (
-                    <PostCard key={p.id} post={p} index={i} />
+                    <PostCard 
+                      key={p.id} 
+                      post={p} 
+                      index={i} 
+                      onDelete={handleDeletePost} 
+                      isDeleting={deletingId === p.id} 
+                    />
                   ))}
                 </PostSection>
               )}
@@ -391,17 +444,25 @@ const PostSection = React.memo(function PostSection({
           {title}
         </h3>
       </div>
-      <div className="space-y-4">{children}</div>
+       <div className="space-y-4">
+        <AnimatePresence mode="popLayout" initial={false}>
+          {children}
+        </AnimatePresence>
+      </div>
     </div>
   )
 })
 
-const PostCard = React.memo(function PostCard({
+ const PostCard = React.memo(function PostCard({
   post,
   index,
+  onDelete,
+  isDeleting,
 }: {
   post: Post
   index: number
+  onDelete: (id: string) => void
+  isDeleting: boolean
 }) {
   const isScheduled = post.status === "SCHEDULED"
   const isPublished = post.status === "PUBLISHED"
@@ -409,8 +470,16 @@ const PostCard = React.memo(function PostCard({
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
 
   return (
-    <AnimatedCard animation="slide-up" index={index}>
-      <Card className="rounded-[2rem] border-border/40 bg-card/40 backdrop-blur-sm hover:bg-card/60 hover:border-primary/30 transition-all duration-300 relative overflow-hidden group">
+     <AnimatedCard 
+      animation="slide-up" 
+      index={index} 
+      layout 
+      exit={{ opacity: 0, scale: 0.9, x: -20, transition: { duration: 0.2 } }}
+    >
+      <Card className={cn(
+        "rounded-[2rem] border-border/40 bg-card/40 backdrop-blur-sm hover:bg-card/60 hover:border-primary/30 transition-all duration-300 relative overflow-hidden group",
+        isDeleting && "opacity-60 scale-[0.98] grayscale"
+      )}>
         <div
           className={cn(
             "absolute left-0 top-6 bottom-6 w-1 rounded-r-full transition-all duration-300 opacity-20 group-hover:opacity-100",
@@ -443,19 +512,34 @@ const PostCard = React.memo(function PostCard({
                 )}
               </div>
             </div>
-            <Link href={`/posts/new?id=${post.id}`} >
+            <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-10 w-10 rounded-xl hover:bg-primary hover:text-white transition-all shadow-none"
+                onClick={() => onDelete(post.id)}
+                disabled={isDeleting}
+                className="h-10 w-10 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all shadow-none"
               >
-                {isPublished ? (
-                  <ArrowUpRight className="w-5 h-5" />
+                {isDeleting ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
-                  <Plus className="w-5 h-5" />
+                  <Trash2 className="w-5 h-5" />
                 )}
               </Button>
-            </Link>
+              <Link href={`/posts/new?id=${post.id}`} >
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-10 rounded-xl hover:bg-primary hover:text-white transition-all shadow-none"
+                >
+                  {isPublished ? (
+                    <ArrowUpRight className="w-5 h-5" />
+                  ) : (
+                    <Plus className="w-5 h-5" />
+                  )}
+                </Button>
+              </Link>
+            </div>
           </div>
         </CardContent>
       </Card>
