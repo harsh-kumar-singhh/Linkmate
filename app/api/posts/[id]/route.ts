@@ -5,6 +5,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { publishToLinkedIn } from "@/lib/linkedin";
+import { revalidateTag } from "next/cache";
+import { dashboardCache } from "@/lib/cache-server";
 
 export async function GET(
     req: Request,
@@ -89,6 +91,12 @@ export async function PUT(
             } as any,
         });
 
+        // Bust cache
+        const userId = session.user.id;
+        revalidateTag(`dashboard:${userId}`);
+        revalidateTag("dashboard");
+        dashboardCache.delete(`dashboard:${userId}`);
+
         return NextResponse.json({
             success: true,
             data: post,
@@ -121,6 +129,12 @@ export async function DELETE(
         await prisma.post.delete({
             where: { id: postId },
         });
+
+        // Bust cache
+        const userId = session.user.id;
+        revalidateTag(`dashboard:${userId}`);
+        revalidateTag("dashboard");
+        dashboardCache.delete(`dashboard:${userId}`);
 
         return NextResponse.json({ 
             success: true, 

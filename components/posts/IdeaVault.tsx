@@ -85,8 +85,8 @@ export function IdeaVault({ isOpen, onClose, onSelectIdea }: IdeaVaultProps) {
 
         const previousIdeas = [...ideas];
         // Optimistic UI: remove immediately
-        setIdeas(ideas.filter(idea => idea.id !== id));
         setDeletingId(id);
+        setIdeas(ideas.filter(idea => idea.id !== id));
 
         try {
             const res = await fetch(`/api/ideas/${id}`, { method: "DELETE" });

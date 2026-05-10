@@ -140,6 +140,8 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
   const handleDeletePost = async (postId: string) => {
     if (deletingId) return
 
+    setDeletingId(postId)
+
     // Optimistic Update
     const previousData = queryClient.getQueryData<DashboardData>(["dashboard"])
     if (previousData) {
@@ -149,7 +151,6 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
       })
     }
 
-    setDeletingId(postId)
     try {
       const res = await fetch(`/api/posts/${postId}`, { method: "DELETE" })
       if (!res.ok) throw new Error("Delete failed")
