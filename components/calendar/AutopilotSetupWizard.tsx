@@ -7,6 +7,7 @@ import { X, Sparkles, Loader2, ArrowRight, ArrowLeft, Check, Calendar as Calenda
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { saveAutopilotSettings } from "@/lib/actions/autopilot";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 
 // Fix for Framer Motion version 12 type errors on Vercel
@@ -37,6 +38,7 @@ const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "S
 export function AutopilotSetupWizard({ isOpen, onClose, initialData }: AutopilotSetupWizardProps) {
     const [step, setStep] = useState(1);
     const [isSaving, setIsSaving] = useState(false);
+    const queryClient = useQueryClient();
 
     const [topics, setTopics] = useState<string[]>(initialData?.topics || []);
     const [customTopic, setCustomTopic] = useState("");
@@ -137,6 +139,45 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
             const result = await saveAutopilotSettings(payload);
             console.log("[Autopilot] Save result:", result);
             
+            if (result.success && (result.posts?.length > 0 || result.deletedPostIds?.length > 0)) {
+                const newPosts = result.posts || [];
+                const deletedIds = result.deletedPostIds || [];
+
+                // 1. Update Dashboard Cache
+                queryClient.setQueryData(["dashboard"], (old: any) => {
+                    if (!old) return old;
+                    
+                    // Filter out deleted posts
+                    let updatedPosts = (old.posts || []).filter((p: any) => !deletedIds.includes(p.id));
+                    // Add new posts
+                    updatedPosts = [...newPosts, ...updatedPosts];
+
+                    const baseStats = old.stats || { postsQueued: 0, totalPostsPublished: 0, totalCount: 0 };
+                    return {
+                        ...old,
+                        posts: updatedPosts,
+                        stats: {
+                            ...baseStats,
+                            // Recalculate queued count: subtract deleted if they were scheduled, add new
+                            // For simplicity, we just add new ones as we don't know if deleted were scheduled
+                            postsQueued: Math.max(0, (baseStats.postsQueued || 0) + newPosts.length - deletedIds.length),
+                            totalCount: Math.max(0, (baseStats.totalCount || 0) + newPosts.length - deletedIds.length),
+                        }
+                    };
+                });
+
+                // 2. Update Calendar/Posts Cache
+                queryClient.setQueryData(["posts"], (old: any) => {
+                    if (!old) return newPosts;
+                    const filtered = old.filter((p: any) => !deletedIds.includes(p.id));
+                    return [...newPosts, ...filtered];
+                });
+
+                // 3. Mark as stale (refetchType: 'none' to avoid immediate overwrite)
+                queryClient.invalidateQueries({ queryKey: ["dashboard"], refetchType: 'none' });
+                queryClient.invalidateQueries({ queryKey: ["posts"], refetchType: 'none' });
+            }
+
             onClose();
         } catch (error) {
             console.error("Setup error:", error);

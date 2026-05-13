@@ -58,12 +58,12 @@ export async function saveAutopilotSettings(data: {
     },
   });
 
-  await reconcileAutopilotSchedule(session.user.id, data.days);
-  await maintainAutopilotPipeline(session.user.id);
+  const deletedPostIds = await reconcileAutopilotSchedule(session.user.id, data.days);
+  const newPosts = await maintainAutopilotPipeline(session.user.id);
 
   revalidatePath("/calendar");
 
-  return { success: true };
+  return { success: true, posts: newPosts, deletedPostIds };
 }
 
 export async function toggleAutopilot(enabled: boolean) {
@@ -87,15 +87,17 @@ export async function toggleAutopilot(enabled: boolean) {
     }),
   ]);
 
+  let newPosts: any[] = [];
   if (enabled) {
-    await maintainAutopilotPipeline(session.user.id).catch((err) =>
-      console.error("[Toggle] Maintenance failed:", err)
-    );
+    newPosts = await maintainAutopilotPipeline(session.user.id).catch((err) => {
+      console.error("[Toggle] Maintenance failed:", err);
+      return [];
+    });
   }
 
   revalidatePath("/calendar");
 
-  return { success: true };
+  return { success: true, posts: newPosts };
 }
 
 // ── CALL THIS AFTER EVERY SUCCESSFUL LINKEDIN PUBLISH ─────────────────────

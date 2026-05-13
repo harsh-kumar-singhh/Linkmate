@@ -20,7 +20,7 @@ import {
     FileText,
     X
 } from "lucide-react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
@@ -105,6 +105,7 @@ function StatusDot({ status }: { status: string }) {
 export default function CalendarPage() {
     const { user, isPro, refreshUser } = useUser()
     const router = useRouter()
+    const queryClient = useQueryClient()
     
     const [viewDate, setViewDate] = useState(new Date())
     const [posts, setPosts] = useState<any[]>([])
@@ -171,7 +172,57 @@ export default function CalendarPage() {
         if (!user) return;
         setIsToggling(true);
         try {
-            await toggleAutopilot(!user.autopilotEnabled);
+            const nextEnabled = !user.autopilotEnabled;
+            const result = await toggleAutopilot(nextEnabled);
+            
+            if (result.success) {
+                const newPosts = result.posts || [];
+
+                // 1. Update Dashboard Cache
+                queryClient.setQueryData(["dashboard"], (old: any) => {
+                    if (!old) return old;
+                    
+                    // Update status of existing autopilot posts
+                    const updatedExistingPosts = (old.posts || []).map((p: any) => {
+                        if (p.source === "autopilot" && p.status !== "PUBLISHED") {
+                            return { ...p, status: nextEnabled ? "SCHEDULED" : "PAUSED" };
+                        }
+                        return p;
+                    });
+
+                    const updatedPosts = [...newPosts, ...updatedExistingPosts];
+                    const baseStats = old.stats || { postsQueued: 0, totalPostsPublished: 0, totalCount: 0 };
+                    
+                    return {
+                        ...old,
+                        posts: updatedPosts,
+                        stats: {
+                            ...baseStats,
+                            // We don't precisely know the count change without deep diffing, 
+                            // but adding newPosts.length is a good start.
+                            postsQueued: Math.max(0, (baseStats.postsQueued || 0) + newPosts.length),
+                            totalCount: Math.max(0, (baseStats.totalCount || 0) + newPosts.length),
+                        }
+                    };
+                });
+
+                // 2. Update Calendar/Posts Cache
+                queryClient.setQueryData(["posts"], (old: any) => {
+                    if (!old) return newPosts;
+                    const updated = old.map((p: any) => {
+                        if (p.source === "autopilot" && p.status !== "PUBLISHED") {
+                            return { ...p, status: nextEnabled ? "SCHEDULED" : "PAUSED" };
+                        }
+                        return p;
+                    });
+                    return [...newPosts, ...updated];
+                });
+
+                // 3. Mark as stale
+                queryClient.invalidateQueries({ queryKey: ["dashboard"], refetchType: 'none' });
+                queryClient.invalidateQueries({ queryKey: ["posts"], refetchType: 'none' });
+            }
+
             await refreshUser();
         } catch (error) {
             alert("Failed to toggle autopilot");

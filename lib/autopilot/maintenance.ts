@@ -17,7 +17,9 @@ export async function maintainAutopilotPipeline(userId?: string) {
   const now = new Date();
   const windowEnd = addDays(now, 21);
 
-  if (userId && isThrottled(userId)) return;
+  if (userId && isThrottled(userId)) return [];
+
+  const createdPosts: any[] = [];
 
   try {
     const users = await prisma.user.findMany({
@@ -36,7 +38,7 @@ export async function maintainAutopilotPipeline(userId?: string) {
       take: userId ? 1 : 20,
     });
 
-    if (!users.length) return;
+    if (!users.length) return [];
 
     const upcomingPosts = await prisma.post.findMany({
       where: {
@@ -82,13 +84,16 @@ export async function maintainAutopilotPipeline(userId?: string) {
           console.log(
             `[Maintenance] Generating missing post | user=${user.id} | day=${day}`
           );
-          await generateAutopilotPosts(user.id, day);
+          const post = await generateAutopilotPosts(user.id, day);
+          if (post) createdPosts.push(post);
         }
       }
     }
   } catch (err) {
     console.error("[Maintenance] ERROR:", err);
   }
+
+  return createdPosts;
 }
 
 // ── THE MISSING PIECE ──────────────────────────────────────────────────────
@@ -174,4 +179,5 @@ export async function reconcileAutopilotSchedule(
     await prisma.post.deleteMany({ where: { id: { in: toDelete } } });
     console.log(`[Reconcile] Deleted ${toDelete.length} stale posts for user=${userId}`);
   }
+  return toDelete;
 }
