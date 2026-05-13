@@ -29,9 +29,13 @@ interface AutopilotSetupWizardProps {
 
 const TOPIC_EXAMPLES = ["Startups", "AI", "Productivity", "Marketing", "Career Advice", "Software Engineering", "Entrepreneurship", "Personal Branding"];
 const FREQUENCY_OPTIONS = [
+    { label: "1 post per week", value: "1" },
     { label: "2 posts per week", value: "2" },
     { label: "3 posts per week", value: "3" },
     { label: "4 posts per week", value: "4" },
+    { label: "5 posts per week", value: "5" },
+    { label: "6 posts per week", value: "6" },
+    { label: "7 posts per week", value: "7" },
 ];
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 

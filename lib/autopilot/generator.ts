@@ -58,9 +58,10 @@ export function createContentPlan(
   for (let i = 0; i < slots; i++) {
     let archetype = ARCHETYPE_ROTATION[i % ARCHETYPE_ROTATION.length];
     
-    // If no weekly focus provided, skip to next archetype for the first slot
-    if (archetype === "WEEKLY_FOCUS" && !weeklyFocus) {
-      archetype = "INDUSTRY_OBSERVATION";
+    // REQUIREMENT: Weekly focus should only be used directly ONCE per week.
+    // If we hit it again in the rotation (i >= 5) or if it's missing, fallback to other types.
+    if (archetype === "WEEKLY_FOCUS" && (i >= ARCHETYPE_ROTATION.length || !weeklyFocus)) {
+      archetype = "TOPIC_DEEP_DIVE";
     }
 
     // Assign source and value based on archetype
