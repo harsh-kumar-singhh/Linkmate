@@ -139,43 +139,55 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
             const result = await saveAutopilotSettings(payload);
             console.log("[Autopilot] Save result:", result);
             
-            if (result.success && (result.posts?.length > 0 || result.deletedPostIds?.length > 0)) {
+            if (result.success) {
                 const newPosts = result.posts || [];
                 const deletedIds = result.deletedPostIds || [];
 
-                // 1. Update Dashboard Cache
+                console.log(`[Autopilot] Syncing UI: ${newPosts.length} new, ${deletedIds.length} deleted`);
+
+                // 1. Update Dashboard Cache (Optimistic)
                 queryClient.setQueryData(["dashboard"], (old: any) => {
                     if (!old) return old;
                     
                     // Filter out deleted posts
                     let updatedPosts = (old.posts || []).filter((p: any) => !deletedIds.includes(p.id));
-                    // Add new posts
+                    // Add new posts (prepend to show at top if recently created)
                     updatedPosts = [...newPosts, ...updatedPosts];
 
                     const baseStats = old.stats || { postsQueued: 0, totalPostsPublished: 0, totalCount: 0 };
+                    
+                    // Surgical stat update
+                    const netChange = newPosts.length - deletedIds.length;
+                    
                     return {
                         ...old,
                         posts: updatedPosts,
                         stats: {
                             ...baseStats,
-                            // Recalculate queued count: subtract deleted if they were scheduled, add new
-                            // For simplicity, we just add new ones as we don't know if deleted were scheduled
-                            postsQueued: Math.max(0, (baseStats.postsQueued || 0) + newPosts.length - deletedIds.length),
-                            totalCount: Math.max(0, (baseStats.totalCount || 0) + newPosts.length - deletedIds.length),
+                            postsQueued: Math.max(0, (baseStats.postsQueued || 0) + netChange),
+                            totalCount: Math.max(0, (baseStats.totalCount || 0) + netChange),
                         }
                     };
                 });
 
-                // 2. Update Calendar/Posts Cache
+                // 2. Update Calendar/Posts Cache (Optimistic)
                 queryClient.setQueryData(["posts"], (old: any) => {
                     if (!old) return newPosts;
                     const filtered = old.filter((p: any) => !deletedIds.includes(p.id));
-                    return [...newPosts, ...filtered];
+                    // Sort by scheduledFor to keep calendar happy
+                    return [...newPosts, ...filtered].sort((a, b) => {
+                        if (!a.scheduledFor) return 1;
+                        if (!b.scheduledFor) return -1;
+                        return new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime();
+                    });
                 });
 
-                // 3. Mark as stale (refetchType: 'none' to avoid immediate overwrite)
-                queryClient.invalidateQueries({ queryKey: ["dashboard"], refetchType: 'none' });
-                queryClient.invalidateQueries({ queryKey: ["posts"], refetchType: 'none' });
+                // 3. Force Invalidation and Refetch
+                // We use refetchType: 'active' to ensure that if the user is looking at the dashboard/calendar, it updates NOW.
+                await Promise.all([
+                    queryClient.invalidateQueries({ queryKey: ["dashboard"], refetchType: 'active' }),
+                    queryClient.invalidateQueries({ queryKey: ["posts"], refetchType: 'active' })
+                ]);
             }
 
             onClose();

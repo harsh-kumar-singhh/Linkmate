@@ -2,7 +2,8 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { dashboardCache } from "@/lib/cache-server";
 import {
   maintainAutopilotPipeline,
   reconcileAutopilotSchedule,
@@ -62,6 +63,8 @@ export async function saveAutopilotSettings(data: {
   const newPosts = await maintainAutopilotPipeline(session.user.id);
 
   revalidatePath("/calendar");
+  revalidateTag("dashboard");
+  dashboardCache.delete(`dashboard:${session.user.id}`);
 
   return { success: true, posts: newPosts, deletedPostIds };
 }
@@ -96,6 +99,8 @@ export async function toggleAutopilot(enabled: boolean) {
   }
 
   revalidatePath("/calendar");
+  revalidateTag("dashboard");
+  dashboardCache.delete(`dashboard:${session.user.id}`);
 
   return { success: true, posts: newPosts };
 }
@@ -127,6 +132,8 @@ export async function markPostPublished(postId: string) {
   }
 
   revalidatePath("/calendar");
+  revalidateTag("dashboard");
+  dashboardCache.delete(`dashboard:${session.user.id}`);
 
   return { success: true };
 }

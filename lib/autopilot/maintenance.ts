@@ -22,27 +22,65 @@ export async function maintainAutopilotPipeline(userId?: string) {
   const createdPosts: any[] = [];
 
   try {
+    const userCount = await prisma.user.count({
+      where: { id: userId ?? undefined }
+    });
+
+    if (userId && userCount === 0) {
+      console.warn(`[Maintenance] User ${userId} not found in database.`);
+      return [];
+    }
+
     const users = await prisma.user.findMany({
       where: {
         id: userId ?? undefined,
         autopilotEnabled: true,
-        linkedinConnected: true,
+        // linkedinConnected: true, // Temporarily relaxed for direct userId calls to help debugging
         autopilotTopics: { not: { equals: [] } },
         NOT: [{ autopilotDays: { equals: [] } }, { autopilotTime: null }],
       },
       select: {
         id: true,
+        autopilotEnabled: true,
+        linkedinConnected: true,
+        autopilotTopics: true,
         autopilotDays: true,
+        autopilotTime: true,
         schedule: { select: { timezone: true } },
       },
       take: userId ? 1 : 20,
     });
 
+    if (userId && users.length === 0) {
+      // Find out exactly why the user was filtered out
+      const rawUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { autopilotEnabled: true, autopilotTopics: true, autopilotDays: true, autopilotTime: true, linkedinConnected: true }
+      });
+      console.warn(`[Maintenance] User ${userId} filtered out of pipeline. Status:`, {
+        exists: !!rawUser,
+        enabled: rawUser?.autopilotEnabled,
+        topics: (rawUser?.autopilotTopics as any[])?.length || 0,
+        days: rawUser?.autopilotDays?.length || 0,
+        time: !!rawUser?.autopilotTime,
+        linkedin: rawUser?.linkedinConnected
+      });
+      return [];
+    }
+
     if (!users.length) return [];
+
+    // If we're doing a bulk run, we still enforce linkedinConnected
+    const activeUsers = userId ? users : users.filter(u => u.linkedinConnected);
+    
+    if (activeUsers.length === 0) {
+      console.log("[Maintenance] No users with LinkedIn connected found for bulk processing.");
+      return [];
+    }
 
     const upcomingPosts = await prisma.post.findMany({
       where: {
-        userId: { in: users.map((u) => u.id) },
+        userId: { in: activeUsers.map((u) => u.id) },
         source: "autopilot",
         status: { in: ["SCHEDULED", "PENDING"] },
         scheduledFor: { gte: now, lte: windowEnd },
