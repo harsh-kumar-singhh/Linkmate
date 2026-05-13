@@ -609,7 +609,7 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                         {isSaving ? (
                                             <>
                                                 <Loader2 className="w-5 h-5 animate-spin" />
-                                                <span>Saving...</span>
+                                                <span>Generating AI Posts...</span>
                                             </>
                                         ) : (
                                             <>
@@ -620,6 +620,11 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                     </Button>
                                 )}
                             </div>
+                            {isSaving && (
+                                <p className="text-[10px] text-center text-muted-foreground mt-4 animate-pulse">
+                                    Our AI is crafting your posts. This usually takes 15-20 seconds.
+                                </p>
+                            )}
                         </div>
                     </AnimatedCard>
                 </div>

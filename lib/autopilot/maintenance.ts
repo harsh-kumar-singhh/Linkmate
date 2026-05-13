@@ -13,11 +13,11 @@ function isThrottled(userId: string): boolean {
   return false;
 }
 
-export async function maintainAutopilotPipeline(userId?: string) {
+export async function maintainAutopilotPipeline(userId?: string, force: boolean = false) {
   const now = new Date();
   const windowEnd = addDays(now, 21);
 
-  if (userId && isThrottled(userId)) return [];
+  if (userId && !force && isThrottled(userId)) return [];
 
   const createdPosts: any[] = [];
 
@@ -111,18 +111,28 @@ export async function maintainAutopilotPipeline(userId?: string) {
       coveredDays.get(post.userId)!.add(dayName);
     }
 
-    for (const user of users) {
+    for (const user of activeUsers) {
       const selectedDays = (user.autopilotDays as string[]).map((d) =>
         d.toUpperCase()
       );
       const covered = coveredDays.get(user.id) ?? new Set<string>();
+      const missingDays = selectedDays.filter(day => !covered.has(day));
 
-      for (const day of selectedDays) {
-        if (!covered.has(day)) {
-          console.log(
-            `[Maintenance] Generating missing post | user=${user.id} | day=${day}`
-          );
-          const post = await generateAutopilotPosts(user.id, day);
+      if (missingDays.length > 0) {
+        console.log(
+          `[Maintenance] Generating ${missingDays.length} missing posts in parallel for user=${user.id}`
+        );
+        
+        // Parallelize generation for THIS user
+        const generationPromises = missingDays.map(day => 
+          generateAutopilotPosts(user.id, day).catch(err => {
+            console.error(`[Maintenance] Failed to generate for user=${user.id} day=${day}:`, err);
+            return null;
+          })
+        );
+
+        const results = await Promise.all(generationPromises);
+        for (const post of results) {
           if (post) createdPosts.push(post);
         }
       }

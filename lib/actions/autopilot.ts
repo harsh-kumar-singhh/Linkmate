@@ -60,7 +60,7 @@ export async function saveAutopilotSettings(data: {
   });
 
   const deletedPostIds = await reconcileAutopilotSchedule(session.user.id, data.days);
-  const newPosts = await maintainAutopilotPipeline(session.user.id);
+  const newPosts = await maintainAutopilotPipeline(session.user.id, true);
 
   revalidatePath("/calendar");
   revalidateTag("dashboard");
@@ -92,7 +92,7 @@ export async function toggleAutopilot(enabled: boolean) {
 
   let newPosts: any[] = [];
   if (enabled) {
-    newPosts = await maintainAutopilotPipeline(session.user.id).catch((err) => {
+    newPosts = await maintainAutopilotPipeline(session.user.id, true).catch((err) => {
       console.error("[Toggle] Maintenance failed:", err);
       return [];
     });
