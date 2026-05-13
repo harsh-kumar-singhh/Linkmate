@@ -27,12 +27,12 @@ export const AI_MODELS: AIModel[] = [
     role: "primary"
   },
   {
-    id: "mistralai/mistral-7b-instruct",
+    id: "meta-llama/llama-3.1-8b-instruct",
     priority: 2,
     role: "fallback"
   },
   {
-    id: "meta-llama/llama-3-8b-instruct",
+    id: "google/gemini-2.0-flash-lite-001",
     priority: 3,
     role: "fallback"
   }
@@ -49,20 +49,34 @@ async function logAIEvent(event: {
   success: boolean;
   message?: string;
 }) {
-  console.log(`[AI LOG] ${JSON.stringify(event)}`);
+  // Only log detailed JSON in production if it's an error, or keep it simple
+  if (!event.success || process.env.NODE_ENV === 'development') {
+    console.log(`[AI LOG] ${JSON.stringify(event)}`);
+  }
 }
 
 function classifyError(status: number, message: string): AIErrorType {
+  const msg = message.toLowerCase();
+  
   if (status === 429) {
-    if (message.toLowerCase().includes('quota') || message.toLowerCase().includes('credit')) {
+    if (msg.includes('quota') || msg.includes('credit')) {
       return 'QUOTA_EXCEEDED';
     }
     return 'RATE_LIMIT';
   }
+  
+  // Specific OpenRouter / Provider errors
+  if (msg.includes('no endpoints') || msg.includes('model not found') || msg.includes('provider returned error')) {
+    return 'MODEL_FAILURE';
+  }
+
   if (status === 408 || status === 504) return 'TIMEOUT';
   if (status >= 500) return 'MODEL_FAILURE';
   if (status === 401) return 'AUTH_MISSING';
-  if (status === 400) return 'LOGIC_ERROR';
+  if (status === 400) {
+    if (msg.includes('context_length')) return 'MODEL_FAILURE'; // Treat as model failure to allow fallback
+    return 'LOGIC_ERROR';
+  }
   return 'UNKNOWN_INTERNAL';
 }
 
@@ -119,6 +133,10 @@ export async function generateWithFallback(
         throw new AIError("Empty response from AI", "MODEL_FAILURE", model.id);
       }
 
+      if (attempt > 1) {
+        console.log(`[AI] Recovery success with model: ${model.id} on attempt ${attempt}`);
+      }
+
       await logAIEvent({
         model_id: model.id,
         timestamp: new Date().toISOString(),
@@ -151,8 +169,12 @@ export async function generateWithFallback(
       // If it's a logic error (e.g. bad prompt/config), don't bother falling back
       if (errorType === 'LOGIC_ERROR') throw lastError;
 
-      // Continue to next model
-      console.warn(`[AI] Model ${model.id} failed (${errorType}). Trying next model...`);
+      // Continue to next model if available
+      if (i < sortedModels.length - 1) {
+        console.warn(`[AI] Model ${model.id} failed (${errorType}). Trying next model: ${sortedModels[i+1].id}...`);
+      } else {
+        console.error(`[AI] Final model ${model.id} failed (${errorType}). No more fallbacks.`);
+      }
     }
   }
 

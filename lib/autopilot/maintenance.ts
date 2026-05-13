@@ -120,20 +120,16 @@ export async function maintainAutopilotPipeline(userId?: string, force: boolean 
 
       if (missingDays.length > 0) {
         console.log(
-          `[Maintenance] Generating ${missingDays.length} missing posts in parallel for user=${user.id}`
+          `[Maintenance] Generating ${missingDays.length} missing posts sequentially for user=${user.id} to ensure variety`
         );
         
-        // Parallelize generation for THIS user
-        const generationPromises = missingDays.map(day => 
-          generateAutopilotPosts(user.id, day).catch(err => {
+        for (const day of missingDays) {
+          try {
+            const post = await generateAutopilotPosts(user.id, day);
+            if (post) createdPosts.push(post);
+          } catch (err) {
             console.error(`[Maintenance] Failed to generate for user=${user.id} day=${day}:`, err);
-            return null;
-          })
-        );
-
-        const results = await Promise.all(generationPromises);
-        for (const post of results) {
-          if (post) createdPosts.push(post);
+          }
         }
       }
     }

@@ -62,7 +62,7 @@ export const AI_CORE_CONFIG = {
     },
 
     FALLBACK_MODELS: [
-        "mistralai/mistral-7b-instruct",
-        "meta-llama/llama-3-8b-instruct"
+        "meta-llama/llama-3.1-8b-instruct",
+        "google/gemini-2.0-flash-lite-001"
     ]
 };

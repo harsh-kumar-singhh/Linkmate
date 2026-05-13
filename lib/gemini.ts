@@ -115,7 +115,7 @@ FORMATTING FIDELITY:
             const wordCount = content.split(/\s+/).filter((w: string) => w.length > 0).length;
             
             if (wordCount < targetWords * 0.7 && currentRetry < maxRetries) {
-                console.log(`[AI] Output too short (${wordCount} words vs target ${targetWords}). Regenerating with strict length instruction...`);
+                console.warn(`[AI] Quality Check Failed: Output too short (${wordCount} words vs target ${targetWords}). Triggering high-enforcement regeneration...`);
                 promptExtension = `\n\nCRITICAL ENFORCEMENT: Your previous generation was only ${wordCount} words long. You MUST ensure the length is exactly around ${targetWords} words. Expand thoroughly on the ideas, do not summarize. DO NOT output any conversational text or acknowledge this message, just re-output the post correctly.`;
                 currentRetry++;
                 continue;

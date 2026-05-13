@@ -22,8 +22,28 @@ const WEEK_ORDER: Record<string, number> = {
   MONDAY: 0, TUESDAY: 1, WEDNESDAY: 2, THURSDAY: 3, FRIDAY: 4, SATURDAY: 5, SUNDAY: 6
 };
 
-type PlanItem = { source: "WEEKLY_FOCUS" | "CONTEXT" | "TOPIC", value?: string, variation?: boolean, angle?: string };
-const ANGLES = ["story", "lesson", "contrarian", "mistake", "insight"];
+type ContentArchetype = 
+  | "WEEKLY_FOCUS"           // Uses the exact weekly focus/context directly
+  | "INDUSTRY_OBSERVATION"   // Broader niche insights or trends connected to topics
+  | "OPINION"                // Unique angle, lesson, or contrarian observation
+  | "GENERAL_NEWS"           // Behavioral insights or market shifts
+  | "TOPIC_DEEP_DIVE";       // Focus on a specific user topic
+
+type PlanItem = { 
+  source: "WEEKLY_FOCUS" | "CONTEXT" | "TOPIC", 
+  value?: string, 
+  variation?: boolean, 
+  angle?: string,
+  archetype: ContentArchetype
+};
+
+const ARCHETYPE_ROTATION: ContentArchetype[] = [
+  "WEEKLY_FOCUS",
+  "INDUSTRY_OBSERVATION",
+  "OPINION",
+  "GENERAL_NEWS",
+  "TOPIC_DEEP_DIVE"
+];
 
 export function createContentPlan(
   weeklyFocus: string | undefined,
@@ -32,49 +52,59 @@ export function createContentPlan(
   slots: number
 ): PlanItem[] {
   const plan: PlanItem[] = [];
+  const ANGLES = ["story", "lesson", "contrarian", "mistake", "insight"];
   
-  if (weeklyFocus) {
-    plan.push({ source: "WEEKLY_FOCUS", value: weeklyFocus, variation: false });
-  }
+  // Deterministic rotation based on slots
+  for (let i = 0; i < slots; i++) {
+    let archetype = ARCHETYPE_ROTATION[i % ARCHETYPE_ROTATION.length];
+    
+    // If no weekly focus provided, skip to next archetype for the first slot
+    if (archetype === "WEEKLY_FOCUS" && !weeklyFocus) {
+      archetype = "INDUSTRY_OBSERVATION";
+    }
 
-  for (const ctx of additionalContexts) {
-    if (plan.length >= slots) break;
-    plan.push({ source: "CONTEXT", value: ctx, variation: false });
-  }
-
-  let topicIndex = 0;
-  while (plan.length < slots && topicIndex < topics.length) {
-    plan.push({ source: "TOPIC", value: topics[topicIndex], variation: false });
-    topicIndex++;
-  }
-
-  const availableAngles = [...ANGLES].sort(() => 0.5 - Math.random());
-  let angleIndex = 0;
-
-  while (plan.length < slots) {
-    if (weeklyFocus) {
-      plan.push({
-        source: "WEEKLY_FOCUS",
-        value: weeklyFocus,
-        variation: true,
-        angle: availableAngles[angleIndex % availableAngles.length]
+    // Assign source and value based on archetype
+    if (archetype === "WEEKLY_FOCUS") {
+      plan.push({ 
+        source: "WEEKLY_FOCUS", 
+        value: weeklyFocus, 
+        archetype: "WEEKLY_FOCUS" 
       });
-      angleIndex++;
-    } else if (topics.length > 0) {
-      plan.push({
-        source: "TOPIC",
-        value: topics[topicIndex % topics.length],
-        variation: true,
-        angle: availableAngles[angleIndex % availableAngles.length]
+    } else if (archetype === "INDUSTRY_OBSERVATION") {
+      const topic = topics[i % topics.length] || "Professional Growth";
+      plan.push({ 
+        source: "TOPIC", 
+        value: topic, 
+        archetype: "INDUSTRY_OBSERVATION" 
       });
-      angleIndex++;
-      topicIndex++;
+    } else if (archetype === "OPINION") {
+      const topic = topics[(i + 1) % topics.length] || "Industry Trends";
+      plan.push({ 
+        source: "TOPIC", 
+        value: topic, 
+        archetype: "OPINION",
+        angle: "contrarian"
+      });
+    } else if (archetype === "GENERAL_NEWS") {
+      const topic = topics[(i + 2) % topics.length] || "Market Insights";
+      plan.push({ 
+        source: "TOPIC", 
+        value: topic, 
+        archetype: "GENERAL_NEWS" 
+      });
     } else {
-       plan.push({ source: "TOPIC", value: "Networking & Growth", variation: false });
+      // TOPIC_DEEP_DIVE or fallback
+      const topic = topics[(i + 3) % topics.length] || "Success Strategies";
+      plan.push({ 
+        source: "TOPIC", 
+        value: topic, 
+        archetype: "TOPIC_DEEP_DIVE",
+        angle: ANGLES[i % ANGLES.length]
+      });
     }
   }
 
-  return plan.slice(0, slots);
+  return plan;
 }
 
 function calculateSimilarity(str1: string, str2: string): number {
@@ -180,22 +210,53 @@ export async function generateAutopilotPosts(
 
   let promptTopic = topics[0];
   let promptContext = "";
+  const weeklyFocus = user.autopilotCurrentFocus;
 
-  if (currentPlan.source === "WEEKLY_FOCUS") {
-    promptTopic = "Weekly Focus / Theme";
-    promptContext = `FOCUS: ${currentPlan.value}\nPlease tie the narrative deeply into this focus.`;
-  } else if (currentPlan.source === "CONTEXT") {
-    promptTopic = "Personal Insights";
-    promptContext = `CONTEXT/BACKGROUND: ${currentPlan.value}`;
-  } else if (currentPlan.source === "TOPIC") {
-    promptTopic = currentPlan.value || topics[0];
-    if (user.aboutYou) {
-      promptContext = `ABOUT ME: ${user.aboutYou}`;
-    }
+  // Archetype-specific prompt construction
+  switch (currentPlan.archetype) {
+    case "WEEKLY_FOCUS":
+      promptTopic = "Weekly Strategy / Theme";
+      promptContext = `PRIMARY FOCUS: ${currentPlan.value}\n
+Directly address this weekly focus. This is the central strategic anchor for this week. Use examples or insights directly related to this theme.`;
+      break;
+
+    case "INDUSTRY_OBSERVATION":
+      promptTopic = currentPlan.value || topics[0];
+      promptContext = `ARCHETYPE: Industry Observation.
+Write an observational post about ${promptTopic}. Connect it to broader industry shifts or professional trends.
+${weeklyFocus ? `STRATEGIC ANCHOR (Background): ${weeklyFocus}. Do NOT repeat this theme directly, but let it inform the tone and perspective.` : ""}
+The goal is to provide a thoughtful "state of the industry" insight.`;
+      break;
+
+    case "OPINION":
+      promptTopic = currentPlan.value || topics[0];
+      promptContext = `ARCHETYPE: Opinion / Contrarian Insight.
+Share a unique, perhaps slightly contrarian opinion or a hard-learned lesson about ${promptTopic}.
+${weeklyFocus ? `STRATEGIC ANCHOR (Background): ${weeklyFocus}. Use this theme only as context, not as the primary subject.` : ""}
+Be bold and provide a fresh perspective that challenges the status quo.`;
+      break;
+
+    case "GENERAL_NEWS":
+      promptTopic = currentPlan.value || topics[0];
+      promptContext = `ARCHETYPE: Market Shift / Behavioral Insight.
+Discuss a recent trend, market shift, or behavioral insight related to ${promptTopic}.
+${weeklyFocus ? `STRATEGIC ANCHOR (Background): ${weeklyFocus}. Let this theme influence your conclusion or summary.` : ""}
+Make the post feel timely, relevant, and grounded in current professional reality.`;
+      break;
+
+    case "TOPIC_DEEP_DIVE":
+      promptTopic = currentPlan.value || topics[0];
+      const angle = currentPlan.angle || "practical tip";
+      promptContext = `ARCHETYPE: Practical Deep Dive.
+Provide a specific ${angle} or a deep-dive lesson about ${promptTopic}.
+${weeklyFocus ? `STRATEGIC ANCHOR (Background): ${weeklyFocus}. Align this lesson with the broader strategic goal.` : ""}
+Focus on actionable value and practical takeaways.`;
+      break;
   }
 
-  if (currentPlan.variation && currentPlan.angle) {
-    promptContext += `\n\nVARIATION ANGLE: Twist the perspective to focus heavily on a ${currentPlan.angle}. Approach the writing from this specific angle.`;
+  // Add personal context if available (but don't let it overpower the archetype)
+  if (user.aboutYou) {
+    promptContext += `\n\nUSER BACKGROUND (Use for voice/authority): ${user.aboutYou}`;
   }
 
   const recentPosts = await prisma.post.findMany({
