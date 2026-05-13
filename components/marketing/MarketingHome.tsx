@@ -36,9 +36,9 @@ export function MarketingHome() {
                   align="left"
                   title={
                     <Flex direction="col" align="start" gap="md">
-                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/5 border border-border text-primary text-xs font-semibold tracking-wider uppercase">
-                        <Sparkles className="w-3.5 h-3.5" />
-                        LinkMate Autopilot
+                      <div className="inline-flex items-center gap-2">
+                        <img src="/logo.png" alt="LinkMate" className="h-6 w-auto object-contain" />
+                        <span className="px-3 py-1 rounded-full bg-primary/5 border border-border text-primary text-xs font-semibold tracking-wider uppercase">Autopilot</span>
                       </div>
                       <Heading level={1} className="leading-[0.85]">
                         Your <br/> LinkedIn <br/>
@@ -226,9 +226,8 @@ export function MarketingHome() {
         {/* Seamless transition instead of hard border */}
         <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-t from-background to-transparent -translate-y-full pointer-events-none" />
         <Container className="flex flex-col md:flex-row justify-between items-center gap-8 text-center md:text-left">
-          <div className="font-bold text-xl tracking-tight uppercase flex items-center gap-2 justify-center md:justify-start">
-            <div className="w-2 h-2 rounded-full bg-primary" />
-            Linkmate
+          <div className="flex items-center justify-center md:justify-start">
+            <img src="/logo.png" alt="Linkmate" className="h-8 w-auto object-contain" />
           </div>
           <Text variant="small">© 2026 Built for builders.</Text>
         </Container>

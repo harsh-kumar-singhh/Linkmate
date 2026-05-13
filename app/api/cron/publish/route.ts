@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { publishToLinkedIn } from "@/lib/linkedin";
 import { maintainAutopilotPipeline } from "@/lib/autopilot/maintenance";
-import { triggerPostPublishedNotification, sendPushNotification } from "@/lib/notifications";
+import { triggerPostPublishedNotification, sendPushNotification, cleanupOldNotifications } from "@/lib/notifications";
 
 export async function POST(req: Request) {
     const now = new Date();
@@ -153,11 +153,12 @@ export async function POST(req: Request) {
 
         console.log("[CRON] Phase 1 (Publishing) completed. Starting Phase 2 (Maintenance)...");
         
-        // 4. Trigger Autopilot Maintenance Pipeline
+        // 4. Trigger Autopilot Maintenance Pipeline & Cleanup
         try {
             await maintainAutopilotPipeline();
+            await cleanupOldNotifications();
         } catch (maintenanceError) {
-            console.error("[CRON] Phase 2 (Maintenance) failed:", maintenanceError);
+            console.error("[CRON] Phase 2 (Maintenance/Cleanup) failed:", maintenanceError);
         }
 
         const summary = {

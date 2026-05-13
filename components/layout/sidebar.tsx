@@ -24,9 +24,14 @@ export function Sidebar() {
             className="hidden md:flex flex-col w-64 border-r border-border bg-site-bg h-screen sticky top-0 z-[100] transition-colors"
         >
             <div className="p-8 flex flex-col h-full">
-                <div className="flex items-center gap-3 mb-12 relative group">
-                    <span className="font-bold text-xl tracking-tight uppercase">Linkmate</span>
-                    <span className="hidden md:block w-1.5 h-1.5 rounded-full bg-blue-600 absolute -right-3 top-1 animate-pulse" />
+                <div className="flex items-center mb-12 relative group">
+                    <Link href="/dashboard" className="block w-full">
+                        <img 
+                            src="/logo.png" 
+                            alt="Linkmate" 
+                            className="w-full h-12 object-cover rounded-lg"
+                        />
+                    </Link>
                 </div>
 
                 <nav className="space-y-1 flex-1">

@@ -251,3 +251,28 @@ export async function triggerUpgradePrompt(userId: string, feature: string) {
   }, true); 
 }
 
+/**
+ * Cleanup notifications older than 2 days
+ */
+export async function cleanupOldNotifications() {
+  const twoDaysAgo = new Date();
+  twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+
+  try {
+    const deleted = await prisma.notification.deleteMany({
+      where: {
+        createdAt: {
+          lt: twoDaysAgo
+        }
+      }
+    });
+    if (deleted.count > 0) {
+      console.log(`[NOTIFICATIONS] Cleaned up ${deleted.count} old notifications.`);
+    }
+    return deleted.count;
+  } catch (error) {
+    console.error('[NOTIFICATIONS] Cleanup failed:', error);
+    return 0;
+  }
+}
+

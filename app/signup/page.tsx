@@ -67,8 +67,8 @@ export default function SignupPage() {
     <div className="min-h-screen grid lg:grid-cols-2 bg-background selection:bg-primary/10 transition-colors duration-500">
       {/* Brand Side */}
       <div className="hidden lg:flex flex-col justify-between p-16 bg-secondary/30 relative overflow-hidden">
-        <div className="relative z-10 flex items-center gap-2 font-bold text-xl tracking-tight uppercase">
-          Linkmate
+        <div className="relative z-10 flex items-center">
+          <img src="/logo.png" alt="Linkmate" className="h-12 w-auto object-cover rounded-lg" />
         </div>
 
         <div className="relative z-10 space-y-6">

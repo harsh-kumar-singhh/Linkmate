@@ -15,12 +15,10 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   icons: {
     icon: [
-      { url: '/favicon.ico?v=3', sizes: 'any' },
-      { url: '/favicon-32x32.png?v=3', type: 'image/png', sizes: '32x32' },
-      { url: '/favicon-16x16.png?v=3', type: 'image/png', sizes: '16x16' },
+      { url: '/logo.png', sizes: 'any' },
     ],
     apple: [
-      { url: '/apple-touch-icon.png?v=3', sizes: '180x180', type: 'image/png' },
+      { url: '/logo.png', sizes: '180x180', type: 'image/png' },
     ],
   },
 };

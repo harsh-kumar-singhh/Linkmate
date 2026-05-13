@@ -47,9 +47,8 @@ export function AIModal({ isOpen, onClose, onGenerate }: AIModalProps) {
                         <div className="absolute top-0 left-0 right-0 h-1.5 bg-blue-600" />
                         <div className="p-10">
                             <div className="flex items-center justify-between mb-10">
-                                <div className="flex items-center gap-3">
-                                    <Sparkles className="w-5 h-5 text-blue-600" />
-                                    <h2 className="font-bold text-2xl tracking-tight text-site-fg uppercase">Linkmate AI</h2>
+                                <div className="flex items-center">
+                                    <img src="/logo.png" alt="Linkmate" className="h-8 w-auto object-contain" />
                                 </div>
                                 <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors p-2">
                                     <X className="w-5 h-5" />
