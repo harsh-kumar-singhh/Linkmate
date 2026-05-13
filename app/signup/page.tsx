@@ -68,7 +68,7 @@ export default function SignupPage() {
       {/* Brand Side */}
       <div className="hidden lg:flex flex-col justify-between p-16 bg-secondary/30 relative overflow-hidden">
         <div className="relative z-10 flex items-center">
-          <img src="/logo.png" alt="Linkmate" className="h-12 w-auto object-cover rounded-lg" />
+          <img src="/logo.png" alt="Linkmate" className="h-10 w-auto object-contain" />
         </div>
 
         <div className="relative z-10 space-y-6">
