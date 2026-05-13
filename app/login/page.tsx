@@ -51,7 +51,7 @@ export default function LoginPage() {
       {/* Brand Side */}
       <div className="hidden lg:flex flex-col justify-between p-16 bg-secondary/30 relative overflow-hidden">
         <div className="relative z-10 flex items-center">
-          <img src="/logo.png" alt="Linkmate" className="h-10 w-auto object-contain" />
+          <Image src="/logo.png" alt="Linkmate" width={100} height={40} className="h-10 w-auto object-contain" priority />
         </div>
 
         <div className="relative z-10 space-y-6">
