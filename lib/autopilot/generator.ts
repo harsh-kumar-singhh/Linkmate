@@ -214,11 +214,14 @@ export async function generateAutopilotPosts(
   const weeklyFocus = user.autopilotCurrentFocus;
 
   // Archetype-specific prompt construction
+  let usedFocusContext = false;
+  
   switch (currentPlan.archetype) {
     case "WEEKLY_FOCUS":
       promptTopic = "Weekly Strategy / Theme";
       promptContext = `PRIMARY FOCUS: ${currentPlan.value}\n
 Directly address this weekly focus. This is the central strategic anchor for this week. Use examples or insights directly related to this theme.`;
+      usedFocusContext = true;
       break;
 
     case "INDUSTRY_OBSERVATION":
@@ -227,22 +230,23 @@ Directly address this weekly focus. This is the central strategic anchor for thi
 Write an observational post about ${promptTopic}. Connect it to broader industry shifts or professional trends.
 ${weeklyFocus ? `STRATEGIC ANCHOR (Background): ${weeklyFocus}. Do NOT repeat this theme directly, but let it inform the tone and perspective.` : ""}
 The goal is to provide a thoughtful "state of the industry" insight.`;
+      if (weeklyFocus) usedFocusContext = true;
       break;
 
     case "OPINION":
       promptTopic = currentPlan.value || topics[0];
       promptContext = `ARCHETYPE: Opinion / Contrarian Insight.
 Share a unique, perhaps slightly contrarian opinion or a hard-learned lesson about ${promptTopic}.
-${weeklyFocus ? `STRATEGIC ANCHOR (Background): ${weeklyFocus}. Use this theme only as context, not as the primary subject.` : ""}
 Be bold and provide a fresh perspective that challenges the status quo.`;
+      // Intentionally kept generic, not influenced by focus
       break;
 
     case "GENERAL_NEWS":
       promptTopic = currentPlan.value || topics[0];
       promptContext = `ARCHETYPE: Market Shift / Behavioral Insight.
 Discuss a recent trend, market shift, or behavioral insight related to ${promptTopic}.
-${weeklyFocus ? `STRATEGIC ANCHOR (Background): ${weeklyFocus}. Let this theme influence your conclusion or summary.` : ""}
 Make the post feel timely, relevant, and grounded in current professional reality.`;
+      // Intentionally kept generic, not influenced by focus
       break;
 
     case "TOPIC_DEEP_DIVE":
@@ -250,8 +254,8 @@ Make the post feel timely, relevant, and grounded in current professional realit
       const angle = currentPlan.angle || "practical tip";
       promptContext = `ARCHETYPE: Practical Deep Dive.
 Provide a specific ${angle} or a deep-dive lesson about ${promptTopic}.
-${weeklyFocus ? `STRATEGIC ANCHOR (Background): ${weeklyFocus}. Align this lesson with the broader strategic goal.` : ""}
 Focus on actionable value and practical takeaways.`;
+      // Intentionally kept generic, not influenced by focus
       break;
   }
 
@@ -305,6 +309,8 @@ Focus on actionable value and practical takeaways.`;
       scheduledFor: slot,
       source: "autopilot",
       topic: promptTopic,
+      autopilotFocus: usedFocusContext ? user.autopilotCurrentFocus : null,
+      archetype: currentPlan.archetype,
     },
   });
 

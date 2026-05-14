@@ -99,7 +99,7 @@ export async function generateWithFallback(
       console.log(`[AI] Attempt ${attempt} with model: ${model.id}`);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 1 minute timeout
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 seconds timeout
 
       const response = await fetch(`${BASE_URL}/chat/completions`, {
         method: "POST",

@@ -21,6 +21,8 @@ export async function maintainAutopilotPipeline(userId?: string, force: boolean 
 
   const createdPosts: any[] = [];
 
+
+
   try {
     const userCount = await prisma.user.count({
       where: { id: userId ?? undefined }
@@ -120,17 +122,20 @@ export async function maintainAutopilotPipeline(userId?: string, force: boolean 
 
       if (missingDays.length > 0) {
         console.log(
-          `[Maintenance] Generating ${missingDays.length} missing posts sequentially for user=${user.id} to ensure variety`
+          `[Maintenance] Generating ${missingDays.length} missing posts in PARALLEL for user=${user.id}`
         );
         
-        for (const day of missingDays) {
-          try {
-            const post = await generateAutopilotPosts(user.id, day);
-            if (post) createdPosts.push(post);
-          } catch (err) {
-            console.error(`[Maintenance] Failed to generate for user=${user.id} day=${day}:`, err);
-          }
-        }
+        // Generate all missing posts in parallel for maximum speed
+        await Promise.all(
+          missingDays.map(async (day) => {
+            try {
+              const post = await generateAutopilotPosts(user.id, day);
+              if (post) createdPosts.push(post);
+            } catch (err) {
+              console.error(`[Maintenance] Failed to generate for user=${user.id} day=${day}:`, err);
+            }
+          })
+        );
       }
     }
   } catch (err) {
@@ -224,4 +229,55 @@ export async function reconcileAutopilotSchedule(
     console.log(`[Reconcile] Deleted ${toDelete.length} stale posts for user=${userId}`);
   }
   return toDelete;
+}
+
+/**
+ * SELECTIVE REGENERATION:
+ * When the weekly focus changes, we only want to replace future posts that were
+ * directly influenced by the OLD weekly focus.
+ */
+export async function syncAutopilotWeeklyFocus(userId: string, newFocus: string) {
+    const now = new Date();
+    
+    // 1. Identify future autopilot posts influenced by focus
+    const futurePosts = await prisma.post.findMany({
+        where: {
+            userId,
+            source: "autopilot",
+            status: { in: ["SCHEDULED", "PENDING"] },
+            scheduledFor: { gte: now },
+            // Only posts where archetype was WEEKLY_FOCUS OR it was influenced by focus
+            OR: [
+                { archetype: "WEEKLY_FOCUS" },
+                { 
+                    // If metadata was old, we might check if autopilotFocus exists and is different
+                    AND: [
+                        { autopilotFocus: { not: newFocus } },
+                        { autopilotFocus: { not: null } }
+                    ]
+                }
+            ]
+        },
+        select: { id: true, autopilotFocus: true, archetype: true }
+    });
+
+    if (futurePosts.length === 0) return 0;
+
+    // 2. Delete only the ones that match the "stale focus" criteria
+    // We keep generic topic posts (archetype != WEEKLY_FOCUS and no direct focus anchor, which have autopilotFocus = null)
+    const staleIds = futurePosts
+        .filter(p => p.autopilotFocus && p.autopilotFocus !== newFocus)
+        .map(p => p.id);
+
+    if (staleIds.length > 0) {
+        await prisma.post.deleteMany({
+            where: { id: { in: staleIds } }
+        });
+        console.log(`[FocusSync] Deleted ${staleIds.length} stale focus-influenced posts for user=${userId}`);
+        
+        // 3. Trigger maintenance to refill gaps with NEW focus
+        await maintainAutopilotPipeline(userId, true);
+    }
+
+    return staleIds.length;
 }

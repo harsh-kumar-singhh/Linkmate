@@ -136,6 +136,8 @@ model Post {
   updatedAt      DateTime   @updatedAt
   source         String     @default("MANUAL") // "AI", "MANUAL", or "autopilot"
   topic          String?    // Topic used for autopilot generation
+  autopilotFocus String?    // The weekly focus active during generation
+  archetype      String?    // The content archetype used (WEEKLY_FOCUS, OPINION, etc.)
   
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   

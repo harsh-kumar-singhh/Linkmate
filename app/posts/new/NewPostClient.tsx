@@ -455,6 +455,47 @@ function EditorContent() {
         try {
             const response = await fetch(`/api/posts/${postId}`, { method: "DELETE" })
             if (response.ok) {
+                // Update Dashboard Cache
+                queryClient.setQueryData(["dashboard"], (old: any) => {
+                    if (!old) return old;
+
+                    const existingPost = (old?.posts || []).find((p: any) => p.id === postId)
+                    if (!existingPost) return old;
+
+                    const isScheduled = existingPost.status === "SCHEDULED"
+                    const isPublished = existingPost.status === "PUBLISHED"
+
+                    const baseStats = old?.stats || {
+                        postsQueued: 0,
+                        totalPostsPublished: 0,
+                        totalCount: 0,
+                        postingStreak: 0,
+                        aiUsageThisWeek: 0,
+                        consistencyScore: 0
+                    }
+
+                    return {
+                        ...old,
+                        posts: old.posts.filter((p: any) => p.id !== postId),
+                        stats: {
+                            ...baseStats,
+                            postsQueued: Math.max(0, baseStats.postsQueued - (isScheduled ? 1 : 0)),
+                            totalPostsPublished: Math.max(0, baseStats.totalPostsPublished - (isPublished ? 1 : 0)),
+                            totalCount: Math.max(0, baseStats.totalCount - 1),
+                        }
+                    }
+                })
+
+                // Update Calendar/Posts Cache
+                queryClient.setQueryData(["posts"], (old: any) => {
+                    if (!old) return old;
+                    return old.filter((p: any) => p.id !== postId);
+                })
+
+                // Mark both as stale to sync with server in background
+                queryClient.invalidateQueries({ queryKey: ["dashboard"], refetchType: 'none' })
+                queryClient.invalidateQueries({ queryKey: ["posts"], refetchType: 'none' })
+
                 router.push("/dashboard")
             } else {
                 const result = await response.json();

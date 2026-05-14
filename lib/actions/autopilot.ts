@@ -8,6 +8,7 @@ import {
   maintainAutopilotPipeline,
   reconcileAutopilotSchedule,
   refillAfterPublish,
+  syncAutopilotWeeklyFocus,
 } from "@/lib/autopilot/maintenance";
 
 export async function saveAutopilotSettings(data: {
@@ -26,7 +27,7 @@ export async function saveAutopilotSettings(data: {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, plan: true },
+    select: { id: true, plan: true, autopilotCurrentFocus: true },
   });
 
   if (user?.plan?.toUpperCase() !== "PRO") {
@@ -46,6 +47,8 @@ export async function saveAutopilotSettings(data: {
     throw new Error(`Frequency must be between 1 and ${data.days.length}`);
   }
 
+  const focusChanged = user.autopilotCurrentFocus !== data.currentFocus;
+
   await prisma.user.update({
     where: { id: session.user.id },
     data: {
@@ -58,6 +61,10 @@ export async function saveAutopilotSettings(data: {
       autopilotWritingStyleId: data.writingStyleId,
     },
   });
+
+  if (focusChanged && data.currentFocus) {
+    await syncAutopilotWeeklyFocus(session.user.id, data.currentFocus);
+  }
 
   const deletedPostIds = await reconcileAutopilotSchedule(session.user.id, data.days);
   const newPosts = await maintainAutopilotPipeline(session.user.id, true);
