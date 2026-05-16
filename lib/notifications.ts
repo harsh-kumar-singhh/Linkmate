@@ -1,18 +1,26 @@
 import webpush from 'web-push';
 import { prisma } from '@/lib/prisma';
 
-
-// Configure web-push with VAPID keys
+// ============================================================
+// VAPID Configuration
+// ============================================================
 if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
     process.env.VAPID_EMAIL || 'mailto:support@linkmate.com',
     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
     process.env.VAPID_PRIVATE_KEY
   );
+} else {
+  // This will cause push to silently fail. Surface it loudly in dev.
+  console.error(
+    '[NOTIFICATIONS] VAPID keys are missing. Push notifications will NOT work. ' +
+    'Set NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, and VAPID_EMAIL in your env.'
+  );
 }
 
-// Constants removed since all notifications are product-critical
-
+// ============================================================
+// Allowed Events
+// ============================================================
 const ALLOWED_NOTIFICATION_EVENTS = [
   'scheduled_post_published',
   'scheduled_post_failed',
@@ -20,74 +28,71 @@ const ALLOWED_NOTIFICATION_EVENTS = [
   'pro_plan_limit_reached',
   'subscription_payment_failed',
   'subscription_renewed',
-  'trial_or_plan_expiry_warning'
+  'trial_or_plan_expiry_warning',
 ] as const;
 
-// Cleaned up unused high priority types since all notifications are now critical
+type AllowedNotificationEvent = typeof ALLOWED_NOTIFICATION_EVENTS[number];
 
-/**
- * INTELLIGENCE LAYER: Determine if we should send a notification based on behavior
- */
+// ============================================================
+// Intelligence Layer
+// ============================================================
 async function shouldSendNotification(userId: string, type: string): Promise<boolean> {
-  // 0. STRICT FILTER: Only allow approved product events
-  if (!ALLOWED_NOTIFICATION_EVENTS.includes(type as any)) {
-    console.log(`[NOTIFICATIONS] Suppressed ${type} - Not in allowed events list`);
+  if (!ALLOWED_NOTIFICATION_EVENTS.includes(type as AllowedNotificationEvent)) {
+    console.log(`[NOTIFICATIONS] Suppressed ${type} - not in allowed events list`);
     return false;
   }
-
-  // All allowed events are product-critical, so we always send them.
-  // We removed AI Coach messages and non-critical noise to ensure a premium experience.
   return true;
 }
 
-/**
- * INTELLIGENCE LAYER: Determine user segment
- */
 async function getUserSegment(userId: string): Promise<'NEW' | 'CASUAL' | 'POWER'> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
       _count: {
-        select: { posts: { where: { status: 'PUBLISHED' } } }
-      }
-    }
+        select: { posts: { where: { status: 'PUBLISHED' } } },
+      },
+    },
   });
 
   const publishedCount = user?._count.posts || 0;
   let segment: 'NEW' | 'CASUAL' | 'POWER' = 'NEW';
-
   if (publishedCount > 15) segment = 'POWER';
   else if (publishedCount > 3) segment = 'CASUAL';
 
-  // Update segment if it changed
   if (user?.engagementSegment !== segment) {
     await prisma.user.update({
       where: { id: userId },
-      data: { engagementSegment: segment }
+      data: { engagementSegment: segment },
     }).catch(console.error);
   }
 
   return segment;
 }
 
-
-export async function sendPushNotification(userId: string, payload: {
-  title: string;
-  body: string;
-  url?: string;
-  type: string;
-}, bypassIntelligence = false) {
-  
-  // VALIDATION: Ensure only allowed events can EVER create records
-  if (!ALLOWED_NOTIFICATION_EVENTS.includes(payload.type as any)) {
+// ============================================================
+// Core Push Sender
+// ============================================================
+export async function sendPushNotification(
+  userId: string,
+  payload: {
+    title: string;
+    body: string;
+    url?: string;
+    type: string;
+    // Optional: pass a unique tag per post to prevent duplicates
+    tag?: string;
+  },
+  bypassIntelligence = false
+) {
+  // Hard guard: never send unapproved types
+  if (!ALLOWED_NOTIFICATION_EVENTS.includes(payload.type as AllowedNotificationEvent)) {
+    console.warn(`[NOTIFICATIONS] Blocked unapproved type: ${payload.type}`);
     return;
   }
 
   if (!bypassIntelligence) {
     const shouldSend = await shouldSendNotification(userId, payload.type);
     if (!shouldSend) {
-      // Still create an in-app notification even if push is suppressed (silently)
-      // BUT ONLY IF IT IS AN ALLOWED TYPE
       await prisma.notification.create({
         data: {
           userId,
@@ -95,7 +100,7 @@ export async function sendPushNotification(userId: string, payload: {
           body: payload.body,
           link: payload.url,
           type: payload.type,
-          metadata: { suppressedPush: true }
+          metadata: { suppressedPush: true },
         },
       });
       return;
@@ -104,34 +109,76 @@ export async function sendPushNotification(userId: string, payload: {
 
   const segment = await getUserSegment(userId);
 
+  // ============================================================
+  // BUG FIX #1 — Diagnostic: log subscription count.
+  // If this logs 0, that's your root cause. No subscriptions = no push.
+  // You need frontend code that calls navigator.serviceWorker + pushManager.subscribe
+  // and POSTs the subscription to /api/push-subscription (see note below).
+  // ============================================================
   const subscriptions = await prisma.pushSubscription.findMany({
     where: { userId },
   });
 
-  const notifications = subscriptions.map(async (sub) => {
-    try {
-      await webpush.sendNotification(
-        {
-          endpoint: sub.endpoint,
-          keys: {
-            p256dh: sub.p256dh,
-            auth: sub.auth,
-          },
-        },
-        JSON.stringify(payload)
-      );
-    } catch (error: any) {
-      console.error('Error sending push notification:', error);
-      if (error.statusCode === 410 || error.statusCode === 404) {
-        // Subscription has expired or is no longer valid
-        await prisma.pushSubscription.delete({
-          where: { id: sub.id },
-        });
-      }
-    }
+  console.log(`[NOTIFICATIONS] Found ${subscriptions.length} push subscription(s) for user ${userId}`);
+
+  if (subscriptions.length === 0) {
+    console.warn(
+      `[NOTIFICATIONS] No push subscriptions for user ${userId}. ` +
+      'Push will NOT be delivered. In-app record will still be created. ' +
+      'Check that the frontend is registering the service worker and storing subscriptions.'
+    );
+  }
+
+  // Build the push payload — this is what sw.js receives as event.data.json()
+  const pushPayload = JSON.stringify({
+    title: payload.title,
+    body: payload.body,
+    url: payload.url || '/dashboard',
+    type: payload.type,
+    // Use a unique tag per notification to allow renotify while preventing true duplicates
+    tag: payload.tag || payload.type,
   });
 
-  // Create in-app notification record
+  // Send to all registered devices in parallel
+  const pushResults = await Promise.allSettled(
+    subscriptions.map(async (sub) => {
+      try {
+        await webpush.sendNotification(
+          {
+            endpoint: sub.endpoint,
+            keys: {
+              p256dh: sub.p256dh,
+              auth: sub.auth,
+            },
+          },
+          pushPayload
+        );
+        console.log(`[NOTIFICATIONS] Push sent to endpoint: ${sub.endpoint.slice(0, 50)}...`);
+      } catch (error: any) {
+        console.error(`[NOTIFICATIONS] webpush.sendNotification failed for sub ${sub.id}:`, {
+          statusCode: error.statusCode,
+          message: error.message,
+          endpoint: sub.endpoint.slice(0, 50),
+        });
+
+        // 410 Gone or 404 = subscription is dead. Clean it up.
+        if (error.statusCode === 410 || error.statusCode === 404) {
+          await prisma.pushSubscription.delete({ where: { id: sub.id } }).catch(console.error);
+          console.log(`[NOTIFICATIONS] Deleted stale subscription ${sub.id}`);
+        }
+
+        // Re-throw so Promise.allSettled captures the rejection
+        throw error;
+      }
+    })
+  );
+
+  // Log summary
+  const sent = pushResults.filter((r) => r.status === 'fulfilled').length;
+  const failed = pushResults.filter((r) => r.status === 'rejected').length;
+  console.log(`[NOTIFICATIONS] Push delivery summary: ${sent} sent, ${failed} failed out of ${subscriptions.length} subscriptions`);
+
+  // Always create in-app notification record, regardless of push delivery outcome
   await prisma.notification.create({
     data: {
       userId,
@@ -139,66 +186,98 @@ export async function sendPushNotification(userId: string, payload: {
       body: payload.body,
       link: payload.url,
       type: payload.type,
-      metadata: { segment }
+      metadata: { segment, pushSent: sent, pushFailed: failed },
     },
   });
-
-  await Promise.all(notifications);
 }
 
-export async function triggerPostPublishedNotification(userId: string, postContent: string, postId: string) {
+// ============================================================
+// Trigger Helpers
+// ============================================================
+export async function triggerPostPublishedNotification(
+  userId: string,
+  postContent: string,
+  postId: string
+) {
   const snippet = postContent.length > 50 ? postContent.substring(0, 47) + '...' : postContent;
   const segment = await getUserSegment(userId);
-  
+
   let title = 'Post Published! 🚀';
-  let body = `Your post "${snippet}" is now live.`;
+  let body = `Your post "${snippet}" is now live on LinkedIn.`;
 
   if (segment === 'NEW') {
     title = 'First Wins! 🎉';
-    body = `Great job publishing: "${snippet}".`;
+    body = `Great job publishing: "${snippet}". Keep the momentum going!`;
   }
 
-  await sendPushNotification(userId, {
-    title,
-    body,
-    url: '/dashboard',
-    type: 'scheduled_post_published',
-  }, true); 
+  await sendPushNotification(
+    userId,
+    {
+      title,
+      body,
+      url: '/dashboard',
+      type: 'scheduled_post_published',
+      // Use postId as the tag so each post gets its own notification (no collapsing)
+      tag: `post-published-${postId}`,
+    },
+    true // bypass intelligence — post publish is always high-value
+  );
 }
 
-export async function triggerInactivityReminder(userId: string) {
-  // REMOVED: Generic reminders are no longer sent
-  return;
-}
+export async function triggerPostFailedNotification(
+  userId: string,
+  postContent: string,
+  postId: string
+) {
+  const snippet = postContent.length > 50 ? postContent.substring(0, 47) + '...' : postContent;
 
-export async function triggerAICoachFollowUp(userId: string, message: string) {
-  // REMOVED: AI Coach messages must never appear in notifications
-  return;
+  await sendPushNotification(
+    userId,
+    {
+      title: 'Post Failed to Publish ⚠️',
+      body: `"${snippet}" could not be published. Tap to review.`,
+      url: `/dashboard`,
+      type: 'scheduled_post_failed',
+      tag: `post-failed-${postId}`,
+    },
+    true
+  );
 }
 
 export async function triggerUpgradePrompt(userId: string, feature: string) {
-  await sendPushNotification(userId, {
-    title: 'Limit Reached ✨',
-    body: `Upgrade to Pro to continue using ${feature} without limits.`,
-    url: '/upgrade',
-    type: 'pro_plan_limit_reached',
-  }, true); 
+  await sendPushNotification(
+    userId,
+    {
+      title: 'Limit Reached ✨',
+      body: `Upgrade to Pro to continue using ${feature} without limits.`,
+      url: '/upgrade',
+      type: 'pro_plan_limit_reached',
+    },
+    true
+  );
 }
 
-/**
- * Cleanup notifications older than 2 days
- */
+// ============================================================
+// Deprecated stubs — kept to avoid import errors
+// ============================================================
+export async function triggerInactivityReminder(_userId: string) {
+  return; // Intentionally removed
+}
+
+export async function triggerAICoachFollowUp(_userId: string, _message: string) {
+  return; // Intentionally removed
+}
+
+// ============================================================
+// Cleanup
+// ============================================================
 export async function cleanupOldNotifications() {
   const twoDaysAgo = new Date();
   twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
 
   try {
     const deleted = await prisma.notification.deleteMany({
-      where: {
-        createdAt: {
-          lt: twoDaysAgo
-        }
-      }
+      where: { createdAt: { lt: twoDaysAgo } },
     });
     if (deleted.count > 0) {
       console.log(`[NOTIFICATIONS] Cleaned up ${deleted.count} old notifications.`);
@@ -209,4 +288,3 @@ export async function cleanupOldNotifications() {
     return 0;
   }
 }
-
