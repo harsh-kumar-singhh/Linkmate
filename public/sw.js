@@ -4,9 +4,10 @@ self.addEventListener('push', function (event) {
       const data = event.data.json();
       const options = {
         body: data.body,
-        icon: '/icon-192x192.png', // Fallback to a generic icon if possible
-        badge: '/badge-72x72.png',
+        icon: '/logo.png', // Changed from non-existent /icon-192x192.png
+        badge: '/logo.png', // Changed from non-existent /badge-72x72.png
         vibrate: [100, 50, 100],
+        tag: data.type || 'linkmate-notification', // Prevent duplicates
         data: {
           url: data.url || '/',
         },
@@ -19,8 +20,10 @@ self.addEventListener('push', function (event) {
     } catch (e) {
       console.error('Error parsing push data:', e);
       event.waitUntil(
-        self.registration.showNotification('New Notification', {
+        self.registration.showNotification('Linkmate Update', {
           body: event.data.text(),
+          icon: '/logo.png',
+          badge: '/logo.png',
         })
       );
     }
@@ -30,7 +33,8 @@ self.addEventListener('push', function (event) {
 self.addEventListener('notificationclick', function (event) {
   event.notification.close();
   
-  const urlToOpen = event.notification.data.url || '/';
+  // Ensure the URL is absolute so it matches client.url properly
+  const urlToOpen = new URL(event.notification.data.url || '/', self.location.origin).href;
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clientList) {

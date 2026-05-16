@@ -1,6 +1,6 @@
 import webpush from 'web-push';
 import { prisma } from '@/lib/prisma';
-import { startOfDay } from 'date-fns';
+
 
 // Configure web-push with VAPID keys
 if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -11,8 +11,7 @@ if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   );
 }
 
-const MAX_NOTIFICATIONS_PER_DAY = 3;
-const COOLDOWN_HOURS = 4;
+// Constants removed since all notifications are product-critical
 
 const ALLOWED_NOTIFICATION_EVENTS = [
   'scheduled_post_published',
@@ -24,12 +23,7 @@ const ALLOWED_NOTIFICATION_EVENTS = [
   'trial_or_plan_expiry_warning'
 ] as const;
 
-const HIGH_PRIORITY_TYPES = [
-  'scheduled_post_published',
-  'scheduled_post_failed',
-  'pro_plan_limit_reached',
-  'subscription_payment_failed'
-];
+// Cleaned up unused high priority types since all notifications are now critical
 
 /**
  * INTELLIGENCE LAYER: Determine if we should send a notification based on behavior
@@ -41,68 +35,8 @@ async function shouldSendNotification(userId: string, type: string): Promise<boo
     return false;
   }
 
-  // Always send high priority notifications
-  if (HIGH_PRIORITY_TYPES.includes(type)) return true;
-
-  const today = startOfDay(new Date());
-
-  // 1. Check daily limit
-  const todayCount = await prisma.notification.count({
-    where: {
-      userId,
-      createdAt: { gte: today },
-    },
-  });
-
-  if (todayCount >= MAX_NOTIFICATIONS_PER_DAY) {
-    console.log(`[NOTIFICATIONS] Suppressed ${type} for user ${userId} - Daily limit reached`);
-    return false;
-  }
-
-  // 2. Check cooldown period
-  const lastNotification = await prisma.notification.findFirst({
-    where: { userId },
-    orderBy: { createdAt: 'desc' },
-  });
-
-  if (lastNotification) {
-    const hoursSinceLast = (Date.now() - lastNotification.createdAt.getTime()) / (1000 * 60 * 60);
-    if (hoursSinceLast < COOLDOWN_HOURS) {
-      console.log(`[NOTIFICATIONS] Suppressed ${type} for user ${userId} - In cooldown (${hoursSinceLast.toFixed(1)}h)`);
-      return false;
-    }
-  }
-
-  // 3. Check if user is currently active (suppress push if active in last 15 mins)
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { lastActiveAt: true },
-  });
-
-  if (user?.lastActiveAt) {
-    const minsSinceActive = (Date.now() - user.lastActiveAt.getTime()) / (1000 * 60);
-    if (minsSinceActive < 15) {
-       console.log(`[NOTIFICATIONS] Suppressed ${type} for user ${userId} - User is active`);
-       return false;
-    }
-  }
-
-  // 4. Performance Tracking: Check for repeatedly ignored notification types
-  const recentSameTypeNotifications = await prisma.notification.findMany({
-    where: { userId, type },
-    orderBy: { createdAt: 'desc' },
-    take: 3,
-  });
-
-  // If the last 3 notifications of this type were ignored (not clicked), suppress it to reduce spam
-  if (recentSameTypeNotifications.length >= 3) {
-    const allIgnored = recentSameTypeNotifications.every(n => !n.clicked);
-    if (allIgnored) {
-       console.log(`[NOTIFICATIONS] Suppressed ${type} for user ${userId} - Type frequently ignored`);
-       return false;
-    }
-  }
-
+  // All allowed events are product-critical, so we always send them.
+  // We removed AI Coach messages and non-critical noise to ensure a premium experience.
   return true;
 }
 

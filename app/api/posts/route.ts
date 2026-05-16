@@ -103,6 +103,14 @@ export async function POST(req: Request) {
             linkedinPostId: result.linkedinPostId,
           }
         }));
+
+        // Trigger push notification for manual publish
+        const { triggerPostPublishedNotification } = await import('@/lib/notifications');
+        try {
+            await triggerPostPublishedNotification(user.id, content, post.id);
+        } catch (notifyError) {
+            console.error("Failed to notify user for manual publish:", notifyError);
+        }
       } catch (error: any) {
         console.error("LinkedIn publishing failed:", error);
         
