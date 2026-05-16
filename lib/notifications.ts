@@ -29,6 +29,7 @@ const ALLOWED_NOTIFICATION_EVENTS = [
   'subscription_payment_failed',
   'subscription_renewed',
   'trial_or_plan_expiry_warning',
+  'draft_saved',
 ] as const;
 
 type AllowedNotificationEvent = typeof ALLOWED_NOTIFICATION_EVENTS[number];
@@ -239,6 +240,26 @@ export async function triggerPostFailedNotification(
       url: `/dashboard`,
       type: 'scheduled_post_failed',
       tag: `post-failed-${postId}`,
+    },
+    true
+  );
+}
+
+export async function triggerDraftSavedNotification(
+  userId: string,
+  postContent: string,
+  postId: string
+) {
+  const snippet = postContent.length > 50 ? postContent.substring(0, 47) + '...' : postContent;
+
+  await sendPushNotification(
+    userId,
+    {
+      title: 'Draft Saved 📝',
+      body: `Your draft "${snippet}" has been saved safely.`,
+      url: `/dashboard`,
+      type: 'draft_saved',
+      tag: `draft-saved-${postId}`,
     },
     true
   );

@@ -176,6 +176,11 @@ export async function POST(req: Request) {
           { status: 500 }
         );
       }
+    } else if (status === "DRAFT" || !status) {
+      const { triggerDraftSavedNotification } = await import("@/lib/notifications");
+      triggerDraftSavedNotification(user.id, content, post.id).catch((notifyError) => {
+        console.error("[POSTS] Push notification failed for saving draft:", notifyError);
+      });
     }
 
     // Invalidate dashboard cache for this user
