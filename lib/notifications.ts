@@ -4,18 +4,31 @@ import { prisma } from '@/lib/prisma';
 // ============================================================
 // VAPID Configuration
 // ============================================================
-if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-  webpush.setVapidDetails(
-    process.env.VAPID_EMAIL || 'mailto:support@linkmate.com',
-    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY
-  );
-} else {
-  // This will cause push to silently fail. Surface it loudly in dev.
-  console.error(
-    '[NOTIFICATIONS] VAPID keys are missing. Push notifications will NOT work. ' +
-    'Set NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, and VAPID_EMAIL in your env.'
-  );
+let vapidInitialized = false;
+
+function initVapid() {
+  if (vapidInitialized) return;
+
+  const pubKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || process.env.VAPID_PUBLIC_KEY;
+  const privKey = process.env.VAPID_PRIVATE_KEY;
+  let email = process.env.VAPID_EMAIL || 'mailto:support@linkmate.com';
+
+  // Auto-fix missing mailto: prefix
+  if (email && !email.startsWith('mailto:') && !email.startsWith('https://')) {
+    email = `mailto:${email}`;
+  }
+
+  if (pubKey && privKey) {
+    webpush.setVapidDetails(email, pubKey, privKey);
+    vapidInitialized = true;
+  } else {
+    // Explicit diagnostic logging to pinpoint exactly which key is missing
+    console.error(
+      `[NOTIFICATIONS] VAPID keys are missing in this environment runtime! ` +
+      `NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ? '✅ PRESENT' : '❌ MISSING'} | ` +
+      `VAPID_PRIVATE_KEY: ${process.env.VAPID_PRIVATE_KEY ? '✅ PRESENT' : '❌ MISSING'}`
+    );
+  }
 }
 
 // ============================================================
@@ -85,6 +98,9 @@ export async function sendPushNotification(
   },
   bypassIntelligence = false
 ) {
+  // Ensure VAPID keys are set
+  initVapid();
+
   // Hard guard: never send unapproved types
   if (!ALLOWED_NOTIFICATION_EVENTS.includes(payload.type as AllowedNotificationEvent)) {
     console.warn(`[NOTIFICATIONS] Blocked unapproved type: ${payload.type}`);

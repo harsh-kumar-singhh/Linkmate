@@ -5,13 +5,22 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 export const prisma = (() => {
-  const instance = globalForPrisma.prisma ?? new PrismaClient({ log: ["error"] });
+  // Fix P2024 connection timeout by overriding the hardcoded connection_limit=1 from Vercel
+  const dbUrl = process.env.DATABASE_URL?.replace("connection_limit=1", "connection_limit=5");
+  
+  const instance = globalForPrisma.prisma ?? new PrismaClient({ 
+    log: ["error"],
+    ...(dbUrl ? { datasources: { db: { url: dbUrl } } } : {})
+  });
   
   // ROBUSTNESS: If new models were added but the singleton is stale, force re-instantiation
   if (process.env.NODE_ENV !== "production") {
     if (!(instance as any).chatSession && (instance as any).user) {
       console.log("[PRISMA] Stale client detected (missing models). Re-instantiating...");
-      return new PrismaClient({ log: ["error"] });
+      return new PrismaClient({ 
+        log: ["error"],
+        ...(dbUrl ? { datasources: { db: { url: dbUrl } } } : {})
+      });
     }
   }
   
