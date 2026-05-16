@@ -28,20 +28,16 @@ self.addEventListener('push', function (event) {
       self.registration.showNotification('Linkmate Update', {
         body: event.data.text(),
         icon: '/logo.png',
-        badge: '/badge-72x72.png',
         tag: 'linkmate-fallback',
       })
     );
     return;
   }
 
-  // BUG FIX #2: badge must be a small monochrome icon, NOT the full logo.
-  // Make sure /badge-72x72.png exists in your /public folder.
-  // It should be a 72x72 white-on-transparent monochrome version of your logo.
+  // Fallback to default app icon by omitting 'badge' if a valid monochrome badge is missing.
   const options = {
     body: data.body || '',
     icon: '/logo.png',
-    badge: '/badge-72x72.png',
     vibrate: [100, 50, 100],
     // tag: prevents duplicate notifications for the same type.
     // If you want one notification per post, use the postId in the tag.

@@ -172,16 +172,18 @@ export async function sendPushNotification(
         );
         console.log(`[NOTIFICATIONS] Push sent to endpoint: ${sub.endpoint.slice(0, 50)}...`);
       } catch (error: any) {
-        console.error(`[NOTIFICATIONS] webpush.sendNotification failed for sub ${sub.id}:`, {
-          statusCode: error.statusCode,
-          message: error.message,
-          endpoint: sub.endpoint.slice(0, 50),
-        });
-
         // 410 Gone or 404 = subscription is dead. Clean it up.
         if (error.statusCode === 410 || error.statusCode === 404) {
-          await prisma.pushSubscription.delete({ where: { id: sub.id } }).catch(console.error);
-          console.log(`[NOTIFICATIONS] Deleted stale subscription ${sub.id}`);
+          await prisma.pushSubscription.delete({ where: { id: sub.id } }).catch(e => 
+            console.error('[NOTIFICATIONS] Failed to delete stale subscription:', e)
+          );
+          console.log(`[NOTIFICATIONS] 🧹 Cleaned up expired/stale subscription ${sub.id}`);
+        } else {
+          console.error(`[NOTIFICATIONS] 🚨 webpush.sendNotification failed for sub ${sub.id}:`, {
+            statusCode: error.statusCode,
+            message: error.message,
+            endpoint: sub.endpoint.slice(0, 50),
+          });
         }
 
         // Re-throw so Promise.allSettled captures the rejection
