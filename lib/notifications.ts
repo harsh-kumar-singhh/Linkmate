@@ -168,7 +168,13 @@ export async function sendPushNotification(
               auth: sub.auth,
             },
           },
-          pushPayload
+          pushPayload,
+          {
+            TTL: 86400,
+            headers: {
+              Urgency: 'high',
+            },
+          }
         );
         console.log(`[NOTIFICATIONS] Push sent to endpoint: ${sub.endpoint.slice(0, 50)}...`);
       } catch (error: any) {

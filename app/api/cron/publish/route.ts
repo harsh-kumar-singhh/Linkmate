@@ -7,7 +7,7 @@ import { publishToLinkedIn } from "@/lib/linkedin";
 import { maintainAutopilotPipeline } from "@/lib/autopilot/maintenance";
 import { triggerPostPublishedNotification, sendPushNotification, cleanupOldNotifications } from "@/lib/notifications";
 
-export async function POST(req: Request) {
+async function handleCron(req: Request) {
     const now = new Date();
     const nowUTC = now.toISOString();
 
@@ -183,4 +183,12 @@ export async function POST(req: Request) {
             timestamp: nowUTC
         }, { status: 200 });
     }
+}
+
+export async function GET(req: Request) {
+    return handleCron(req);
+}
+
+export async function POST(req: Request) {
+    return handleCron(req);
 }

@@ -91,6 +91,18 @@ export async function PUT(
             } as any,
         });
 
+        // Trigger push notification if published manually via PUT
+        if (status === "PUBLISHED") {
+            try {
+                const { triggerPostPublishedNotification } = await import("@/lib/notifications");
+                triggerPostPublishedNotification(session.user.id, content, post.id).catch((notifyError) => {
+                    console.error("[POSTS] Push notification failed for manual publish (PUT):", notifyError);
+                });
+            } catch (importError) {
+                console.error("[POSTS] Failed to import notifications module:", importError);
+            }
+        }
+
         // Bust cache
         const userId = session.user.id;
         revalidateTag(`dashboard:${userId}`);
