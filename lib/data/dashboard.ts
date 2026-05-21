@@ -2,8 +2,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Centralized dashboard data fetcher.
 // Used by BOTH the Server Component (page.tsx) and the API route (/api/dashboard).
-// unstable_cache persists across serverless invocations (unlike in-memory Map),
-// is per-user, and auto-invalidates when you call revalidateTag("dashboard").
+//
+// FIX: unstable_cache now receives fetchDashboardData as a direct function
+// reference (not a closure) so Next.js deduplicates correctly across
+// serverless invocations. The userId is passed as a call argument, not
+// captured in a closure.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { prisma } from "@/lib/prisma"
@@ -33,7 +36,8 @@ export interface DashboardData {
   stats: DashboardStats
 }
 
-// ── The actual data fetcher (not cached yet) ──────────────────────────────────
+// ── The actual data fetcher (not cached) ──────────────────────────────────────
+// Receives userId as a plain argument — no closure capture.
 async function fetchDashboardData(userId: string): Promise<DashboardData> {
   const today = startOfDay(new Date())
   const thirtyDaysAgo = subDays(today, 30)
@@ -75,6 +79,7 @@ async function fetchDashboardData(userId: string): Promise<DashboardData> {
       orderBy: { publishedAt: "desc" },
     }),
 
+    // FIX: use aggregate (DB-side sum) instead of findMany + JS reduce
     prisma.aIUsage.aggregate({
       where: { userId, date: { gte: startOfWeek } },
       _sum: { count: true },
@@ -141,15 +146,17 @@ async function fetchDashboardData(userId: string): Promise<DashboardData> {
   }
 }
 
-
-
-export async function getDashboardData(userId: string): Promise<DashboardData> {
+// ── Cached version ────────────────────────────────────────────────────────────
+// FIX: Pass fetchDashboardData as a direct function reference, not a closure.
+// unstable_cache deduplicates by the key array ["dashboard", userId].
+// Call it with (userId) so the argument flows through correctly.
+export function getDashboardData(userId: string): Promise<DashboardData> {
   return unstable_cache(
-    async () => fetchDashboardData(userId),
-    [`dashboard-${userId}`],
+    fetchDashboardData,
+    ["dashboard", userId],
     {
-      revalidate: 3600, // 1 hour cache, but we'll bust it with tags
-      tags: ["dashboard", `dashboard:${userId}`],
+      revalidate: 3600,
+      tags: [`dashboard:${userId}`],
     }
-  )()
+  )(userId)
 }

@@ -2,8 +2,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // All DB queries run in parallel via Promise.all.
 // Result is cached with unstable_cache — survives serverless cold starts.
-// Cache busted by calling revalidateTag("activity") or revalidateTag(`activity:${userId}`)
-// from any route that creates/updates/deletes a post or AI usage record.
+//
+// FIXES:
+// 1. unstable_cache now uses direct function reference, not a closure.
+// 2. aiUsage switched from findMany + JS reduce → aggregate (DB-side sum).
+// 3. Cache key is ["activity", userId] — deterministic, per-user.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { unstable_cache } from "next/cache"
@@ -29,6 +32,7 @@ export interface ActivityData {
 }
 
 // ── Raw fetcher (not cached) ──────────────────────────────────────────────────
+// Receives userId as a plain argument — no closure capture.
 async function fetchActivityData(userId: string): Promise<ActivityData> {
   const today = new Date()
   today.setUTCHours(0, 0, 0, 0)
@@ -68,10 +72,11 @@ async function fetchActivityData(userId: string): Promise<ActivityData> {
       orderBy: { publishedAt: "desc" },
     }),
 
-    // AI usage this week
-    prisma.aIUsage.findMany({
+    // FIX: aggregate pushes the sum to the DB instead of loading all rows
+    // into memory and reducing in JS (findMany was wrong here)
+    prisma.aIUsage.aggregate({
       where: { userId, date: { gte: startOfWeek } },
-      select: { count: true },
+      _sum: { count: true },
     }),
   ])
 
@@ -133,7 +138,9 @@ async function fetchActivityData(userId: string): Promise<ActivityData> {
 
   // ── Averages ───────────────────────────────────────────────────────────────
   const avgPostsPerWeek = ((recentPosts.length / 30) * 7).toFixed(1)
-  const aiUsageThisWeek = aiUsage.reduce((sum, u) => sum + u.count, 0)
+
+  // FIX: read from aggregate result, not reduce
+  const aiUsageThisWeek = aiUsage._sum.count ?? 0
 
   return {
     stats: {
@@ -150,16 +157,15 @@ async function fetchActivityData(userId: string): Promise<ActivityData> {
 }
 
 // ── Cached version ────────────────────────────────────────────────────────────
-// unstable_cache uses Next.js Data Cache — persists across serverless cold starts.
-// Call revalidateTag("activity") or revalidateTag(`activity:${userId}`)
-// from post create/update/delete routes to bust this cache.
+// FIX: Direct function reference (not a closure). Key is ["activity", userId].
+// Call revalidateTag(`activity:${userId}`) from post create/update/delete routes.
 export function getActivityData(userId: string): Promise<ActivityData> {
   return unstable_cache(
-    () => fetchActivityData(userId),
-    [`activity-data-${userId}`],
+    fetchActivityData,
+    ["activity", userId],
     {
       revalidate: 60,
-      tags: ["activity", `activity:${userId}`],
+      tags: [`activity:${userId}`],
     }
-  )()
+  )(userId)
 }

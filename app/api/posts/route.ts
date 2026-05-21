@@ -185,7 +185,6 @@ export async function POST(req: Request) {
 
     // Invalidate dashboard cache for this user
     revalidateTag(`dashboard:${user.id}`);
-    revalidateTag("dashboard");
     revalidatePath("/dashboard");
     dashboardCache.delete(`dashboard:${user.id}`);
 

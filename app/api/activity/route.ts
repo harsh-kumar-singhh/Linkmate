@@ -47,7 +47,6 @@ export async function POST() {
     }
 
     revalidateTag(`activity:${session.user.id}`)
-    revalidateTag("activity")
 
     return NextResponse.json({ success: true, message: "Cache invalidated" })
   } catch (error: any) {

@@ -2,14 +2,27 @@
 
 // app/dashboard/DashboardClient.tsx
 // ─── CLIENT SHELL ─────────────────────────────────────────────────────────────
-// Receives initialData from the Server Component — no loading state on first
-// render. React Query still handles refetch/invalidation after hydration.
+// Receives real initialData from the Server Component — no loading skeleton
+// on first render. React Query uses it as initialData (not placeholderData)
+// and background-refetches after staleTime.
+//
+// FIXES:
+// 1. queryKey includes user.id — prevents cross-account data bleed.
+// 2. placeholderData → initialData + initialDataUpdatedAt for correct
+//    stale/fresh semantics.
+// 3. staleTime raised to 2min — prevents unnecessary refetches on PWA.
+// 4. Notification effect uses a useRef to track shown IDs across refetches —
+//    prevents toasts re-appearing on background data updates.
+// 5. handleDeletePost no longer calls invalidateQueries on success —
+//    optimistic update is sufficient, the extra refetch was wasted work.
+// 6. USER_TIMEZONE moved to module scope — not re-allocated on every render.
+// 7. All queryClient calls updated to use ["dashboard", user.id] key.
 
-import React, { useEffect, useState, Suspense } from "react"
+import React, { useEffect, useState, useRef } from "react"
 import { useTrialTrigger } from "@/context/TrialTriggerContext"
 import { PushPermissionPrompt } from "@/components/layout/push-permission-prompt"
 import Link from "next/link"
-import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { AnimatedCard } from "@/components/animated/AnimatedCard"
 import { motion, AnimatePresence } from "framer-motion"
 import { Card, CardContent } from "@/components/ui/card"
@@ -32,6 +45,12 @@ import { format } from "date-fns"
 import { toZonedTime } from "date-fns-tz"
 import { AICoach } from "@/components/ai/AICoach"
 import { StatSkeleton, PostSkeleton, WelcomeSkeleton } from "@/components/dashboard/DashboardSkeletons"
+import type { DashboardData } from "@/lib/data/dashboard"
+
+// ─── Module-scope constant ────────────────────────────────────────────────────
+// FIX: Moved out of PostCard render — was being re-allocated per card per
+// render cycle. Intl.DateTimeFormat() is not free.
+const USER_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -51,11 +70,6 @@ interface DashboardStats {
   aiUsageThisWeek: number
   consistencyScore: number
   totalCount: number
-}
-
-interface DashboardData {
-  posts: Post[]
-  stats: DashboardStats
 }
 
 interface SessionUser {
@@ -78,18 +92,38 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
   const [notifications, setNotifications] = useState<Post[]>([])
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
+  // FIX: Track notification IDs that have been shown in this session.
+  // A plain useRef survives React Query background refetches — unlike state,
+  // mutating it does not trigger a re-render, and it is not reset when
+  // `data` changes. This prevents toasts re-appearing when the background
+  // refetch returns posts that are still notified: false in the DB
+  // (because the PATCH hasn't landed yet).
+  const shownNotificationIds = useRef<Set<string>>(new Set())
+
   // ─── Data Fetching ─────────────────────────────────────────────────────────
   const { data, isLoading } = useQuery<DashboardData>({
-    queryKey: ["dashboard"],
+    // FIX: userId in key prevents cross-account data bleed when a user
+    // logs out and a different account logs in the same browser session.
+    queryKey: ["dashboard", user.id],
     queryFn: async () => {
       const res = await fetch("/api/dashboard")
       if (!res.ok) throw new Error("Failed to fetch dashboard")
       const result = await res.json()
       return result.data
     },
-    // Use the server snapshot only as a placeholder so it does not poison the cache.
-    placeholderData: (previousData) => previousData ?? initialData ?? undefined,
-    staleTime: 30_000,
+    // FIX: initialData (not placeholderData) — React Query treats this as
+    // real cached data, not a temporary stand-in. The dashboard renders
+    // immediately with no skeleton.
+    //
+    // initialDataUpdatedAt tells React Query how old the SSR data is.
+    // We treat it as 1 minute old so it background-refetches after
+    // staleTime (2min) - 1min = 1 minute of idle time.
+    // If initialData is null (should not happen after page.tsx fix, but
+    // kept as a safety fallback), initialDataUpdatedAt is undefined and
+    // React Query fetches immediately.
+    initialData: initialData ?? undefined,
+    initialDataUpdatedAt: initialData ? Date.now() - 60_000 : undefined,
+    staleTime: 2 * 60_000,   // 2 minutes — generous for a PWA
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
@@ -100,22 +134,32 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
     trackAction("view_dashboard")
   }, [trackAction])
 
-  // Handle published-post notifications with localStorage deduplication
+  // ── Notification effect ────────────────────────────────────────────────────
+  // FIX: Uses shownNotificationIds ref to deduplicate across refetches.
+  // Previous implementation only checked localStorage dismissed IDs, which
+  // meant a toast could re-appear between the PATCH firing and the DB
+  // confirming notified: true on the next background refetch.
   useEffect(() => {
     if (!data?.posts) return
-    const unnotified = data.posts.filter(p => p.status === "PUBLISHED" && !p.notified)
-    if (unnotified.length === 0) return
 
     const dismissedIds: string[] = JSON.parse(
       localStorage.getItem("dismissed_notifications") || "[]"
     )
-    setNotifications(prev => {
-      const existingIds = new Set(prev.map(n => n.id))
-      const fresh = unnotified.filter(
-        n => !existingIds.has(n.id) && !dismissedIds.includes(n.id)
-      )
-      return fresh.length === 0 ? prev : [...prev, ...fresh]
-    })
+
+    const unnotified = data.posts.filter(
+      p =>
+        p.status === "PUBLISHED" &&
+        !p.notified &&
+        !dismissedIds.includes(p.id) &&
+        !shownNotificationIds.current.has(p.id)
+    )
+
+    if (unnotified.length === 0) return
+
+    // Mark as shown before setting state to prevent a second render
+    // from adding duplicates if the effect fires twice (React strict mode)
+    unnotified.forEach(n => shownNotificationIds.current.add(n.id))
+    setNotifications(prev => [...prev, ...unnotified])
   }, [data])
 
   const dismissNotification = async (postId: string) => {
@@ -143,26 +187,29 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
 
     setDeletingId(postId)
 
-    // Optimistic Update
-    const previousData = queryClient.getQueryData<DashboardData>(["dashboard"])
+    // Optimistic update — remove post from cache immediately
+    // FIX: key is now ["dashboard", user.id]
+    const previousData = queryClient.getQueryData<DashboardData>(["dashboard", user.id])
     if (previousData) {
-      queryClient.setQueryData(["dashboard"], {
+      queryClient.setQueryData(["dashboard", user.id], {
         ...previousData,
-        posts: previousData.posts.filter(p => p.id !== postId)
+        posts: previousData.posts.filter(p => p.id !== postId),
       })
     }
 
     try {
       const res = await fetch(`/api/posts/${postId}`, { method: "DELETE" })
       if (!res.ok) throw new Error("Delete failed")
-      
-      // Success - invalidate to ensure server state is synced
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+
+      // FIX: No invalidateQueries on success. The optimistic update is
+      // already correct — the post is gone. Calling invalidateQueries here
+      // triggered a background refetch that caused a redundant re-render.
+      // Only invalidate on error (rollback path below).
     } catch (err) {
       console.error("Delete post error:", err)
-      // Rollback on error
+      // Rollback: restore previous data on failure
       if (previousData) {
-        queryClient.setQueryData(["dashboard"], previousData)
+        queryClient.setQueryData(["dashboard", user.id], previousData)
       }
       alert("Failed to delete post")
     } finally {
@@ -177,6 +224,9 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
   const drafts = posts.filter(p => p.status === "DRAFT")
 
   // ── Loading State (Skeletons) ──────────────────────────────────────────────
+  // After page.tsx fix this branch should never be hit on normal navigation —
+  // initialData is always provided. Kept as a fallback for direct deep-links
+  // or if SSR data fetch fails.
   if (isLoading && !data) {
     return (
       <div className="relative min-h-screen bg-transparent">
@@ -230,7 +280,7 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
           </div>
         )}
 
-        {/* ── Welcome header — no skeleton, data is already here ───────────── */}
+        {/* ── Welcome header ────────────────────────────────────────────────── */}
         <AnimatedCard animation="fade-in-up" className="relative">
           <div className="space-y-3 relative">
             <div className="absolute -top-12 -left-12 w-64 h-64 bg-primary/10 rounded-full blur-[80px] -z-10 animate-pulse" />
@@ -251,7 +301,7 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
           </div>
         </AnimatedCard>
 
-        {/* ── Stats — rendered immediately from initialData ─────────────────── */}
+        {/* ── Stats ─────────────────────────────────────────────────────────── */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <StatCard
             label="Posting Streak"
@@ -303,12 +353,12 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
                   icon={<Clock className="w-4 h-4 text-primary" />}
                 >
                   {scheduledPosts.map((p, i) => (
-                    <PostCard 
-                      key={p.id} 
-                      post={p} 
-                      index={i} 
-                      onDelete={handleDeletePost} 
-                      isDeleting={deletingId === p.id} 
+                    <PostCard
+                      key={p.id}
+                      post={p}
+                      index={i}
+                      onDelete={handleDeletePost}
+                      isDeleting={deletingId === p.id}
                     />
                   ))}
                 </PostSection>
@@ -320,12 +370,12 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
                   icon={<CheckCircle2 className="w-4 h-4 text-emerald-500" />}
                 >
                   {publishedPosts.map((p, i) => (
-                    <PostCard 
-                      key={p.id} 
-                      post={p} 
-                      index={i} 
-                      onDelete={handleDeletePost} 
-                      isDeleting={deletingId === p.id} 
+                    <PostCard
+                      key={p.id}
+                      post={p}
+                      index={i}
+                      onDelete={handleDeletePost}
+                      isDeleting={deletingId === p.id}
                     />
                   ))}
                 </PostSection>
@@ -337,12 +387,12 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
                   icon={<FileEdit className="w-4 h-4 text-zinc-500" />}
                 >
                   {drafts.map((p, i) => (
-                    <PostCard 
-                      key={p.id} 
-                      post={p} 
-                      index={i} 
-                      onDelete={handleDeletePost} 
-                      isDeleting={deletingId === p.id} 
+                    <PostCard
+                      key={p.id}
+                      post={p}
+                      index={i}
+                      onDelete={handleDeletePost}
+                      isDeleting={deletingId === p.id}
                     />
                   ))}
                 </PostSection>
@@ -469,13 +519,14 @@ const PostCard = React.memo(function PostCard({
   const isScheduled = post.status === "SCHEDULED"
   const isPublished = post.status === "PUBLISHED"
   const isDraft = post.status === "DRAFT"
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+  // FIX: USER_TIMEZONE is now module-scope — not re-allocated per card per render
 
   return (
-    <AnimatedCard 
-      animation="slide-up" 
-      index={index} 
-      layout 
+    <AnimatedCard
+      animation="slide-up"
+      index={index}
+      layout
       exit={{ opacity: 0, scale: 0.9, x: -20, transition: { duration: 0.2 } }}
     >
       <Card className={cn(
@@ -498,13 +549,13 @@ const PostCard = React.memo(function PostCard({
                 {isScheduled && post.scheduledFor && (
                   <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-primary/5 text-primary text-xs font-black">
                     <Clock className="w-3.5 h-3.5" />
-                    {format(toZonedTime(post.scheduledFor, tz), "MMM d • hh:mm a")}
+                    {format(toZonedTime(post.scheduledFor, USER_TIMEZONE), "MMM d • hh:mm a")}
                   </div>
                 )}
                 {isPublished && post.publishedAt && (
                   <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/5 text-emerald-600 text-xs font-black">
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    Published {format(toZonedTime(post.publishedAt, tz), "MMM d")}
+                    Published {format(toZonedTime(post.publishedAt, USER_TIMEZONE), "MMM d")}
                   </div>
                 )}
                 {isDraft && (

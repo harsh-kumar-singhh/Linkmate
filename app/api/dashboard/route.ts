@@ -1,13 +1,20 @@
 // app/api/dashboard/route.ts
 // ─────────────────────────────────────────────────────────────────────────────
 // NextAuth v5 — uses `auth()` instead of getServerSession(authOptions)
+//
+// FIXES:
+// 1. Removed dashboardCache (in-memory Map) — it does not work across
+//    serverless instances. unstable_cache + revalidateTag is the single
+//    source of truth for server-side caching.
+// 2. Cache-Control changed from "no-store" to "private, max-age=0,
+//    must-revalidate" — communicates "don't cache at HTTP layer, trust
+//    React Query client-side" without the misleading no-store semantics.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { getDashboardData } from "@/lib/data/dashboard"
 import { revalidateTag } from "next/cache"
-import { dashboardCache } from "@/lib/cache-server"
 
 export const dynamic = "force-dynamic"
 
@@ -22,6 +29,7 @@ export async function GET() {
       )
     }
 
+    // Served from unstable_cache if within revalidation window — zero DB cost
     const data = await getDashboardData(session.user.id)
 
     const response = NextResponse.json({
@@ -30,9 +38,12 @@ export async function GET() {
       message: "Dashboard data loaded",
     })
 
+    // FIX: "no-store" conflicted with the intent (React Query caches client-side,
+    // unstable_cache caches server-side). This header now correctly says:
+    // "browsers/CDNs: don't cache; React Query: you're in charge."
     response.headers.set(
       "Cache-Control",
-      "no-store, max-age=0"
+      "private, max-age=0, must-revalidate"
     )
 
     return response
@@ -50,8 +61,8 @@ export async function GET() {
 }
 
 // ── POST — explicit cache invalidation ───────────────────────────────────────
-// Call revalidateTag("dashboard") directly from post create/update routes,
-// or hit this endpoint if you need to bust the cache from the client.
+// Call revalidateTag(`dashboard:${userId}`) directly from server actions,
+// or hit this endpoint from the client when you need to bust the cache.
 export async function POST() {
   try {
     const session = await auth()
@@ -59,9 +70,10 @@ export async function POST() {
       return NextResponse.json({ success: false }, { status: 401 })
     }
 
+    // FIX: single cache layer — unstable_cache only.
+    // dashboardCache.delete() removed (in-memory Map is process-local,
+    // useless in serverless multi-instance environments).
     revalidateTag(`dashboard:${session.user.id}`)
-    revalidateTag("dashboard")
-    dashboardCache.delete(`dashboard:${session.user.id}`)
 
     return NextResponse.json({ success: true, message: "Cache invalidated" })
   } catch (error: any) {

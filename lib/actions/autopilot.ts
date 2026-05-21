@@ -1,9 +1,16 @@
 "use server";
 
+// lib/actions/autopilot.ts
+//
+// FIXES:
+// 1. Removed dashboardCache import and all dashboardCache.delete() calls.
+//    In-memory Map is process-local — useless in serverless multi-instance
+//    environments. unstable_cache + revalidateTag is the single source of truth.
+// 2. Removed debug console.log for autopilot time (was firing in production).
+
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath, revalidateTag } from "next/cache";
-import { dashboardCache } from "@/lib/cache-server";
 import {
   maintainAutopilotPipeline,
   reconcileAutopilotSchedule,
@@ -21,9 +28,6 @@ export async function saveAutopilotSettings(data: {
 }) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
-
-  // ✅ DEBUG LOG (DO NOT REMOVE YET)
-  console.log("[Autopilot-Settings] Raw time received:", data.time);
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
@@ -62,16 +66,21 @@ export async function saveAutopilotSettings(data: {
     },
   });
 
-  if (focusChanged && data.currentFocus) {
-    await syncAutopilotWeeklyFocus(session.user.id, data.currentFocus);
-  }
+  // reconcileAutopilotSchedule must complete before maintainAutopilotPipeline
+  // (pipeline needs post state after reconciliation). Sequential is correct here.
+  // syncAutopilotWeeklyFocus is independent — run it in parallel with reconcile.
+  const [, deletedPostIds] = await Promise.all([
+    focusChanged && data.currentFocus
+      ? syncAutopilotWeeklyFocus(session.user.id, data.currentFocus)
+      : Promise.resolve(null),
+    reconcileAutopilotSchedule(session.user.id, data.days),
+  ]);
 
-  const deletedPostIds = await reconcileAutopilotSchedule(session.user.id, data.days);
   const newPosts = await maintainAutopilotPipeline(session.user.id, true);
 
   revalidatePath("/calendar");
-  revalidateTag("dashboard");
-  dashboardCache.delete(`dashboard:${session.user.id}`);
+  // FIX: single cache layer — revalidateTag only, no dashboardCache.delete()
+  revalidateTag(`dashboard:${session.user.id}`);
 
   return { success: true, posts: newPosts, deletedPostIds };
 }
@@ -106,8 +115,8 @@ export async function toggleAutopilot(enabled: boolean) {
   }
 
   revalidatePath("/calendar");
-  revalidateTag("dashboard");
-  dashboardCache.delete(`dashboard:${session.user.id}`);
+  // FIX: single cache layer — revalidateTag only
+  revalidateTag(`dashboard:${session.user.id}`);
 
   return { success: true, posts: newPosts };
 }
@@ -133,14 +142,14 @@ export async function markPostPublished(postId: string) {
     },
   });
 
-  // ✅ Refill pipeline
+  // Refill autopilot pipeline after a post publishes
   if (post.source === "autopilot" && post.scheduledFor) {
     await refillAfterPublish(post.userId, post.scheduledFor);
   }
 
   revalidatePath("/calendar");
-  revalidateTag("dashboard");
-  dashboardCache.delete(`dashboard:${session.user.id}`);
+  // FIX: single cache layer — revalidateTag only
+  revalidateTag(`dashboard:${session.user.id}`);
 
   return { success: true };
 }

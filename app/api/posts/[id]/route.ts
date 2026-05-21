@@ -106,7 +106,6 @@ export async function PUT(
         // Bust cache
         const userId = session.user.id;
         revalidateTag(`dashboard:${userId}`);
-        revalidateTag("dashboard");
         dashboardCache.delete(`dashboard:${userId}`);
 
         return NextResponse.json({
@@ -145,7 +144,6 @@ export async function DELETE(
         // Bust cache
         const userId = session.user.id;
         revalidateTag(`dashboard:${userId}`);
-        revalidateTag("dashboard");
         dashboardCache.delete(`dashboard:${userId}`);
 
         return NextResponse.json({ 

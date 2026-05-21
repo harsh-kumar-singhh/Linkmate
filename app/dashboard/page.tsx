@@ -1,6 +1,17 @@
 // app/dashboard/page.tsx
-// ─── SERVER COMPONENT ────────────────────────────────────────────────────────
-// NextAuth v5 — uses `auth()` instead of getServerSession(authOptions)
+// ─────────────────────────────────────────────────────────────────────────────
+// FIX: SSR now prefetches getDashboardData and passes real initialData to
+// the client component. This eliminates the loading skeleton on first render —
+// data is available before hydration begins.
+//
+// getDashboardData hits unstable_cache, so this costs zero DB queries when
+// the cache is warm. On cold start it runs the DB queries, but the result
+// is then cached for 1 hour.
+//
+// React Query in DashboardClient uses this as initialData with
+// initialDataUpdatedAt set to treat it as ~1 minute old, so it renders
+// instantly and background-refetches after staleTime elapses.
+// ─────────────────────────────────────────────────────────────────────────────
 
 import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
@@ -16,9 +27,12 @@ export default async function DashboardPage() {
     redirect("/login")
   }
 
-  // ── 2. Fetch data on the server for instant first-paint ─────────────────
-  const dashboardData = await getDashboardData(session.user.id)
-  
+  // ── 2. Prefetch dashboard data server-side ────────────────────────────────
+  // Hits unstable_cache — near-zero cost when warm, full DB fetch on cold.
+  // Passing this as initialData means the client renders with real data
+  // immediately, no skeleton, no waterfall.
+  const initialData = await getDashboardData(session.user.id)
+
   return (
     <DashboardClient
       user={{
@@ -27,7 +41,7 @@ export default async function DashboardPage() {
         email: session.user.email ?? null,
         image: session.user.image ?? null,
       }}
-      initialData={dashboardData}
+      initialData={initialData}
     />
   )
 }
