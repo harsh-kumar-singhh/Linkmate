@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { verifyCronRequest } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -7,8 +8,11 @@ export const dynamic = "force-dynamic";
  * Cron job to downgrade users whose PRO plan has expired.
  * This should be called regularly (e.g., daily).
  */
-export async function GET(req: Request) {
+async function handleCron(req: Request) {
     try {
+        const authError = verifyCronRequest(req);
+        if (authError) return authError;
+
         const now = new Date();
 
         // 1. Find users with PRO plan that has expired (batching)
@@ -54,4 +58,12 @@ export async function GET(req: Request) {
         console.error("[CRON ERROR] Subscription check failed:", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
+}
+
+export async function GET(req: Request) {
+    return handleCron(req);
+}
+
+export async function POST(req: Request) {
+    return handleCron(req);
 }

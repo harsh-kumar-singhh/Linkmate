@@ -6,33 +6,21 @@ import { prisma } from "@/lib/prisma";
 import { publishToLinkedIn } from "@/lib/linkedin";
 import { maintainAutopilotPipeline } from "@/lib/autopilot/maintenance";
 import { triggerPostPublishedNotification, sendPushNotification, cleanupOldNotifications } from "@/lib/notifications";
+import { verifyCronRequest } from "@/lib/cron-auth";
 
 async function handleCron(req: Request) {
     const now = new Date();
     const nowUTC = now.toISOString();
 
     // 1. Diagnostic Logging
-    const authHeader = req.headers.get('authorization');
-    const xCronSecret = req.headers.get('x-cron-secret');
     const method = req.method;
 
     console.log(`[CRON] ${method} request received at ${nowUTC}`);
 
     try {
         // 2. Security Check
-        const cronSecret = process.env.CRON_SECRET;
-        const isAuthValid = authHeader === `Bearer ${cronSecret}`;
-        const isXSecretValid = xCronSecret === cronSecret;
-
-        if (!cronSecret) {
-            console.error("[CRON] CRON_SECRET is not set.");
-            return NextResponse.json({ error: 'System Configuration Error' }, { status: 500 });
-        }
-
-        if (!isAuthValid && !isXSecretValid) {
-            console.warn("[CRON] Unauthorized attempt blocked.");
-            return NextResponse.json({ error: 'Unauthorized', timestamp: nowUTC }, { status: 401 });
-        }
+        const authError = verifyCronRequest(req);
+        if (authError) return authError;
 
         const BATCH_SIZE = 10;
 
