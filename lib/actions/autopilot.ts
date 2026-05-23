@@ -17,6 +17,7 @@ import {
   refillAfterPublish,
   syncAutopilotWeeklyFocus,
 } from "@/lib/autopilot/maintenance";
+import { sendPostPublishedNotification } from "@/lib/notifications";
 
 export async function saveAutopilotSettings(data: {
   topics: string[];
@@ -128,18 +129,26 @@ export async function markPostPublished(postId: string) {
 
   const post = await prisma.post.findUnique({
     where: { id: postId },
-    select: { id: true, userId: true, scheduledFor: true, source: true },
+    select: { id: true, userId: true, content: true, scheduledFor: true, source: true },
   });
 
   if (!post) throw new Error("Post not found");
   if (post.userId !== session.user.id) throw new Error("Forbidden");
 
-  await prisma.post.update({
+  const publishedPost = await prisma.post.update({
     where: { id: postId },
     data: {
       status: "PUBLISHED",
       publishedAt: new Date(),
+      notified: true,
     },
+  });
+
+  console.log(`[PUBLISH] Post successfully published | post=${publishedPost.id} | user=${publishedPost.userId} | source=${post.source}`);
+  await sendPostPublishedNotification({
+    userId: publishedPost.userId,
+    postContent: publishedPost.content,
+    postId: publishedPost.id,
   });
 
   // Refill autopilot pipeline after a post publishes

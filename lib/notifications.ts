@@ -125,6 +125,7 @@ export async function sendPushNotification(
   }
 
   const segment = await getUserSegment(userId);
+  const timestamp = new Date().toISOString();
 
   // ============================================================
   // BUG FIX #1 — Diagnostic: log subscription count.
@@ -152,11 +153,22 @@ export async function sendPushNotification(
     body: payload.body,
     url: payload.url || '/dashboard',
     type: payload.type,
+    icon: '/android-chrome-192x192.png',
+    badge: '/favicon-32x32.png',
+    timestamp,
     // Use a unique tag per notification to allow renotify while preventing true duplicates
     tag: payload.tag || payload.type,
+    data: {
+      url: payload.url || '/dashboard',
+      type: payload.type,
+      tag: payload.tag || payload.type,
+      timestamp,
+    },
   });
 
   // Send to all registered devices in parallel
+  console.log(`[NOTIFICATIONS] Enqueueing push dispatch for user ${userId} | type=${payload.type} | subscriptions=${subscriptions.length}`);
+
   const pushResults = await Promise.allSettled(
     subscriptions.map(async (sub) => {
       try {
@@ -176,16 +188,16 @@ export async function sendPushNotification(
             },
           }
         );
-        console.log(`[NOTIFICATIONS] Push sent to endpoint: ${sub.endpoint.slice(0, 50)}...`);
+        console.log(`[NOTIFICATIONS] Push sent successfully | subscription=${sub.id} | endpoint=${sub.endpoint.slice(0, 50)}...`);
       } catch (error: any) {
         // 410 Gone or 404 = subscription is dead. Clean it up.
         if (error.statusCode === 410 || error.statusCode === 404) {
           await prisma.pushSubscription.delete({ where: { id: sub.id } }).catch(e => 
             console.error('[NOTIFICATIONS] Failed to delete stale subscription:', e)
           );
-          console.log(`[NOTIFICATIONS] 🧹 Cleaned up expired/stale subscription ${sub.id}`);
+          console.log(`[NOTIFICATIONS] Cleaned stale subscription | subscription=${sub.id} | statusCode=${error.statusCode}`);
         } else {
-          console.error(`[NOTIFICATIONS] 🚨 webpush.sendNotification failed for sub ${sub.id}:`, {
+          console.error(`[NOTIFICATIONS] Push send failure | subscription=${sub.id}:`, {
             statusCode: error.statusCode,
             message: error.message,
             endpoint: sub.endpoint.slice(0, 50),
@@ -224,6 +236,20 @@ export async function triggerPostPublishedNotification(
   postContent: string,
   postId: string
 ) {
+  return sendPostPublishedNotification({ userId, postContent, postId });
+}
+
+export async function sendPostPublishedNotification({
+  userId,
+  postContent,
+  postId,
+}: {
+  userId: string;
+  postContent: string;
+  postId: string;
+}) {
+  console.log(`[NOTIFICATIONS] Triggering publish notification | post=${postId} | user=${userId}`);
+
   const snippet = postContent.length > 50 ? postContent.substring(0, 47) + '...' : postContent;
   const segment = await getUserSegment(userId);
 

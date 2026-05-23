@@ -5,6 +5,7 @@ import { resolveUser } from "@/lib/auth/user";
 import { prisma, withRetry } from "@/lib/prisma";
 import { publishToLinkedIn } from "@/lib/linkedin";
 import { dashboardCache } from "@/lib/cache-server";
+import { sendPostPublishedNotification, triggerDraftSavedNotification } from "@/lib/notifications";
 
 // ============================================================
 // GET /api/posts — Fetch paginated posts for the current user
@@ -140,19 +141,22 @@ export async function POST(req: Request) {
               status: "PUBLISHED",
               publishedAt: new Date(),
               linkedinPostId: result.linkedinPostId,
+              notified: true,
             },
           })
         );
 
-        // ============================================================
-        // BUG FIX — Notify AFTER confirming successful publish.
-        // We pass postId so the sw.js tag is unique per post.
-        // Notification errors are caught and logged but do NOT fail the request.
-        // ============================================================
-        const { triggerPostPublishedNotification } = await import("@/lib/notifications");
-        triggerPostPublishedNotification(user.id, content, post.id).catch((notifyError) => {
+        console.log(`[PUBLISH] Post successfully published | post=${post.id} | user=${user.id} | linkedinPostId=${result.linkedinPostId}`);
+
+        try {
+          await sendPostPublishedNotification({
+            userId: user.id,
+            postContent: content,
+            postId: post.id,
+          });
+        } catch (notifyError) {
           console.error("[POSTS] Push notification failed for manual publish:", notifyError);
-        });
+        }
 
       } catch (error: any) {
         console.error("LinkedIn publishing failed:", error);
@@ -177,7 +181,6 @@ export async function POST(req: Request) {
         );
       }
     } else if (status === "DRAFT" || !status) {
-      const { triggerDraftSavedNotification } = await import("@/lib/notifications");
       triggerDraftSavedNotification(user.id, content, post.id).catch((notifyError) => {
         console.error("[POSTS] Push notification failed for saving draft:", notifyError);
       });

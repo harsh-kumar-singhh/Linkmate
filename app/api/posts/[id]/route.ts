@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { publishToLinkedIn } from "@/lib/linkedin";
 import { revalidateTag } from "next/cache";
 import { dashboardCache } from "@/lib/cache-server";
+import { sendPostPublishedNotification } from "@/lib/notifications";
 
 export async function GET(
     req: Request,
@@ -84,6 +85,7 @@ export async function PUT(
                 scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
                 publishedAt: status === "PUBLISHED" ? new Date() : null,
                 linkedinPostId: finalLinkedinPostId,
+                notified: status === "PUBLISHED" ? true : undefined,
                 imageUrl: imageUrl !== undefined ? imageUrl : undefined,
                 imageData: imageData !== undefined ? imageData : undefined,
                 writingStyle: writingStyle !== undefined ? writingStyle : undefined,
@@ -91,15 +93,17 @@ export async function PUT(
             } as any,
         });
 
-        // Trigger push notification if published manually via PUT
+        // Trigger push notification only after LinkedIn succeeded and the DB row is PUBLISHED.
         if (status === "PUBLISHED") {
+            console.log(`[PUBLISH] Post successfully published | post=${post.id} | user=${session.user.id} | linkedinPostId=${finalLinkedinPostId}`);
             try {
-                const { triggerPostPublishedNotification } = await import("@/lib/notifications");
-                triggerPostPublishedNotification(session.user.id, content, post.id).catch((notifyError) => {
-                    console.error("[POSTS] Push notification failed for manual publish (PUT):", notifyError);
+                await sendPostPublishedNotification({
+                    userId: session.user.id,
+                    postContent: content,
+                    postId: post.id,
                 });
-            } catch (importError) {
-                console.error("[POSTS] Failed to import notifications module:", importError);
+            } catch (notifyError) {
+                console.error("[POSTS] Push notification failed for manual publish (PUT):", notifyError);
             }
         }
 

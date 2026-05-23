@@ -15,6 +15,18 @@ self.addEventListener('activate', function (event) {
 self.addEventListener('push', function (event) {
   if (!event.data) {
     console.warn('[SW] Push event received but no data.');
+    event.waitUntil(
+      self.registration.showNotification('Linkmate Update', {
+        body: 'You have a new Linkmate update.',
+        icon: '/android-chrome-192x192.png',
+        badge: '/favicon-32x32.png',
+        tag: 'linkmate-empty-push',
+        data: {
+          url: '/dashboard',
+          timestamp: new Date().toISOString(),
+        },
+      })
+    );
     return;
   }
 
@@ -27,17 +39,26 @@ self.addEventListener('push', function (event) {
     event.waitUntil(
       self.registration.showNotification('Linkmate Update', {
         body: event.data.text(),
-        icon: '/logo.png',
+        icon: '/android-chrome-192x192.png',
+        badge: '/favicon-32x32.png',
         tag: 'linkmate-fallback',
+        data: {
+          url: '/dashboard',
+          timestamp: new Date().toISOString(),
+        },
       })
     );
     return;
   }
 
-  // Fallback to default app icon by omitting 'badge' if a valid monochrome badge is missing.
+  const notificationData = data.data || {};
+  const targetUrl = notificationData.url || data.url || '/dashboard';
+  const timestamp = notificationData.timestamp || data.timestamp || new Date().toISOString();
+
   const options = {
     body: data.body || '',
-    icon: '/logo.png',
+    icon: data.icon || '/android-chrome-192x192.png',
+    badge: data.badge || '/favicon-32x32.png',
     vibrate: [100, 50, 100],
     // tag: prevents duplicate notifications for the same type.
     // If you want one notification per post, use the postId in the tag.
@@ -45,7 +66,9 @@ self.addEventListener('push', function (event) {
     // renotify: true means even if tag already exists, re-vibrate/re-alert
     renotify: true,
     data: {
-      url: data.url || '/dashboard',
+      ...notificationData,
+      url: targetUrl,
+      timestamp,
     },
     // actions are only shown on some platforms (Android Chrome, not iOS Safari)
     actions: data.actions || [],

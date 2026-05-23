@@ -4,8 +4,8 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { publishToLinkedIn } from "@/lib/linkedin";
-import { maintainAutopilotPipeline } from "@/lib/autopilot/maintenance";
-import { triggerPostPublishedNotification, sendPushNotification, cleanupOldNotifications } from "@/lib/notifications";
+import { maintainAutopilotPipeline, refillAfterPublish } from "@/lib/autopilot/maintenance";
+import { cleanupOldNotifications, sendPostPublishedNotification, triggerPostFailedNotification } from "@/lib/notifications";
 import { verifyCronRequest } from "@/lib/cron-auth";
 
 async function handleCron(req: Request) {
@@ -22,9 +22,8 @@ async function handleCron(req: Request) {
         const authError = verifyCronRequest(req);
         if (authError) return authError;
 
-        const BATCH_SIZE = 10;
-
-        // 3. Find due posts with batching and selective fetching
+        // 3. Find every due post with selective fetching.
+        // A hard take limit here delays posts beyond the first batch until a later cron run.
         const duePosts = await prisma.post.findMany({
             where: {
                 status: "SCHEDULED",
@@ -49,8 +48,7 @@ async function handleCron(req: Request) {
             },
             orderBy: {
                 scheduledFor: 'asc'
-            },
-            take: BATCH_SIZE
+            }
         });
 
         if (duePosts.length === 0) {
@@ -89,8 +87,8 @@ async function handleCron(req: Request) {
                     }
                 );
 
-                // Success
-                await prisma.post.update({
+                // Success: persist PUBLISHED only after LinkedIn confirms success.
+                const publishedPost = await prisma.post.update({
                     where: { id: post.id },
                     data: {
                         status: "PUBLISHED",
@@ -101,11 +99,21 @@ async function handleCron(req: Request) {
                     }
                 });
 
-                // Trigger notification
+                console.log(`[PUBLISH] Post successfully published | post=${post.id} | user=${post.userId} | linkedinPostId=${publishResult.linkedinPostId}`);
+
+                // Trigger notification only after the database status is PUBLISHED.
                 try {
-                    await triggerPostPublishedNotification(post.userId, post.content, post.id);
+                    await sendPostPublishedNotification({
+                        userId: publishedPost.userId,
+                        postContent: publishedPost.content,
+                        postId: publishedPost.id,
+                    });
                 } catch (notifyError) {
                     console.error(`[CRON] Failed to notify user for post ${post.id}:`, notifyError);
+                }
+
+                if (publishedPost.source === "autopilot" && publishedPost.scheduledFor) {
+                    await refillAfterPublish(publishedPost.userId, publishedPost.scheduledFor);
                 }
 
                 console.log(`[CRON] Post ${post.id}: Published successfully.`);
@@ -125,12 +133,7 @@ async function handleCron(req: Request) {
 
                 // Trigger failure notification
                 try {
-                    await sendPushNotification(post.userId, {
-                        title: 'Publishing Failed ⚠️',
-                        body: `We couldn't publish your post. Error: ${errorMessage.substring(0, 50)}...`,
-                        url: '/dashboard',
-                        type: 'scheduled_post_failed',
-                    });
+                    await triggerPostFailedNotification(post.userId, post.content, post.id);
                 } catch (notifyError) {
                     console.error(`[CRON] Failed to notify user for post failure ${post.id}:`, notifyError);
                 }
