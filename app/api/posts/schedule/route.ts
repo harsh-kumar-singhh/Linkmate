@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveUser } from "@/lib/auth/user";
 import { prisma } from "@/lib/prisma";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 export async function POST(req: Request) {
     try {
@@ -52,6 +53,9 @@ export async function POST(req: Request) {
                 } as any
             });
         }
+
+        revalidateTag(`dashboard:${user.id}`);
+        revalidatePath("/dashboard");
 
         return NextResponse.json({ success: true, post });
     } catch (error) {

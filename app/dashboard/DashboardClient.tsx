@@ -219,8 +219,13 @@ export default function DashboardClient({ user, initialData }: DashboardClientPr
 
   const posts = data?.posts ?? []
   const stats = data?.stats
-  const scheduledPosts = posts.filter(p => p.status === "SCHEDULED")
-  const publishedPosts = posts.filter(p => p.status === "PUBLISHED").slice(0, 5)
+  const scheduledPosts = posts
+    .filter(p => p.status === "SCHEDULED")
+    .sort((a, b) => new Date(a.scheduledFor || 0).getTime() - new Date(b.scheduledFor || 0).getTime())
+  const publishedPosts = posts
+    .filter(p => p.status === "PUBLISHED")
+    .sort((a, b) => new Date(b.publishedAt || 0).getTime() - new Date(a.publishedAt || 0).getTime())
+    .slice(0, 7)
   const drafts = posts.filter(p => p.status === "DRAFT")
 
   // ── Loading State (Skeletons) ──────────────────────────────────────────────

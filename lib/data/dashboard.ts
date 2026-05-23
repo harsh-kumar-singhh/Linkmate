@@ -48,9 +48,36 @@ async function fetchDashboardData(userId: string): Promise<DashboardData> {
   startOfWeek.setHours(0, 0, 0, 0)
 
   // All queries fire simultaneously — single DB round-trip window
-  const [posts, counts, recentPublishedPosts, aiUsage] = await Promise.all([
+  const [scheduledPosts, publishedPosts, draftPosts, counts, recentPublishedPosts, aiUsage] = await Promise.all([
     prisma.post.findMany({
-      where: { userId },
+      where: { userId, status: "SCHEDULED" },
+      orderBy: [{ scheduledFor: "asc" }, { createdAt: "desc" }],
+      select: {
+        id: true,
+        content: true,
+        status: true,
+        scheduledFor: true,
+        publishedAt: true,
+        notified: true,
+      },
+    }),
+
+    prisma.post.findMany({
+      where: { userId, status: "PUBLISHED" },
+      orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+      take: 7,
+      select: {
+        id: true,
+        content: true,
+        status: true,
+        scheduledFor: true,
+        publishedAt: true,
+        notified: true,
+      },
+    }),
+
+    prisma.post.findMany({
+      where: { userId, status: "DRAFT" },
       orderBy: { createdAt: "desc" },
       take: 50,
       select: {
@@ -134,7 +161,7 @@ async function fetchDashboardData(userId: string): Promise<DashboardData> {
   const consistencyScore = Math.round((uniqueDaysLast15 / 15) * 100)
 
   return {
-    posts: posts as DashboardPost[],
+    posts: [...scheduledPosts, ...publishedPosts, ...draftPosts] as DashboardPost[],
     stats: {
       postingStreak: streak,
       totalPostsPublished: statusCounts.PUBLISHED,

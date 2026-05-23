@@ -378,7 +378,7 @@ function EditorContent() {
             const newPost = result.data || result.post || result
 
             // Update Dashboard Cache
-            queryClient.setQueryData(["dashboard"], (old: any) => {
+            queryClient.setQueryData(["dashboard", user.id], (old: any) => {
                 const newPostsList = [newPost, ...(old?.posts || [])]
                 
                 // If we don't have old data, we'll initialize a partial structure
@@ -427,7 +427,7 @@ function EditorContent() {
             })
 
             // Mark both as stale to sync with server in background
-            queryClient.invalidateQueries({ queryKey: ["dashboard"], refetchType: 'none' })
+            queryClient.invalidateQueries({ queryKey: ["dashboard", user.id], refetchType: 'none' })
             queryClient.invalidateQueries({ queryKey: ["posts"], refetchType: 'none' })
             
             if (statusArg !== "DRAFT") {
@@ -449,14 +449,14 @@ function EditorContent() {
     }
 
     const handleDelete = async () => {
-        if (!postId || isDeleting) return
+        if (!postId || isDeleting || !user) return
 
         setIsDeleting(true)
         try {
             const response = await fetch(`/api/posts/${postId}`, { method: "DELETE" })
             if (response.ok) {
                 // Update Dashboard Cache
-                queryClient.setQueryData(["dashboard"], (old: any) => {
+                queryClient.setQueryData(["dashboard", user.id], (old: any) => {
                     if (!old) return old;
 
                     const existingPost = (old?.posts || []).find((p: any) => p.id === postId)
@@ -493,7 +493,7 @@ function EditorContent() {
                 })
 
                 // Mark both as stale to sync with server in background
-                queryClient.invalidateQueries({ queryKey: ["dashboard"], refetchType: 'none' })
+                queryClient.invalidateQueries({ queryKey: ["dashboard", user.id], refetchType: 'none' })
                 queryClient.invalidateQueries({ queryKey: ["posts"], refetchType: 'none' })
 
                 router.push("/dashboard")
