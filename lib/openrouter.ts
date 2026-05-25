@@ -82,7 +82,7 @@ function classifyError(status: number, message: string): AIErrorType {
 
 export async function generateWithFallback(
   messages: { role: string; content: string }[],
-  options: { temperature?: number; max_tokens?: number; response_format?: { type: 'json_object' } } = {}
+  options: { temperature?: number; max_tokens?: number; response_format?: { type: 'json_object' }; timeoutMs?: number } = {}
 ) {
   if (!OPENROUTER_API_KEY) {
     throw new AIError("OpenRouter API key not configured", "LOGIC_ERROR");
@@ -99,7 +99,7 @@ export async function generateWithFallback(
       console.log(`[AI] Attempt ${attempt} with model: ${model.id}`);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 seconds timeout
+      const timeoutId = setTimeout(() => controller.abort(), options.timeoutMs ?? 8000);
 
       const response = await fetch(`${BASE_URL}/chat/completions`, {
         method: "POST",

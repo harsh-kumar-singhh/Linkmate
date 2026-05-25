@@ -25,30 +25,29 @@ export async function GET(req: Request) {
       );
     }
 
-    const posts = await withRetry(() =>
-      prisma.post.findMany({
-        where: { userId: user.id },
-        orderBy: { createdAt: "desc" },
-        skip,
-        take: limit,
-        select: {
-          id: true,
-          content: true,
-          status: true,
-          scheduledFor: true,
-          publishedAt: true,
-          linkedinPostId: true,
-          imageUrl: true,
-          writingStyle: true,
-          createdAt: true,
-          source: true,
-        },
-      })
-    );
-
-    const total = await withRetry(() =>
-      prisma.post.count({ where: { userId: user.id } })
-    );
+    const [posts, total] = await Promise.all([
+      withRetry(() =>
+        prisma.post.findMany({
+          where: { userId: user.id },
+          orderBy: [{ scheduledFor: "asc" }, { createdAt: "desc" }],
+          skip,
+          take: limit,
+          select: {
+            id: true,
+            content: true,
+            status: true,
+            scheduledFor: true,
+            publishedAt: true,
+            linkedinPostId: true,
+            imageUrl: true,
+            writingStyle: true,
+            createdAt: true,
+            source: true,
+          },
+        })
+      ),
+      withRetry(() => prisma.post.count({ where: { userId: user.id } })),
+    ]);
 
     const response = NextResponse.json({
       success: true,

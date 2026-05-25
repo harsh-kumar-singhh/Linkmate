@@ -261,14 +261,15 @@ export async function syncAutopilotWeeklyFocus(userId: string, newFocus: string)
         select: { id: true, autopilotFocus: true, archetype: true }
     });
 
-    if (futurePosts.length === 0) return 0;
+    if (futurePosts.length === 0) return { deletedPostIds: [], posts: [] };
 
     // 2. Delete only the ones that match the "stale focus" criteria
     // We keep generic topic posts (archetype != WEEKLY_FOCUS and no direct focus anchor, which have autopilotFocus = null)
     const staleIds = futurePosts
-        .filter(p => p.autopilotFocus && p.autopilotFocus !== newFocus)
+        .filter(p => p.archetype === "WEEKLY_FOCUS" || (p.autopilotFocus && p.autopilotFocus !== newFocus))
         .map(p => p.id);
 
+    let posts: any[] = [];
     if (staleIds.length > 0) {
         await prisma.post.deleteMany({
             where: { id: { in: staleIds } }
@@ -276,8 +277,8 @@ export async function syncAutopilotWeeklyFocus(userId: string, newFocus: string)
         console.log(`[FocusSync] Deleted ${staleIds.length} stale focus-influenced posts for user=${userId}`);
         
         // 3. Trigger maintenance to refill gaps with NEW focus
-        await maintainAutopilotPipeline(userId, true);
+        posts = await maintainAutopilotPipeline(userId, true);
     }
 
-    return staleIds.length;
+    return { deletedPostIds: staleIds, posts };
 }

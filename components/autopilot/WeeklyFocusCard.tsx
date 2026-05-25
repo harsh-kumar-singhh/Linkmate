@@ -9,7 +9,7 @@ import { useTrialTrigger } from "@/context/TrialTriggerContext";
 
 interface WeeklyFocusCardProps {
     initialFocus?: string;
-    onUpdate?: () => void;
+    onUpdate?: (result: { posts?: any[]; deletedPostIds?: string[]; focus?: string }) => void | Promise<void>;
 }
 
 export function WeeklyFocusCard({ initialFocus = "", onUpdate }: WeeklyFocusCardProps) {
@@ -37,7 +37,7 @@ export function WeeklyFocusCard({ initialFocus = "", onUpdate }: WeeklyFocusCard
 
             if (response.ok) {
                 setStatus("success");
-                if (onUpdate) onUpdate();
+                if (onUpdate) await onUpdate(await response.json());
                 setTimeout(() => setStatus("idle"), 3000);
             } else {
                 setStatus("error");

@@ -287,12 +287,16 @@ Focus on actionable value and practical takeaways.`;
   }
 
   let content = "";
-  for (let attempt = 0; attempt <= 2; attempt++) {
+  for (let attempt = 0; attempt <= 1; attempt++) {
     content = await generatePost({
       topic: promptTopic,
       style: selectedStyle,
       userWritingSample,
+      targetLength: 750,
       context: `${promptContext}\n\nStart with ${hook}`,
+      enforceLength: false,
+      maxTokens: 520,
+      timeoutMs: 8000,
     });
 
     const isDuplicate = recentPosts.some(

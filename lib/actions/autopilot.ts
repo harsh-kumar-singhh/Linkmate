@@ -70,20 +70,25 @@ export async function saveAutopilotSettings(data: {
   // reconcileAutopilotSchedule must complete before maintainAutopilotPipeline
   // (pipeline needs post state after reconciliation). Sequential is correct here.
   // syncAutopilotWeeklyFocus is independent — run it in parallel with reconcile.
-  const [, deletedPostIds] = await Promise.all([
-    focusChanged && data.currentFocus
-      ? syncAutopilotWeeklyFocus(session.user.id, data.currentFocus)
-      : Promise.resolve(null),
+  const [focusSyncResult, deletedPostIds] = await Promise.all([
+    focusChanged
+      ? syncAutopilotWeeklyFocus(session.user.id, data.currentFocus || "")
+      : Promise.resolve({ deletedPostIds: [], posts: [] }),
     reconcileAutopilotSchedule(session.user.id, data.days),
   ]);
 
   const newPosts = await maintainAutopilotPipeline(session.user.id, true);
+  const posts = [...focusSyncResult.posts, ...newPosts].sort((a, b) => {
+    if (!a.scheduledFor) return 1;
+    if (!b.scheduledFor) return -1;
+    return new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime();
+  });
 
   revalidatePath("/calendar");
   // FIX: single cache layer — revalidateTag only, no dashboardCache.delete()
   revalidateTag(`dashboard:${session.user.id}`);
 
-  return { success: true, posts: newPosts, deletedPostIds };
+  return { success: true, posts, deletedPostIds: [...focusSyncResult.deletedPostIds, ...deletedPostIds] };
 }
 
 export async function toggleAutopilot(enabled: boolean) {

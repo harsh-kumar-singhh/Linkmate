@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { syncAutopilotWeeklyFocus } from "@/lib/autopilot/maintenance";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 export async function POST(req: Request) {
     try {
@@ -23,11 +24,15 @@ export async function POST(req: Request) {
         console.log(`[USER_FOCUS] Updated weekly focus for user ${session.user.id}. Triggering selective sync...`);
         
         // SELECTIVE REGENERATION: Replace future posts that used the old focus
-        await syncAutopilotWeeklyFocus(session.user.id, focus);
+        const result = await syncAutopilotWeeklyFocus(session.user.id, focus);
+        revalidatePath("/calendar");
+        revalidateTag(`dashboard:${session.user.id}`);
 
         return NextResponse.json({ 
             success: true, 
-            focus: updatedUser.autopilotCurrentFocus 
+            focus: updatedUser.autopilotCurrentFocus,
+            posts: result.posts,
+            deletedPostIds: result.deletedPostIds,
         });
     } catch (error) {
         console.error("Error updating weekly focus:", error);

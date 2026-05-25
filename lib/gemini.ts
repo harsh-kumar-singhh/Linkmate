@@ -9,6 +9,9 @@ export interface GeneratePostOptions {
     userWritingSample?: string; // Content to mimic
     targetLength?: number; // In characters
     context?: string; // Additional user context
+    enforceLength?: boolean;
+    maxTokens?: number;
+    timeoutMs?: number;
 }
 
 /**
@@ -20,7 +23,10 @@ export async function generatePost({
     style, 
     userWritingSample, 
     targetLength = 1000, 
-    context 
+    context,
+    enforceLength = true,
+    maxTokens,
+    timeoutMs
 }: GeneratePostOptions) {
     if (!topic) throw new Error("Topic is required for AI generation.");
 
@@ -89,7 +95,7 @@ FORMATTING FIDELITY:
     }
 
     let currentRetry = 0;
-    const maxRetries = 1;
+    const maxRetries = enforceLength ? 1 : 0;
     let finalContent = "";
     let promptExtension = "";
 
@@ -100,7 +106,10 @@ FORMATTING FIDELITY:
                 { role: "user", content: basePrompt + promptExtension }
             ];
 
-            let content = await generateWithFallback(messages);
+            let content = await generateWithFallback(messages, {
+                max_tokens: maxTokens,
+                timeoutMs,
+            });
             
             if (!content) throw new Error("Empty response from AI");
 
@@ -114,7 +123,7 @@ FORMATTING FIDELITY:
             // Validate word count length
             const wordCount = content.split(/\s+/).filter((w: string) => w.length > 0).length;
             
-            if (wordCount < targetWords * 0.7 && currentRetry < maxRetries) {
+            if (enforceLength && wordCount < targetWords * 0.7 && currentRetry < maxRetries) {
                 console.warn(`[AI] Quality Check Failed: Output too short (${wordCount} words vs target ${targetWords}). Triggering high-enforcement regeneration...`);
                 promptExtension = `\n\nCRITICAL ENFORCEMENT: Your previous generation was only ${wordCount} words long. You MUST ensure the length is exactly around ${targetWords} words. Expand thoroughly on the ideas, do not summarize. DO NOT output any conversational text or acknowledge this message, just re-output the post correctly.`;
                 currentRetry++;

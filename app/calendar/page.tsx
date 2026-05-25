@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { 
@@ -108,8 +108,6 @@ export default function CalendarPage() {
     const queryClient = useQueryClient()
     
     const [viewDate, setViewDate] = useState(new Date())
-    const [posts, setPosts] = useState<any[]>([])
-    const [isLoading, setIsLoading] = useState(true)
     const [schedulingMode, setSchedulingMode] = useState<"manual" | "autopilot">("manual")
     
     // UI State
@@ -135,16 +133,31 @@ export default function CalendarPage() {
         return day
     })
 
-    const { data: postsData, isLoading: isPostsLoading } = useQuery({
+    const { data: postsData } = useQuery({
         queryKey: ["posts"],
         queryFn: async () => {
-            const response = await fetch("/api/posts")
+            const response = await fetch("/api/posts?limit=100")
             if (!response.ok) throw new Error("Failed to fetch posts")
             const result = await response.json()
             return result.data?.posts || result.posts || []
         },
-        staleTime: 10_000, // 10s freshness to allow server cache bust to propagate
+        staleTime: 60_000,
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
     })
+
+    const posts = useMemo(() => postsData || [], [postsData])
+    const postsByDate = useMemo(() => {
+        const grouped = new Map<string, any[]>()
+        for (const post of posts) {
+            if (!post.scheduledFor && !post.createdAt) continue
+            const key = new Date(post.scheduledFor || post.createdAt).toDateString()
+            const dayPosts = grouped.get(key) || []
+            dayPosts.push(post)
+            grouped.set(key, dayPosts)
+        }
+        return grouped
+    }, [posts])
 
     // Close popup when clicking outside
     useEffect(() => {
@@ -154,13 +167,6 @@ export default function CalendarPage() {
             return () => document.removeEventListener("click", handleClickOutside)
         }
     }, [selectedDate])
-
-    useEffect(() => {
-        if (postsData) {
-            setPosts(postsData)
-            setIsLoading(false)
-        }
-    }, [postsData])
 
     useEffect(() => {
         if (user?.autopilotEnabled) {
@@ -179,7 +185,7 @@ export default function CalendarPage() {
                 const newPosts = result.posts || [];
 
                 // 1. Update Dashboard Cache
-                queryClient.setQueryData(["dashboard"], (old: any) => {
+                queryClient.setQueriesData({ queryKey: ["dashboard"] }, (old: any) => {
                     if (!old) return old;
                     
                     // Update status of existing autopilot posts
@@ -511,7 +517,32 @@ export default function CalendarPage() {
                         <div className="mx-2 md:mx-0">
                             <WeeklyFocusCard
                                 initialFocus={user?.autopilotCurrentFocus || ""}
-                                onUpdate={() => refreshUser()}
+                                onUpdate={async (result) => {
+                                    const newPosts = result?.posts || []
+                                    const deletedIds = result?.deletedPostIds || []
+
+                                    queryClient.setQueriesData({ queryKey: ["dashboard"] }, (old: any) => {
+                                        if (!old) return old
+                                        const filtered = (old.posts || []).filter((p: any) => !deletedIds.includes(p.id))
+                                        return { ...old, posts: [...newPosts, ...filtered] }
+                                    })
+
+                                    queryClient.setQueryData(["posts"], (old: any) => {
+                                        const current = old || []
+                                        const filtered = current.filter((p: any) => !deletedIds.includes(p.id))
+                                        return [...newPosts, ...filtered].sort((a, b) => {
+                                            if (!a.scheduledFor) return 1
+                                            if (!b.scheduledFor) return -1
+                                            return new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime()
+                                        })
+                                    })
+
+                                    await Promise.all([
+                                        refreshUser(),
+                                        queryClient.invalidateQueries({ queryKey: ["dashboard"], refetchType: "active" }),
+                                        queryClient.invalidateQueries({ queryKey: ["posts"], refetchType: "active" }),
+                                    ])
+                                }}
                             />
                         </div>
                     </div>
@@ -541,11 +572,7 @@ export default function CalendarPage() {
                     >
                         {DATES.map((date, i) => {
                             const cellDate = date ? new Date(currentYear, currentMonth, date) : null
-                            const datePosts = cellDate ? posts.filter(p => {
-                                if (!p.scheduledFor && !p.createdAt) return false
-                                const d = new Date(p.scheduledFor || p.createdAt)
-                                return d.toDateString() === cellDate.toDateString()
-                            }) : []
+                            const datePosts = cellDate ? postsByDate.get(cellDate.toDateString()) || [] : []
 
                             const isToday = cellDate && new Date().toDateString() === cellDate.toDateString()
                             const isSelected = selectedDate && cellDate && selectedDate.toDateString() === cellDate.toDateString()

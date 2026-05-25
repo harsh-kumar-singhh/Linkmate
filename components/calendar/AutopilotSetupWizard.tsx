@@ -150,7 +150,7 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                 console.log(`[Autopilot] Syncing UI: ${newPosts.length} new, ${deletedIds.length} deleted`);
 
                 // 1. Update Dashboard Cache (Optimistic)
-                queryClient.setQueryData(["dashboard"], (old: any) => {
+                queryClient.setQueriesData({ queryKey: ["dashboard"] }, (old: any) => {
                     if (!old) return old;
                     
                     // Filter out deleted posts
