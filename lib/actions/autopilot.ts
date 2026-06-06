@@ -67,18 +67,17 @@ export async function saveAutopilotSettings(data: {
     },
   });
 
-  // reconcileAutopilotSchedule must complete before maintainAutopilotPipeline
-  // (pipeline needs post state after reconciliation). Sequential is correct here.
-  // syncAutopilotWeeklyFocus is independent — run it in parallel with reconcile.
+  // reconcileAutopilotSchedule and syncAutopilotWeeklyFocus are deletions.
+  // They must complete before maintainAutopilotPipeline.
   const [focusSyncResult, deletedPostIds] = await Promise.all([
     focusChanged
       ? syncAutopilotWeeklyFocus(session.user.id, data.currentFocus || "")
-      : Promise.resolve({ deletedPostIds: [], posts: [] }),
+      : Promise.resolve({ deletedPostIds: [] }),
     reconcileAutopilotSchedule(session.user.id, data.days),
   ]);
 
   const newPosts = await maintainAutopilotPipeline(session.user.id, true);
-  const posts = [...focusSyncResult.posts, ...newPosts].sort((a, b) => {
+  const posts = newPosts.sort((a, b) => {
     if (!a.scheduledFor) return 1;
     if (!b.scheduledFor) return -1;
     return new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime();

@@ -63,6 +63,6 @@ export const AI_CORE_CONFIG = {
 
     FALLBACK_MODELS: [
         "meta-llama/llama-3.1-8b-instruct",
-        "google/gemini-2.0-flash-lite-001"
+        "google/gemini-2.5-flash-lite"
     ]
 };

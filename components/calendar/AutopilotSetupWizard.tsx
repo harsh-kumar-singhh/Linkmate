@@ -39,10 +39,31 @@ const FREQUENCY_OPTIONS = [
 ];
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
+const SAVING_STAGES = [
+    "Analyzing your writing style...",
+    "Assembling strategic themes...",
+    "Drafting posts in parallel...",
+    "Applying quality safeguards...",
+    "Verifying duplicate prevention...",
+    "Scheduling in your calendar..."
+];
+
 export function AutopilotSetupWizard({ isOpen, onClose, initialData }: AutopilotSetupWizardProps) {
     const [step, setStep] = useState(1);
     const [isSaving, setIsSaving] = useState(false);
+    const [savingStage, setSavingStage] = useState(0);
     const queryClient = useQueryClient();
+
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (isSaving) {
+            setSavingStage(0);
+            interval = setInterval(() => {
+                setSavingStage((prev) => (prev + 1) % SAVING_STAGES.length);
+            }, 1500);
+        }
+        return () => clearInterval(interval);
+    }, [isSaving]);
 
     const [topics, setTopics] = useState<string[]>(initialData?.topics || []);
     const [customTopic, setCustomTopic] = useState("");
@@ -625,9 +646,14 @@ export function AutopilotSetupWizard({ isOpen, onClose, initialData }: Autopilot
                                 )}
                             </div>
                             {isSaving && (
-                                <p className="text-[10px] text-center text-muted-foreground mt-4 animate-pulse">
-                                    Our AI is crafting your posts. This usually takes 15-20 seconds.
-                                </p>
+                                <div className="space-y-1 mt-4 text-center">
+                                    <p className="text-[11px] text-blue-600 font-bold animate-pulse">
+                                        {SAVING_STAGES[savingStage]}
+                                    </p>
+                                    <p className="text-[9px] text-muted-foreground">
+                                        Crafting premium posts. This usually takes 5-10 seconds.
+                                    </p>
+                                </div>
                             )}
                         </div>
                     </AnimatedCard>

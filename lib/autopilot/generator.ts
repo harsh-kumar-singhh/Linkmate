@@ -149,11 +149,13 @@ export async function generateAutopilotPosts(
   userId: string,
   specificDay: string,
   afterDate?: Date,
-  testNow?: Date
+  testNow?: Date,
+  prefetchedUser?: any,
+  prefetchedRecentPosts?: any[]
 ) {
   const now = getCurrentTime(testNow);
 
-  const user = await prisma.user.findUnique({
+  const user = prefetchedUser || await prisma.user.findUnique({
     where: { id: userId },
     select: {
       autopilotEnabled: true,
@@ -264,7 +266,7 @@ Focus on actionable value and practical takeaways.`;
     promptContext += `\n\nUSER BACKGROUND (Use for voice/authority): ${user.aboutYou}`;
   }
 
-  const recentPosts = await prisma.post.findMany({
+  const recentPosts = prefetchedRecentPosts || await prisma.post.findMany({
     where: { userId, source: "autopilot" },
     orderBy: { createdAt: "desc" },
     take: 10,

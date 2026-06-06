@@ -21,18 +21,7 @@ export async function maintainAutopilotPipeline(userId?: string, force: boolean 
 
   const createdPosts: any[] = [];
 
-
-
   try {
-    const userCount = await prisma.user.count({
-      where: { id: userId ?? undefined }
-    });
-
-    if (userId && userCount === 0) {
-      console.warn(`[Maintenance] User ${userId} not found in database.`);
-      return [];
-    }
-
     const users = await prisma.user.findMany({
       where: {
         id: userId ?? undefined,
@@ -48,6 +37,10 @@ export async function maintainAutopilotPipeline(userId?: string, force: boolean 
         autopilotTopics: true,
         autopilotDays: true,
         autopilotTime: true,
+        aboutYou: true,
+        autopilotCurrentFocus: true,
+        autopilotWritingStyleId: true,
+        writingStyles: true,
         schedule: { select: { timezone: true } },
       },
       take: userId ? 1 : 20,
@@ -80,14 +73,29 @@ export async function maintainAutopilotPipeline(userId?: string, force: boolean 
       return [];
     }
 
-    const upcomingPosts = await prisma.post.findMany({
-      where: {
-        userId: { in: activeUsers.map((u) => u.id) },
-        source: "autopilot",
-        status: { in: ["SCHEDULED", "PENDING"] },
-        scheduledFor: { gte: now, lte: windowEnd },
-      },
-      select: { userId: true, scheduledFor: true },
+    const [upcomingPosts, ...recentPostsResults] = await Promise.all([
+      prisma.post.findMany({
+        where: {
+          userId: { in: activeUsers.map((u) => u.id) },
+          source: "autopilot",
+          status: { in: ["SCHEDULED", "PENDING"] },
+          scheduledFor: { gte: now, lte: windowEnd },
+        },
+        select: { userId: true, scheduledFor: true },
+      }),
+      ...activeUsers.map((u) =>
+        prisma.post.findMany({
+          where: { userId: u.id, source: "autopilot" },
+          orderBy: { createdAt: "desc" },
+          take: 10,
+          select: { content: true },
+        })
+      ),
+    ]);
+
+    const recentPostsMap = new Map<string, any[]>();
+    activeUsers.forEach((u, index) => {
+      recentPostsMap.set(u.id, recentPostsResults[index]);
     });
 
     // Only count posts within next 14 days as "covering" a slot
@@ -114,9 +122,11 @@ export async function maintainAutopilotPipeline(userId?: string, force: boolean 
     }
 
     for (const user of activeUsers) {
-      const selectedDays = (user.autopilotDays as string[]).map((d) =>
-        d.toUpperCase()
-      );
+      const selectedDays = [
+        ...new Set(
+          (user.autopilotDays as string[]).map((d) => d.toUpperCase())
+        ),
+      ];
       const covered = coveredDays.get(user.id) ?? new Set<string>();
       const missingDays = selectedDays.filter(day => !covered.has(day));
 
@@ -129,7 +139,14 @@ export async function maintainAutopilotPipeline(userId?: string, force: boolean 
         await Promise.all(
           missingDays.map(async (day) => {
             try {
-              const post = await generateAutopilotPosts(user.id, day);
+              const post = await generateAutopilotPosts(
+                user.id,
+                day,
+                undefined,
+                undefined,
+                user,
+                recentPostsMap.get(user.id)
+              );
               if (post) createdPosts.push(post);
             } catch (err) {
               console.error(`[Maintenance] Failed to generate for user=${user.id} day=${day}:`, err);
@@ -261,7 +278,7 @@ export async function syncAutopilotWeeklyFocus(userId: string, newFocus: string)
         select: { id: true, autopilotFocus: true, archetype: true }
     });
 
-    if (futurePosts.length === 0) return { deletedPostIds: [], posts: [] };
+    if (futurePosts.length === 0) return { deletedPostIds: [] };
 
     // 2. Delete only the ones that match the "stale focus" criteria
     // We keep generic topic posts (archetype != WEEKLY_FOCUS and no direct focus anchor, which have autopilotFocus = null)
@@ -269,16 +286,12 @@ export async function syncAutopilotWeeklyFocus(userId: string, newFocus: string)
         .filter(p => p.archetype === "WEEKLY_FOCUS" || (p.autopilotFocus && p.autopilotFocus !== newFocus))
         .map(p => p.id);
 
-    let posts: any[] = [];
     if (staleIds.length > 0) {
         await prisma.post.deleteMany({
             where: { id: { in: staleIds } }
         });
         console.log(`[FocusSync] Deleted ${staleIds.length} stale focus-influenced posts for user=${userId}`);
-        
-        // 3. Trigger maintenance to refill gaps with NEW focus
-        posts = await maintainAutopilotPipeline(userId, true);
     }
 
-    return { deletedPostIds: staleIds, posts };
+    return { deletedPostIds: staleIds };
 }
