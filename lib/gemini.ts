@@ -1,12 +1,14 @@
 import { AI_CORE_CONFIG } from "./ai/config";
 import { generateWithFallback } from "./openrouter";
+import { StyleMemory, DEFAULT_STYLE_MEMORY } from "./ai/default-style-memory";
 
 const TONE_GUIDELINES = AI_CORE_CONFIG.TONE_MAPPING;
 
 export interface GeneratePostOptions {
     topic: string;
     style?: string; // "Professional", "Casual", "Write Like Me - <Name>", etc.
-    userWritingSample?: string; // Content to mimic
+    userWritingSample?: string; // Content to mimic (user custom style or history)
+    styleMemory?: StyleMemory; // Default structured memory
     targetLength?: number; // In characters
     context?: string; // Additional user context
     enforceLength?: boolean;
@@ -22,6 +24,7 @@ export async function generatePost({
     topic, 
     style, 
     userWritingSample, 
+    styleMemory,
     targetLength = 1000, 
     context,
     enforceLength = true,
@@ -48,23 +51,23 @@ export async function generatePost({
         : activeTone;
 
     const targetWords = Math.max(Math.floor(targetLength / 5), 50);
+    
+    // Fallback to default banned phrases if memory is provided or using global defaults
+    const bannedPhrases = styleMemory?.bannedPhrases || DEFAULT_STYLE_MEMORY.bannedPhrases;
 
     // Construct canonical prompt using AI Core rules
     let basePrompt = `You are an expert LinkedIn content writer.
-Write in the EXACT style of the user.
-Tone: ${resolvedToneDescription}
+Tone: ${resolvedToneDescription} (Use this tone as a modifier for the voice, but do NOT let it make the post generic)
 Topic: ${topic}
 Context: ${context || "None"}
 Target length: STRICTLY around ${targetWords} words. You MUST meet this word count.
 
-Instructions:
-- Do NOT be generic.
-- Use strong hooks.
-- Make writing feel human and opinionated.
-- Expand fully on the context provided.
-- Do NOT shorten or summarize important points.
-- Use storytelling or structured flow when possible.
-- Avoid AI-sounding phrases.
+CRITICAL QUALITY INSTRUCTIONS:
+- Generated posts MUST be specific rather than generic.
+- Use concrete examples, observations, experiences, and clear takeaways.
+- Avoid vague advice and empty motivational statements.
+- DO NOT use cliché AI phrases like: ${bannedPhrases.slice(0, 5).map(p => `"${p}"`).join(", ")}.
+- Prioritize accuracy over sounding impressive. If you lack enough information, make fewer claims rather than hallucinating details.
 - DO NOT use markdown code blocks like \`\`\`text or \`\`\`markdown. Output plain text directly.
 
 Output format:
@@ -73,6 +76,7 @@ Output format:
 - Optional punchline or closing insight`;
 
     if (userWritingSample && style?.includes("Write Like Me")) {
+        // High fidelity user style cloning
         basePrompt += `\n\nCRITICAL - WRITING STYLE REPLICATION (WRITE LIKE ME):
 ${AI_CORE_CONFIG.WRITE_LIKE_ME.instruction}
 ${AI_CORE_CONFIG.WRITE_LIKE_ME.rules.map(r => `- ${r}`).join('\n')}
@@ -92,10 +96,39 @@ FORMATTING FIDELITY:
 - Do NOT use markdown bold (**text**) or italics (*text*) unless the Reference Sample EXPLICITLY uses them.
 - Do NOT add stars, bullet points, or visual emphasis symbols unless they appear in the sample.
 - If the sample is plain text, your output MUST be plain text.`;
+
+    } else if (userWritingSample) {
+        // Historical posts style reference (no explicit Write Like Me style tag but history is provided)
+        basePrompt += `\n\nCRITICAL - WRITING STYLE REPLICATION:
+Extract and mimic the sentence length patterns, formatting style, hook structure, and storytelling style from the following historical reference posts:
+
+REFERENCE POSTS:
+"""
+${userWritingSample}
+"""
+`;
+    } else if (styleMemory) {
+        // Default structured style memory
+        basePrompt += `\n\nCRITICAL - WRITING STYLE REPLICATION:
+You must learn and apply the patterns, structure, and writing style from the provided memory.
+Do not copy the examples verbatim. Extract their sentence length patterns, formatting style, hook structure, argument style, and CTA style.
+
+WRITING PRINCIPLES:
+${styleMemory.writingPrinciples.map(p => `- ${p}`).join('\n')}
+
+HOOK STRUCTURES:
+${styleMemory.hookStructures.map(p => `- ${p}`).join('\n')}
+
+FORMATTING PATTERNS:
+${styleMemory.formattingPatterns.map(p => `- ${p}`).join('\n')}
+
+REFERENCE POSTS (Mimic this structure and specificity):
+${styleMemory.referencePosts.map(p => `\n--- EXAMPLE ---\n${p.content}`).join('\n')}
+`;
     }
 
     let currentRetry = 0;
-    const maxRetries = enforceLength ? 1 : 0;
+    const maxRetries = enforceLength ? 2 : 1; // Allow an extra retry for phrase detection
     let finalContent = "";
     let promptExtension = "";
 
@@ -109,6 +142,7 @@ FORMATTING FIDELITY:
             let content = await generateWithFallback(messages, {
                 max_tokens: maxTokens,
                 timeoutMs,
+                task: targetLength > 1200 ? "linkedin_long_form" : "linkedin_post",
             });
             
             if (!content) throw new Error("Empty response from AI");
@@ -120,7 +154,18 @@ FORMATTING FIDELITY:
                 .replace(/\*\*(Hook|Headline|Body|CTA|Conclusion|Post|Draft|Tone|Style|Insight|Lesson|Takeaway)\*\*:\s*/gmi, "")
                 .trim();
                 
-            // Validate word count length
+            // QUALITY CHECK: Banned Phrases
+            const lowerContent = content.toLowerCase();
+            const detectedPhrases = bannedPhrases.filter(phrase => lowerContent.includes(phrase.toLowerCase()));
+            
+            if (detectedPhrases.length > 0 && currentRetry < maxRetries) {
+                console.warn(`[AI] Quality Check Failed: Detected cliché phrases: ${detectedPhrases.join(', ')}. Triggering regeneration...`);
+                promptExtension = `\n\nCRITICAL ENFORCEMENT: Your previous generation contained banned cliché phrases (${detectedPhrases.join(', ')}). You MUST rewrite the post to be completely free of these phrases, and ensure it remains highly specific with concrete examples.`;
+                currentRetry++;
+                continue;
+            }
+
+            // QUALITY CHECK: Word count length
             const wordCount = content.split(/\s+/).filter((w: string) => w.length > 0).length;
             
             if (enforceLength && wordCount < targetWords * 0.7 && currentRetry < maxRetries) {
@@ -141,5 +186,4 @@ FORMATTING FIDELITY:
     
     return finalContent;
 }
-
 

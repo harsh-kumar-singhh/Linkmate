@@ -59,61 +59,75 @@ export async function POST(req: Request) {
             );
         }
 
-        // Fetch User Data for Write Like Me styles
+        // Fetch User Data for Write Like Me styles and Memory Injection
         let userWritingSample = undefined;
+        let styleMemory = undefined;
 
-        if (style && style.includes("Write Like Me")) {
-            const userData = await withRetry(() => prisma.user.findUnique({
-                where: { id: userId },
-                select: {
-                    writingStyles: true,
-                    writingStyle: true,
-                    customStyles: true,
-                    aboutYou: true,
-                    defaultTone: true
-                }
-            } as any));
+        const userData = await withRetry(() => prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                writingStyles: true,
+                writingStyle: true,
+                customStyles: true,
+                aboutYou: true,
+                defaultTone: true
+            }
+        } as any));
 
-            if (userData) {
-                if ((userData as any).aboutYou) {
-                   // Append global context to the generation context
-                   // We'll pass it to generatePost below
+        if (userData) {
+            let styles = (userData as any).writingStyles || [];
+            // Bridge logic: combine legacy and new styles if needed
+            if (styles.length === 0) {
+                if ((userData as any).writingStyle) styles.push({ name: "Legacy (Main)", sample: (userData as any).writingStyle });
+                if ((userData as any).customStyles) {
+                    (userData as any).customStyles.forEach((s: string, i: number) => {
+                        if (s) styles.push({ name: `Legacy (Extra ${i + 1})`, sample: s });
+                    });
                 }
-                let styles = (userData as any).writingStyles || [];
-                // Bridge logic: combine legacy and new styles if needed
-                if (styles.length === 0) {
-                    if ((userData as any).writingStyle) styles.push({ name: "Legacy (Main)", sample: (userData as any).writingStyle });
-                    if ((userData as any).customStyles) {
-                        (userData as any).customStyles.forEach((s: string, i: number) => {
-                            if (s) styles.push({ name: `Legacy (Extra ${i + 1})`, sample: s });
-                        });
-                    }
-                }
+            }
 
+            // 1. User Custom Style
+            let matchedStyle = undefined;
+            if (style && style.includes("Write Like Me")) {
                 const parts = style.split(/[\u2014\u2013-]/);
                 const styleName = parts.length > 1 ? parts[parts.length - 1].trim().toLowerCase() : "";
 
-                const matchedStyle = (styles as any[]).find(
+                matchedStyle = (styles as any[]).find(
                     (s: any) => s.name?.trim().toLowerCase() === styleName
                 );
+            }
 
-                if (matchedStyle?.sample) {
-                    userWritingSample = matchedStyle.sample;
-                    console.log(`[GENERATE] Using writing style: ${matchedStyle.name}`);
+            if (matchedStyle?.sample) {
+                userWritingSample = matchedStyle.sample;
+                console.log(`[GENERATE] Using writing style: ${matchedStyle.name}`);
+            } else {
+                // 2. Try to fetch historical posts as fallback style reference
+                const recentPosts = await withRetry(() => prisma.post.findMany({
+                    where: { userId, source: 'MANUAL', content: { not: '' } },
+                    orderBy: { createdAt: 'desc' },
+                    take: 3
+                }));
+
+                if (recentPosts.length > 0) {
+                    userWritingSample = recentPosts.map(p => p.content).join('\n\n---\n\n');
+                    console.log(`[GENERATE] Using ${recentPosts.length} recent posts for style reference`);
+                    
+                    if (style && style.includes("Write Like Me") && userData?.defaultTone) {
+                        style = userData.defaultTone; // Fallback to their selected basic tone for voice
+                    }
                 } else {
-                    // Try to fetch historical posts as fallback style reference
-                    const recentPosts = await withRetry(() => prisma.post.findMany({
-                        where: { userId, source: 'MANUAL', content: { not: '' } },
-                        orderBy: { createdAt: 'desc' },
-                        take: 3
-                    }));
+                    // 3. Default Style Memory
+                    const { DEFAULT_STYLE_MEMORY, getRelevantMemoryPosts } = require("@/lib/ai/default-style-memory");
+                    const relevantPosts = getRelevantMemoryPosts(topic, 2);
+                    styleMemory = {
+                        ...DEFAULT_STYLE_MEMORY,
+                        referencePosts: relevantPosts
+                    };
+                    console.log(`[GENERATE] Using Default Style Memory with ${relevantPosts.length} relevant posts`);
 
-                    if (recentPosts.length > 0) {
-                        userWritingSample = recentPosts.map(p => p.content).join('\n\n---\n\n');
-                        console.log(`[GENERATE] Using ${recentPosts.length} recent posts for Write Like Me style`);
-                    } else if (userData?.defaultTone) {
-                        console.log(`[GENERATE] No history found. Falling back to defaultTone: ${userData.defaultTone}`);
-                        style = userData.defaultTone; // Fallback to their selected basic tone
+                    if (style && style.includes("Write Like Me") && userData?.defaultTone) {
+                        console.log(`[GENERATE] No history found. Falling back to defaultTone for voice modifier: ${userData.defaultTone}`);
+                        style = userData.defaultTone; 
                     }
                 }
             }
@@ -131,6 +145,7 @@ export async function POST(req: Request) {
                 topic,
                 style,
                 userWritingSample,
+                styleMemory,
                 targetLength,
                 context: finalContext
             });

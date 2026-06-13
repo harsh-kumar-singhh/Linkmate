@@ -6,7 +6,7 @@ import { auth } from "@/lib/auth";
 import { resolveUser } from "@/lib/auth/user";
 import { getCoachContext } from "@/lib/coach-context";
 import { AI_CORE_CONFIG } from "@/lib/ai/config";
-import { generateWithFallback, getCoachErrorResponse, AIError } from "@/lib/openrouter";
+import { getModelConfig, resolveTokenBudget } from "@/lib/ai/model-config";
 import { checkAndIncrementAIQuota } from "@/lib/usage";
 import { AIUsageType } from "@prisma/client";
 import { triggerAICoachFollowUp, triggerUpgradePrompt } from "@/lib/notifications";
@@ -209,6 +209,19 @@ You must output a JSON object with this structure:
             console.error("[AI_COACH] Error: OPENROUTER_API_KEY is not defined");
             throw new Error("AI service configuration missing");
         }
+        const coachModel = "openai/gpt-4o-mini";
+        const tokenBudget = resolveTokenBudget({
+            task: "ai_coach",
+            model: getModelConfig(coachModel),
+        });
+        const startedAt = Date.now();
+
+        if (tokenBudget.clamped) {
+            console.warn(
+                `[AI_COACH] Clamped max_tokens: requested=${tokenBudget.requested}, allowed=${tokenBudget.allowedMaximum}, sent=${tokenBudget.sent}`
+            );
+        }
+
         const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
             method: "POST",
             headers: {
@@ -218,12 +231,17 @@ You must output a JSON object with this structure:
                 "X-Title": "Linkmate AI Coach",
             },
             body: JSON.stringify({
-                model: "openai/gpt-4o-mini",
+                model: coachModel,
                 messages,
                 temperature: 0.6,
+                max_tokens: tokenBudget.sent,
                 stream: true
             }),
         });
+
+        console.log(
+            `[AI_COACH] OpenRouter request | model=${coachModel} | requested_max_tokens=${tokenBudget.requested} | sent_max_tokens=${tokenBudget.sent} | latency_ms=${Date.now() - startedAt}`
+        );
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
@@ -304,4 +322,3 @@ You must output a JSON object with this structure:
         return NextResponse.json({ success: false, message: "Internal server error" }, { status: 500 });
     }
 }
-

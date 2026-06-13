@@ -1,3 +1,5 @@
+import { AI_MODELS } from "./model-config";
+
 export const AI_CORE_CONFIG = {
     GLOBAL_RULES: {
         hard_constraints: [
@@ -61,8 +63,8 @@ export const AI_CORE_CONFIG = {
         UNKNOWN_INTERNAL: "UNKNOWN_INTERNAL"
     },
 
-    FALLBACK_MODELS: [
-        "meta-llama/llama-3.1-8b-instruct",
-        "google/gemini-2.5-flash-lite"
-    ]
+    FALLBACK_MODELS: AI_MODELS
+        .filter((model) => model.role === "fallback")
+        .sort((a, b) => a.priority - b.priority)
+        .map((model) => model.id)
 };

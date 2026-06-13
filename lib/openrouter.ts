@@ -1,6 +1,13 @@
 import { AI_CORE_CONFIG } from "./ai/config";
+import {
+  AITask,
+  AI_MODELS,
+  getReducedTokenBudget,
+  isTokenAllocationError,
+  resolveTokenBudget,
+} from "./ai/model-config";
 
-export type AIErrorType = 'QUOTA_EXCEEDED' | 'RATE_LIMIT' | 'TIMEOUT' | 'MODEL_FAILURE' | 'LOGIC_ERROR' | 'AUTH_MISSING' | 'UNKNOWN_INTERNAL';
+export type AIErrorType = 'QUOTA_EXCEEDED' | 'RATE_LIMIT' | 'TIMEOUT' | 'MODEL_FAILURE' | 'LOGIC_ERROR' | 'AUTH_MISSING' | 'TOKEN_ALLOCATION' | 'UNKNOWN_INTERNAL';
 
 export class AIError extends Error {
   type: AIErrorType;
@@ -14,29 +21,7 @@ export class AIError extends Error {
   }
 }
 
-export interface AIModel {
-  id: string;
-  priority: number;
-  role: 'primary' | 'fallback';
-}
-
-export const AI_MODELS: AIModel[] = [
-  {
-    id: "google/gemini-2.5-flash",
-    priority: 1,
-    role: "primary"
-  },
-  {
-    id: "google/gemini-2.5-flash-lite",
-    priority: 2,
-    role: "fallback"
-  },
-  {
-    id: "meta-llama/llama-3.1-8b-instruct",
-    priority: 3,
-    role: "fallback"
-  }
-];
+export { AI_MODELS };
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const BASE_URL = "https://openrouter.ai/api/v1";
@@ -46,7 +31,14 @@ async function logAIEvent(event: {
   error_type?: AIErrorType;
   timestamp: string;
   attempt_number: number;
+  model_attempt_number?: number;
   success: boolean;
+  task?: AITask;
+  requested_max_tokens?: number;
+  sent_max_tokens?: number;
+  allowed_max_tokens?: number;
+  latency_ms?: number;
+  fallback_reason?: AIErrorType | "TOKEN_CLAMPED";
   message?: string;
 }) {
   // Only log detailed JSON in production if it's an error, or keep it simple
@@ -57,6 +49,8 @@ async function logAIEvent(event: {
 
 function classifyError(status: number, message: string): AIErrorType {
   const msg = message.toLowerCase();
+
+  if (isTokenAllocationError(msg)) return 'TOKEN_ALLOCATION';
   
   if (status === 429) {
     if (msg.includes('quota') || msg.includes('credit')) {
@@ -74,7 +68,7 @@ function classifyError(status: number, message: string): AIErrorType {
   if (status >= 500) return 'MODEL_FAILURE';
   if (status === 401) return 'AUTH_MISSING';
   if (status === 400) {
-    if (msg.includes('context_length')) return 'MODEL_FAILURE'; // Treat as model failure to allow fallback
+    if (msg.includes('context_length')) return 'TOKEN_ALLOCATION';
     return 'LOGIC_ERROR';
   }
   return 'UNKNOWN_INTERNAL';
@@ -82,7 +76,7 @@ function classifyError(status: number, message: string): AIErrorType {
 
 export async function generateWithFallback(
   messages: { role: string; content: string }[],
-  options: { temperature?: number; max_tokens?: number; response_format?: { type: 'json_object' }; timeoutMs?: number } = {}
+  options: { temperature?: number; max_tokens?: number; response_format?: { type: 'json_object' }; timeoutMs?: number; task?: AITask } = {}
 ) {
   if (!OPENROUTER_API_KEY) {
     throw new AIError("OpenRouter API key not configured", "LOGIC_ERROR");
@@ -94,86 +88,129 @@ export async function generateWithFallback(
   for (let i = 0; i < sortedModels.length; i++) {
     const model = sortedModels[i];
     const attempt = i + 1;
+    let modelAttempt = 1;
+    let requestedMaxTokens = options.max_tokens;
 
-    try {
-      console.log(`[AI] Attempt ${attempt} with model: ${model.id}`);
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), options.timeoutMs ?? 8000);
-
-      const response = await fetch(`${BASE_URL}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": process.env.NEXTAUTH_URL || "http://localhost:3000",
-          "X-Title": "LinkMate"
-        },
-        body: JSON.stringify({
-          model: model.id,
-          messages,
-          temperature: options.temperature ?? 0.7,
-          max_tokens: options.max_tokens,
-          response_format: options.response_format
-        }),
-        signal: controller.signal
+    while (modelAttempt <= 2) {
+      const startedAt = Date.now();
+      const tokenBudget = resolveTokenBudget({
+        requestedMaxTokens,
+        task: options.task,
+        model,
       });
 
-      clearTimeout(timeoutId);
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        const errorType = classifyError(response.status, data?.error?.message || "");
-        throw new AIError(data?.error?.message || "OpenRouter Request Failed", errorType, model.id);
+      if (tokenBudget.clamped) {
+        console.warn(
+          `[AI] Clamped max_tokens for ${model.id}: requested=${tokenBudget.requested}, allowed=${tokenBudget.allowedMaximum}, sent=${tokenBudget.sent}`
+        );
       }
 
-      const content = data.choices?.[0]?.message?.content;
-      if (!content) {
-        throw new AIError("Empty response from AI", "MODEL_FAILURE", model.id);
-      }
+      try {
+        console.log(
+          `[AI] Attempt ${attempt}.${modelAttempt} with model: ${model.id} | task=${tokenBudget.task} | max_tokens=${tokenBudget.sent}`
+        );
 
-      if (attempt > 1) {
-        console.log(`[AI] Recovery success with model: ${model.id} on attempt ${attempt}`);
-      }
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), options.timeoutMs ?? model.timeoutMs);
 
-      await logAIEvent({
-        model_id: model.id,
-        timestamp: new Date().toISOString(),
-        attempt_number: attempt,
-        success: true
-      });
+        const response = await fetch(`${BASE_URL}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": process.env.NEXTAUTH_URL || "http://localhost:3000",
+            "X-Title": "LinkMate"
+          },
+          body: JSON.stringify({
+            model: model.id,
+            messages,
+            temperature: options.temperature ?? 0.7,
+            max_tokens: tokenBudget.sent,
+            response_format: options.response_format
+          }),
+          signal: controller.signal
+        });
 
-      return content;
+        clearTimeout(timeoutId);
 
-    } catch (error: any) {
-      const errorType = error instanceof AIError ? error.type : (error.name === 'AbortError' ? 'TIMEOUT' : 'UNKNOWN_INTERNAL');
-      const errorMessage = error.message || "Unknown error occurred";
+        const data = await response.json();
 
-      lastError = new AIError(errorMessage, errorType, model.id);
+        if (!response.ok) {
+          const errorType = classifyError(response.status, data?.error?.message || "");
+          throw new AIError(data?.error?.message || "OpenRouter Request Failed", errorType, model.id);
+        }
 
-      // CRITICAL: Log detailed error in dev to help debugging
-      if (process.env.NODE_ENV === 'development') {
-        console.error(`[AI ERROR] [${model.id}] [${errorType}]:`, errorMessage);
-      }
+        const content = data.choices?.[0]?.message?.content;
+        if (!content) {
+          throw new AIError("Empty response from AI", "MODEL_FAILURE", model.id);
+        }
 
-      await logAIEvent({
-        model_id: model.id,
-        error_type: errorType,
-        timestamp: new Date().toISOString(),
-        attempt_number: attempt,
-        success: false,
-        message: errorMessage
-      });
+        if (attempt > 1 || modelAttempt > 1) {
+          console.log(`[AI] Recovery success with model: ${model.id} on attempt ${attempt}.${modelAttempt}`);
+        }
 
-      // If it's a logic error (e.g. bad prompt/config), don't bother falling back
-      if (errorType === 'LOGIC_ERROR') throw lastError;
+        await logAIEvent({
+          model_id: model.id,
+          timestamp: new Date().toISOString(),
+          attempt_number: attempt,
+          model_attempt_number: modelAttempt,
+          success: true,
+          task: tokenBudget.task,
+          requested_max_tokens: tokenBudget.requested,
+          sent_max_tokens: tokenBudget.sent,
+          allowed_max_tokens: tokenBudget.allowedMaximum,
+          latency_ms: Date.now() - startedAt,
+          fallback_reason: tokenBudget.clamped ? "TOKEN_CLAMPED" : undefined,
+        });
 
-      // Continue to next model if available
-      if (i < sortedModels.length - 1) {
-        console.warn(`[AI] Model ${model.id} failed (${errorType}). Trying next model: ${sortedModels[i+1].id}...`);
-      } else {
-        console.error(`[AI] Final model ${model.id} failed (${errorType}). No more fallbacks.`);
+        return content;
+
+      } catch (error: any) {
+        const errorType = error instanceof AIError ? error.type : (error.name === 'AbortError' ? 'TIMEOUT' : 'UNKNOWN_INTERNAL');
+        const errorMessage = error.message || "Unknown error occurred";
+
+        lastError = new AIError(errorMessage, errorType, model.id);
+
+        // CRITICAL: Log detailed error in dev to help debugging
+        if (process.env.NODE_ENV === 'development') {
+          console.error(`[AI ERROR] [${model.id}] [${errorType}]:`, errorMessage);
+        }
+
+        await logAIEvent({
+          model_id: model.id,
+          error_type: errorType,
+          timestamp: new Date().toISOString(),
+          attempt_number: attempt,
+          model_attempt_number: modelAttempt,
+          success: false,
+          task: tokenBudget.task,
+          requested_max_tokens: tokenBudget.requested,
+          sent_max_tokens: tokenBudget.sent,
+          allowed_max_tokens: tokenBudget.allowedMaximum,
+          latency_ms: Date.now() - startedAt,
+          fallback_reason: errorType,
+          message: errorMessage
+        });
+
+        if (errorType === 'TOKEN_ALLOCATION' && modelAttempt === 1) {
+          requestedMaxTokens = getReducedTokenBudget(tokenBudget.sent, tokenBudget.task);
+          console.warn(
+            `[AI] Token allocation failed for ${model.id}. Retrying same model with max_tokens=${requestedMaxTokens} before fallback.`
+          );
+          modelAttempt++;
+          continue;
+        }
+
+        // If it's a logic error (e.g. bad prompt/config), don't bother falling back
+        if (errorType === 'LOGIC_ERROR') throw lastError;
+
+        // Continue to next model if available
+        if (i < sortedModels.length - 1) {
+          console.warn(`[AI] Model ${model.id} failed (${errorType}). Trying next model: ${sortedModels[i+1].id}...`);
+        } else {
+          console.error(`[AI] Final model ${model.id} failed (${errorType}). No more fallbacks.`);
+        }
+        break;
       }
     }
   }
@@ -193,7 +230,7 @@ export function getPublicErrorMessage(error: any): string {
     if (error.type === 'QUOTA_EXCEEDED') {
       return USER_MESSAGES.quota_exhausted;
     }
-    if (error.type === 'MODEL_FAILURE' || error.type === 'RATE_LIMIT' || error.type === 'TIMEOUT') {
+    if (error.type === 'MODEL_FAILURE' || error.type === 'RATE_LIMIT' || error.type === 'TIMEOUT' || error.type === 'TOKEN_ALLOCATION') {
       return USER_MESSAGES.model_failure;
     }
     if (error.type === 'AUTH_MISSING') {
@@ -214,7 +251,7 @@ export function getCoachErrorResponse(error: any) {
     if (error.type === 'QUOTA_EXCEEDED') code = AI_CORE_CONFIG.ERROR_CATEGORIES.QUOTA_EXCEEDED;
     else if (error.type === 'AUTH_MISSING') code = AI_CORE_CONFIG.ERROR_CATEGORIES.AUTH_MISSING;
     else if (error.type === 'TIMEOUT') code = AI_CORE_CONFIG.ERROR_CATEGORIES.TIMEOUT;
-    else if (error.type === 'MODEL_FAILURE' || error.type === 'RATE_LIMIT') code = AI_CORE_CONFIG.ERROR_CATEGORIES.MODEL_FAILURE;
+    else if (error.type === 'MODEL_FAILURE' || error.type === 'RATE_LIMIT' || error.type === 'TOKEN_ALLOCATION') code = AI_CORE_CONFIG.ERROR_CATEGORIES.MODEL_FAILURE;
   }
 
   return { error: message, code };

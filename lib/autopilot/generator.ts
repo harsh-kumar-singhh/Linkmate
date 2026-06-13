@@ -273,10 +273,18 @@ Focus on actionable value and practical takeaways.`;
     select: { content: true },
   });
 
+  const manualPosts = await prisma.post.findMany({
+    where: { userId, source: "MANUAL", content: { not: "" } },
+    orderBy: { createdAt: "desc" },
+    take: 3,
+    select: { content: true },
+  });
+
   const hook = HOOK_STYLES[Math.floor(Math.random() * HOOK_STYLES.length)];
 
   let selectedStyle = "Professional";
   let userWritingSample: string | undefined = undefined;
+  let styleMemory = undefined;
 
   const styleId = (user as any).autopilotWritingStyleId;
   if (styleId && styleId !== "default") {
@@ -288,12 +296,32 @@ Focus on actionable value and practical takeaways.`;
     }
   }
 
+  // Memory Fallback Chain
+  if (!userWritingSample) {
+    if (manualPosts.length > 0) {
+      userWritingSample = manualPosts.map(p => p.content).join('\n\n---\n\n');
+      console.log(`[Autopilot Generator] Using ${manualPosts.length} recent manual posts for style reference`);
+      // Revert to a base style since we don't have a specific "Write Like Me"
+      selectedStyle = "Professional";
+    } else {
+      const { DEFAULT_STYLE_MEMORY, getRelevantMemoryPosts } = require("@/lib/ai/default-style-memory");
+      const relevantPosts = getRelevantMemoryPosts(promptTopic, 2);
+      styleMemory = {
+          ...DEFAULT_STYLE_MEMORY,
+          referencePosts: relevantPosts
+      };
+      console.log(`[Autopilot Generator] Using Default Style Memory with ${relevantPosts.length} relevant posts`);
+      selectedStyle = "Professional";
+    }
+  }
+
   let content = "";
   for (let attempt = 0; attempt <= 1; attempt++) {
     content = await generatePost({
       topic: promptTopic,
       style: selectedStyle,
       userWritingSample,
+      styleMemory,
       targetLength: 750,
       context: `${promptContext}\n\nStart with ${hook}`,
       enforceLength: false,
