@@ -48,7 +48,7 @@ async function fetchDashboardData(userId: string): Promise<DashboardData> {
   startOfWeek.setHours(0, 0, 0, 0)
 
   // All queries fire simultaneously — single DB round-trip window
-  const [scheduledPosts, publishedPosts, draftPosts, counts, recentPublishedPosts, aiUsage] = await Promise.all([
+  const [scheduledPosts, publishedPosts, draftPosts, counts, allPublishedDates, aiUsage] = await Promise.all([
     prisma.post.findMany({
       where: { userId, status: "SCHEDULED" },
       orderBy: [{ scheduledFor: "asc" }, { createdAt: "desc" }],
@@ -100,7 +100,6 @@ async function fetchDashboardData(userId: string): Promise<DashboardData> {
       where: {
         userId,
         status: "PUBLISHED",
-        publishedAt: { gte: thirtyDaysAgo },
       },
       select: { publishedAt: true },
       orderBy: { publishedAt: "desc" },
@@ -128,17 +127,24 @@ async function fetchDashboardData(userId: string): Promise<DashboardData> {
 
   // ── Streak calculation ──────────────────────────────────────────────────
   let streak = 0
-  if (recentPublishedPosts.length > 0) {
+  if (allPublishedDates.length > 0) {
     const uniqueDays = Array.from(
       new Set(
-        recentPublishedPosts.map(p =>
+        allPublishedDates.map(p =>
           startOfDay(new Date(p.publishedAt!)).getTime()
         )
       )
     ).sort((a, b) => b - a)
 
+    console.log("--- STREAK CALCULATION DEBUG ---")
+    console.log(`User: ${userId}`)
+    console.log(`Today (ms): ${today.getTime()} (${today.toISOString()})`)
+    console.log("Unique Days (last 5 for log):", uniqueDays.slice(0, 5).map(d => new Date(d).toISOString()))
+
     const diffInDays =
       (today.getTime() - uniqueDays[0]) / (1000 * 60 * 60 * 24)
+    
+    console.log(`Diff from today to latest post in days: ${diffInDays}`)
 
     if (diffInDays <= 1) {
       streak = 1
@@ -146,15 +152,21 @@ async function fetchDashboardData(userId: string): Promise<DashboardData> {
         const dayDiff = Math.round(
           (uniqueDays[i] - uniqueDays[i + 1]) / (1000 * 60 * 60 * 24)
         )
-        if (dayDiff === 1) streak++
-        else break
+        if (dayDiff === 1) {
+          streak++
+        } else {
+          console.log(`Streak broken! Gap of ${dayDiff} days between ${new Date(uniqueDays[i]).toISOString()} and ${new Date(uniqueDays[i + 1]).toISOString()}`)
+          break
+        }
       }
     }
+    console.log(`Final Calculated Streak: ${streak}`)
+    console.log("--------------------------------")
   }
 
   // ── Consistency score ───────────────────────────────────────────────────
   const uniqueDaysLast15 = new Set(
-    recentPublishedPosts
+    allPublishedDates
       .filter(p => p.publishedAt && new Date(p.publishedAt) >= fifteenDaysAgo)
       .map(p => startOfDay(new Date(p.publishedAt!)).getTime())
   ).size
