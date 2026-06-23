@@ -146,6 +146,7 @@ export async function POST(req: Request) {
         );
 
         console.log(`[PUBLISH] Post successfully published | post=${post.id} | user=${user.id} | linkedinPostId=${result.linkedinPostId}`);
+        console.log(`[TRACE_NOTIFICATION] publish_success_event | postId=${post.id} | userId=${user.id} | publish_timestamp=${new Date().toISOString()}`);
 
         try {
           await sendPostPublishedNotification({
@@ -180,7 +181,7 @@ export async function POST(req: Request) {
         );
       }
     } else if (status === "DRAFT" || !status) {
-      triggerDraftSavedNotification(user.id, content, post.id).catch((notifyError) => {
+      await triggerDraftSavedNotification(user.id, content, post.id).catch((notifyError) => {
         console.error("[POSTS] Push notification failed for saving draft:", notifyError);
       });
     }

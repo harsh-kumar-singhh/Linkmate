@@ -160,6 +160,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         } else {
           // 'denied' — user blocked notifications. Nothing we can do programmatically.
           console.warn('[PUSH] Notification permission is denied. User must enable manually in browser settings.');
+          addToast({
+            title: 'Notifications Blocked',
+            message: 'Push notifications are blocked in your browser. You will not receive post publish alerts unless enabled in site settings.',
+            type: 'warning',
+            duration: 8000,
+          });
         }
       })
       .catch((err) => {

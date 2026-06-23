@@ -100,6 +100,7 @@ async function handleCron(req: Request) {
                 });
 
                 console.log(`[PUBLISH] Post successfully published | post=${post.id} | user=${post.userId} | linkedinPostId=${publishResult.linkedinPostId}`);
+                console.log(`[TRACE_NOTIFICATION] publish_success_event | postId=${post.id} | userId=${post.userId} | publish_timestamp=${new Date().toISOString()}`);
 
                 // Trigger notification only after the database status is PUBLISHED.
                 try {

@@ -96,6 +96,7 @@ export async function PUT(
         // Trigger push notification only after LinkedIn succeeded and the DB row is PUBLISHED.
         if (status === "PUBLISHED") {
             console.log(`[PUBLISH] Post successfully published | post=${post.id} | user=${session.user.id} | linkedinPostId=${finalLinkedinPostId}`);
+            console.log(`[TRACE_NOTIFICATION] publish_success_event | postId=${post.id} | userId=${session.user.id} | publish_timestamp=${new Date().toISOString()}`);
             try {
                 await sendPostPublishedNotification({
                     userId: session.user.id,

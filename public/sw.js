@@ -54,25 +54,23 @@ self.addEventListener('push', function (event) {
   const notificationData = data.data || {};
   const targetUrl = notificationData.url || data.url || '/dashboard';
   const timestamp = notificationData.timestamp || data.timestamp || new Date().toISOString();
+  const tag = data.tag || data.type || 'linkmate-notification';
+
+  console.log(`[TRACE_NOTIFICATION] service_worker_receive_event | tag=${tag} | sw_receive_timestamp=${timestamp}`);
 
   const options = {
     body: data.body || '',
     icon: data.icon || '/android-chrome-192x192.png',
     badge: data.badge || '/favicon-32x32.png',
     vibrate: [100, 50, 100],
-    // tag: prevents duplicate notifications for the same type.
-    // If you want one notification per post, use the postId in the tag.
-    tag: data.tag || data.type || 'linkmate-notification',
-    // renotify: true means even if tag already exists, re-vibrate/re-alert
+    tag: tag,
     renotify: true,
     data: {
       ...notificationData,
       url: targetUrl,
       timestamp,
     },
-    // actions are only shown on some platforms (Android Chrome, not iOS Safari)
     actions: data.actions || [],
-    // requireInteraction: keeps notification visible until user taps (Android)
     requireInteraction: false,
   };
 
@@ -80,9 +78,22 @@ self.addEventListener('push', function (event) {
     self.registration.showNotification(data.title || 'Linkmate', options)
       .then(() => {
         console.log('[SW] showNotification called successfully for:', data.type);
+        console.log(`[TRACE_NOTIFICATION] notification_display_event | tag=${tag}`);
       })
-      .catch((err) => {
-        console.error('[SW] showNotification failed:', err);
+      .catch(async (err) => {
+        console.error('[SW] showNotification failed, attempting fallback:', err);
+        // Fallback for strict browsers (e.g. Safari) that might throw on renotify or actions
+        const fallbackOptions = {
+          body: data.body || '',
+          icon: data.icon || '/android-chrome-192x192.png',
+          data: { url: targetUrl, timestamp }
+        };
+        try {
+          await self.registration.showNotification(data.title || 'Linkmate', fallbackOptions);
+          console.log(`[TRACE_NOTIFICATION] notification_display_event_fallback | tag=${tag}`);
+        } catch (fallbackErr) {
+          console.error('[SW] Fallback showNotification also failed:', fallbackErr);
+        }
       })
   );
 });

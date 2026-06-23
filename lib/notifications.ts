@@ -138,6 +138,7 @@ export async function sendPushNotification(
   });
 
   console.log(`[NOTIFICATIONS] Found ${subscriptions.length} push subscription(s) for user ${userId}`);
+  console.log(`[TRACE_NOTIFICATION] subscriptions_found | userId=${userId} | count=${subscriptions.length}`);
 
   if (subscriptions.length === 0) {
     console.warn(
@@ -189,6 +190,7 @@ export async function sendPushNotification(
           }
         );
         console.log(`[NOTIFICATIONS] Push sent successfully | subscription=${sub.id} | endpoint=${sub.endpoint.slice(0, 50)}...`);
+        console.log(`[TRACE_NOTIFICATION] dispatch_success | userId=${userId} | subscription=${sub.id} | endpoint=${sub.endpoint.slice(0, 50)}...`);
       } catch (error: any) {
         // 410 Gone or 404 = subscription is dead. Clean it up.
         if (error.statusCode === 410 || error.statusCode === 404) {
@@ -196,12 +198,14 @@ export async function sendPushNotification(
             console.error('[NOTIFICATIONS] Failed to delete stale subscription:', e)
           );
           console.log(`[NOTIFICATIONS] Cleaned stale subscription | subscription=${sub.id} | statusCode=${error.statusCode}`);
+          console.log(`[TRACE_NOTIFICATION] dispatch_stale_removed | userId=${userId} | subscription=${sub.id}`);
         } else {
           console.error(`[NOTIFICATIONS] Push send failure | subscription=${sub.id}:`, {
             statusCode: error.statusCode,
             message: error.message,
             endpoint: sub.endpoint.slice(0, 50),
           });
+          console.error(`[TRACE_NOTIFICATION] dispatch_failure | userId=${userId} | subscription=${sub.id} | statusCode=${error.statusCode} | message=${error.message}`);
         }
 
         // Re-throw so Promise.allSettled captures the rejection
@@ -249,6 +253,7 @@ export async function sendPostPublishedNotification({
   postId: string;
 }) {
   console.log(`[NOTIFICATIONS] Triggering publish notification | post=${postId} | user=${userId}`);
+  console.log(`[TRACE_NOTIFICATION] trigger_post_published | postId=${postId} | userId=${userId} | trigger_timestamp=${new Date().toISOString()}`);
 
   const snippet = postContent.length > 50 ? postContent.substring(0, 47) + '...' : postContent;
   const segment = await getUserSegment(userId);
