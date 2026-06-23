@@ -62,17 +62,29 @@ Topic: ${topic}
 Context: ${context || "None"}
 Target length: STRICTLY around ${targetWords} words. You MUST meet this word count.
 
+CRITICAL HOOK GENERATION INSTRUCTIONS:
+- The hook MUST start directly with a strong action verb (command-verb framework).
+- Examples: "Stop doing this.", "Build before you're ready.", "Learn this skill.", "Ignore the hype.", "Start here.", "Think bigger.", "Delete this habit.", "Focus on this instead.", "Ship faster.", "Question everything."
+- Hook length MUST generally stay under 8 words. Prioritize curiosity and urgency. Maintain variety by rotating verbs and structures.
+- ABSOLUTELY NO setup phrases before the hook (e.g., Do NOT use "You should", "You need to", "I think", "Here's why", "Let me explain", "In my opinion").
+
+AI DETECTION REDUCTION & WRITING STYLE:
+- Do NOT use markdown formatting (NO *, **, #, ##, ###, _, __).
+- Do NOT use excessive emojis or excessive bullet lists.
+- Short paragraphs only (1-3 sentences max).
+- Natural sentence flow and conversational tone.
+- Human observations over generic advice. Specific examples whenever possible.
+- Avoid motivational clichés. Avoid repetitive sentence structures.
+- Avoid sounding like ChatGPT. Output should resemble how real successful creators naturally write LinkedIn posts.
+
 CRITICAL QUALITY INSTRUCTIONS:
 - Generated posts MUST be specific rather than generic.
-- Use concrete examples, observations, experiences, and clear takeaways.
-- Avoid vague advice and empty motivational statements.
 - DO NOT use cliché AI phrases like: ${bannedPhrases.slice(0, 5).map(p => `"${p}"`).join(", ")}.
-- Prioritize accuracy over sounding impressive. If you lack enough information, make fewer claims rather than hallucinating details.
 - DO NOT use markdown code blocks like \`\`\`text or \`\`\`markdown. Output plain text directly.
 
 Output format:
-- Strong hook (1-2 lines)
-- Body (clear, engaging, structured)
+- Strong hook (1-2 lines, command-verb focused)
+- Body (clear, engaging, structured, conversational)
 - Optional punchline or closing insight`;
 
     if (userWritingSample && style?.includes("Write Like Me")) {
@@ -152,15 +164,23 @@ ${styleMemory.referencePosts.map(p => `\n--- EXAMPLE ---\n${p.content}`).join('\
                 .replace(/```$/gi, "")
                 .replace(/^(Hook|Headline|Body|CTA|Conclusion|Post|Draft|Tone|Style|Insight|Lesson|Takeaway):\s*/gmi, "")
                 .replace(/\*\*(Hook|Headline|Body|CTA|Conclusion|Post|Draft|Tone|Style|Insight|Lesson|Takeaway)\*\*:\s*/gmi, "")
+                // Strip markdown formatting as a fallback
+                .replace(/(\*\*|__|\*|_)/g, "")
+                .replace(/^#+\s+/gm, "")
                 .trim();
                 
-            // QUALITY CHECK: Banned Phrases
+            // QUALITY CHECK: Banned Phrases & Formatting
             const lowerContent = content.toLowerCase();
             const detectedPhrases = bannedPhrases.filter(phrase => lowerContent.includes(phrase.toLowerCase()));
+            const hasSetupPhrase = /^(you should|you need to|i think|here's why|let me explain|in my opinion)/i.test(content.trim());
             
-            if (detectedPhrases.length > 0 && currentRetry < maxRetries) {
-                console.warn(`[AI] Quality Check Failed: Detected cliché phrases: ${detectedPhrases.join(', ')}. Triggering regeneration...`);
-                promptExtension = `\n\nCRITICAL ENFORCEMENT: Your previous generation contained banned cliché phrases (${detectedPhrases.join(', ')}). You MUST rewrite the post to be completely free of these phrases, and ensure it remains highly specific with concrete examples.`;
+            if ((detectedPhrases.length > 0 || hasSetupPhrase) && currentRetry < maxRetries) {
+                let issues = [];
+                if (detectedPhrases.length > 0) issues.push(`cliché phrases (${detectedPhrases.join(', ')})`);
+                if (hasSetupPhrase) issues.push(`a forbidden setup phrase at the beginning of the hook`);
+                
+                console.warn(`[AI] Quality Check Failed: Detected ${issues.join(', ')}. Triggering regeneration...`);
+                promptExtension = `\n\nCRITICAL ENFORCEMENT: Your previous generation contained ${issues.join(' and ')}. You MUST rewrite the post to be completely free of these issues. Remember: Start directly with a command verb, NO setup phrases, and NO markdown formatting.`;
                 currentRetry++;
                 continue;
             }
