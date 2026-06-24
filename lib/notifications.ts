@@ -150,94 +150,121 @@ export async function sendPushNotification(
   const segment = await getUserSegment(userId);
   const timestamp = new Date().toISOString();
 
+  // Only dispatch to active subscriptions
   const subscriptions = await prisma.pushSubscription.findMany({
-    where: { userId },
+    where: { userId, isActive: true },
   });
 
-  await logNotificationTrace(traceId, 'SUBSCRIPTIONS_FOUND', { count: subscriptions.length, userId });
+  await logNotificationTrace(traceId, 'SUBSCRIPTIONS_FOUND', {
+    count: subscriptions.length,
+    userId,
+    devices: subscriptions.map(s => `${s.id}(${s.deviceType ?? 'Unknown'}/${s.browser ?? 'Unknown'})`).join(', '),
+  });
 
   if (subscriptions.length === 0) {
     console.warn(
-      `[NOTIFICATIONS] No push subscriptions for user ${userId}. ` +
-      'Push will NOT be delivered. In-app record will still be created. ' +
-      'Check that the frontend is registering the service worker and storing subscriptions.'
+      `[NOTIFICATIONS] No active push subscriptions for user ${userId}. ` +
+      'Push will NOT be delivered. In-app record will still be created.'
     );
   }
 
-  // Build the push payload — this is what sw.js receives as event.data.json()
-  const pushPayload = JSON.stringify({
-    traceId,
-    title: payload.title,
-    body: payload.body,
-    url: payload.url || '/dashboard',
-    type: payload.type,
-    icon: '/android-chrome-192x192.png',
-    badge: '/favicon-32x32.png',
-    timestamp,
-    // Use a unique tag per notification to allow renotify while preventing true duplicates
-    tag: payload.tag || payload.type,
-    data: {
-      traceId,
-      url: payload.url || '/dashboard',
-      type: payload.type,
-      tag: payload.tag || payload.type,
-      timestamp,
-    },
-  });
-
-  // Send to all registered devices in parallel
-  await logNotificationTrace(traceId, 'DISPATCH_STARTED', { count: subscriptions.length });
-
+  // Send to all registered active devices in parallel
+  // Build per-device payload so subscriptionId + deviceType are embedded in each push.
   const pushResults = await Promise.allSettled(
     subscriptions.map(async (sub) => {
+      // Per-device payload — injecting subscriptionId so the SW can report it back
+      const devicePayload = JSON.stringify({
+        traceId,
+        subscriptionId: sub.id,
+        title: payload.title,
+        body: payload.body,
+        url: payload.url || '/dashboard',
+        type: payload.type,
+        icon: '/android-chrome-192x192.png',
+        badge: '/favicon-32x32.png',
+        timestamp,
+        tag: payload.tag || payload.type,
+        data: {
+          traceId,
+          subscriptionId: sub.id,
+          url: payload.url || '/dashboard',
+          type: payload.type,
+          tag: payload.tag || payload.type,
+          timestamp,
+        },
+      });
+
+      await logNotificationTrace(traceId, 'DISPATCH_STARTED', {
+        subscription: sub.id,
+        deviceType: sub.deviceType ?? 'Unknown',
+        browser: sub.browser ?? 'Unknown',
+      });
+
       try {
         await webpush.sendNotification(
           {
             endpoint: sub.endpoint,
-            keys: {
-              p256dh: sub.p256dh,
-              auth: sub.auth,
-            },
+            keys: { p256dh: sub.p256dh, auth: sub.auth },
           },
-          pushPayload,
-          {
-            TTL: 86400,
-            headers: {
-              Urgency: 'high',
-            },
-          }
+          devicePayload,
+          { TTL: 86400, headers: { Urgency: 'high' } }
         );
-        await logNotificationTrace(traceId, 'DISPATCH_SUCCESS', { subscription: sub.id, endpoint: sub.endpoint.slice(0, 50) });
+
+        // Touch lastSeenAt so we know this subscription is reachable
+        await prisma.pushSubscription.update({
+          where: { id: sub.id },
+          data: { lastSeenAt: new Date() },
+        }).catch(() => {/* non-critical */});
+
+        await logNotificationTrace(traceId, 'DISPATCH_SUCCESS', {
+          subscription: sub.id,
+          deviceType: sub.deviceType ?? 'Unknown',
+          browser: sub.browser ?? 'Unknown',
+          endpoint: sub.endpoint.slice(0, 50),
+        });
       } catch (error: any) {
-        // 410 Gone or 404 = subscription is dead. Clean it up.
         if (error.statusCode === 410 || error.statusCode === 404) {
-          await prisma.pushSubscription.delete({ where: { id: sub.id } }).catch(e => 
-            console.error('[NOTIFICATIONS] Failed to delete stale subscription:', e)
-          );
-          await logNotificationTrace(traceId, 'DISPATCH_STALE_REMOVED', { subscription: sub.id });
+          // Soft-deactivate — preserves the row for audit trail
+          await prisma.pushSubscription.update({
+            where: { id: sub.id },
+            data: { isActive: false },
+          }).catch(e => console.error('[NOTIFICATIONS] Failed to deactivate stale subscription:', e));
+
+          await logNotificationTrace(traceId, 'DISPATCH_STALE_DEACTIVATED', {
+            subscription: sub.id,
+            deviceType: sub.deviceType ?? 'Unknown',
+            statusCode: error.statusCode,
+          });
         } else {
           await logNotificationTrace(traceId, 'DISPATCH_FAILURE', {
             subscription: sub.id,
+            deviceType: sub.deviceType ?? 'Unknown',
+            browser: sub.browser ?? 'Unknown',
             errorType: error.name || 'Unknown',
             message: error.message,
             statusCode: error.statusCode,
             stack: error.stack,
-            endpoint: sub.endpoint.slice(0, 50)
+            endpoint: sub.endpoint.slice(0, 50),
           });
         }
-
-        // Re-throw so Promise.allSettled captures the rejection
         throw error;
       }
     })
   );
 
-  // Log summary
   const sent = pushResults.filter((r) => r.status === 'fulfilled').length;
   const failed = pushResults.filter((r) => r.status === 'rejected').length;
-  console.log(`[NOTIFICATIONS] Push delivery summary: ${sent} sent, ${failed} failed out of ${subscriptions.length} subscriptions`);
 
-  // Always create in-app notification record, regardless of push delivery outcome
+  await logNotificationTrace(traceId, 'DELIVERY_SUMMARY', {
+    total: subscriptions.length,
+    sent,
+    failed,
+    devices: subscriptions.map(s => s.deviceType ?? 'Unknown').join(', '),
+  });
+
+  console.log(`[NOTIFICATIONS] Delivery summary: ${sent} sent, ${failed} failed out of ${subscriptions.length} subscriptions`);
+
+  // Always create in-app notification record regardless of push delivery outcome
   await prisma.notification.create({
     data: {
       userId,
@@ -245,7 +272,7 @@ export async function sendPushNotification(
       body: payload.body,
       link: payload.url,
       type: payload.type,
-      metadata: { segment, pushSent: sent, pushFailed: failed },
+      metadata: { segment, pushSent: sent, pushFailed: failed, traceId },
     },
   });
 }

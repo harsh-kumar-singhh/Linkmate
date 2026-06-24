@@ -71,11 +71,12 @@ self.addEventListener('push', function (event) {
   const timestamp = notificationData.timestamp || data.timestamp || new Date().toISOString();
   const tag = data.tag || data.type || 'linkmate-notification';
   const traceId = data.traceId || notificationData.traceId || null;
+  const subscriptionId = data.subscriptionId || notificationData.subscriptionId || null;
 
   if (traceId) {
     event.waitUntil((async () => {
-      await reportTrace(traceId, 'SW_RECEIVED', { tag, sw_receive_timestamp: timestamp });
-      await reportTrace(traceId, 'PAYLOAD_PARSED', { tag, type: data.type });
+      await reportTrace(traceId, 'SW_RECEIVED', { tag, subscriptionId, sw_receive_timestamp: new Date().toISOString() });
+      await reportTrace(traceId, 'PAYLOAD_PARSED', { tag, subscriptionId, type: data.type });
     })());
   } else {
     console.log(`[TRACE_NOTIFICATION] sw_received (legacy/no traceId) | tag=${tag} | sw_receive_timestamp=${timestamp}`);
@@ -90,6 +91,8 @@ self.addEventListener('push', function (event) {
     renotify: true,
     data: {
       ...notificationData,
+      traceId,
+      subscriptionId,
       url: targetUrl,
       timestamp,
     },
@@ -98,28 +101,30 @@ self.addEventListener('push', function (event) {
   };
 
   event.waitUntil(
-    self.registration.showNotification(data.title || 'Linkmate', options)
-      .then(async () => {
-        console.log('[SW] showNotification called successfully for:', data.type);
-        if (traceId) await reportTrace(traceId, 'DISPLAY_SUCCESS', { tag });
-      })
-      .catch(async (err) => {
+    (async () => {
+      if (traceId) await reportTrace(traceId, 'SHOW_NOTIFICATION_STARTED', { tag, subscriptionId });
+      try {
+        await self.registration.showNotification(data.title || 'Linkmate', options);
+        console.log('[SW] showNotification succeeded for:', data.type);
+        if (traceId) await reportTrace(traceId, 'SHOW_NOTIFICATION_SUCCESS', { tag, subscriptionId });
+      } catch (err) {
         console.error('[SW] showNotification failed, attempting fallback:', err);
-        if (traceId) await reportTrace(traceId, 'DISPLAY_FAILURE', { error: err.message, tag });
-        // Fallback for strict browsers (e.g. Safari) that might throw on renotify or actions
+        if (traceId) await reportTrace(traceId, 'DISPLAY_FAILURE', { error: err.message, tag, subscriptionId });
+        // Fallback: drop renotify + actions for stricter browsers (e.g. Safari)
         const fallbackOptions = {
           body: data.body || '',
           icon: data.icon || '/android-chrome-192x192.png',
-          data: { url: targetUrl, timestamp }
+          data: { traceId, subscriptionId, url: targetUrl, timestamp }
         };
         try {
           await self.registration.showNotification(data.title || 'Linkmate', fallbackOptions);
-          if (traceId) await reportTrace(traceId, 'DISPLAY_SUCCESS', { tag, fallback: true });
+          if (traceId) await reportTrace(traceId, 'SHOW_NOTIFICATION_SUCCESS', { tag, subscriptionId, fallback: true });
         } catch (fallbackErr) {
           console.error('[SW] Fallback showNotification also failed:', fallbackErr);
-          if (traceId) await reportTrace(traceId, 'DISPLAY_FAILURE', { error: fallbackErr.message, fallback: true, tag });
+          if (traceId) await reportTrace(traceId, 'DISPLAY_FAILURE', { error: fallbackErr.message, fallback: true, tag, subscriptionId });
         }
-      })
+      }
+    })()
   );
 });
 
@@ -128,9 +133,10 @@ self.addEventListener('notificationclick', function (event) {
 
   const rawUrl = event.notification.data?.url || '/dashboard';
   const traceId = event.notification.data?.traceId || null;
+  const subscriptionId = event.notification.data?.subscriptionId || null;
 
   if (traceId) {
-    event.waitUntil(reportTrace(traceId, 'CLICKED', { url: rawUrl }));
+    event.waitUntil(reportTrace(traceId, 'NOTIFICATION_CLICKED', { url: rawUrl, subscriptionId }));
   }
 
   // Build absolute URL so client.url comparison works cross-origin
