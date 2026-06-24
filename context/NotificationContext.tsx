@@ -139,13 +139,31 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         const existingSubscription = await registration.pushManager.getSubscription();
 
         if (existingSubscription) {
-          // Subscription exists in browser — make sure it's also in the DB.
-          // This handles: user re-installs PWA, DB was reset, server redeployed.
-          console.log('[PUSH] Existing subscription found. Re-syncing to server.');
+          // Subscription exists in browser — but verify it has not expired.
+          // Push subscriptions have an expirationTime field. If it is set and in
+          // the past (or within 24 hours of expiry), the subscription is dead even
+          // though it still exists locally. The push service will accept the
+          // dispatch (DISPATCH_SUCCESS) but never deliver it — this is the primary
+          // cause of silent multi-device failures.
+          const isExpired =
+            existingSubscription.expirationTime !== null &&
+            existingSubscription.expirationTime < Date.now() + 24 * 60 * 60 * 1000;
+
+          if (isExpired) {
+            console.warn('[PUSH] Existing subscription is expired or expiring soon. Re-subscribing.');
+            await existingSubscription.unsubscribe();
+            await createAndSaveSubscription(registration);
+            return;
+          }
+
+          // Valid subscription — re-sync it to the DB.
+          // Handles: DB was wiped, user cleared site data, server redeployed.
+          console.log('[PUSH] Existing valid subscription found. Re-syncing to server.');
           setIsSubscribed(true);
           await saveSubscriptionToServer(existingSubscription);
           return;
         }
+
 
         // No subscription yet.
         if (currentPermission === 'granted') {

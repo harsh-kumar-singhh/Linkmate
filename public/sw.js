@@ -74,12 +74,12 @@ self.addEventListener('push', function (event) {
   const subscriptionId = data.subscriptionId || notificationData.subscriptionId || null;
 
   if (traceId) {
-    event.waitUntil((async () => {
-      await reportTrace(traceId, 'SW_RECEIVED', { tag, subscriptionId, sw_receive_timestamp: new Date().toISOString() });
-      await reportTrace(traceId, 'PAYLOAD_PARSED', { tag, subscriptionId, type: data.type });
-    })());
+    // NOTE: Do NOT call event.waitUntil() here.
+    // All async work is merged into the single waitUntil below.
+    // Having two separate waitUntil calls risks SW termination between them on mobile.
+    reportTrace(traceId, 'SW_RECEIVED', { tag, subscriptionId, sw_receive_timestamp: new Date().toISOString() });
   } else {
-    console.log(`[TRACE_NOTIFICATION] sw_received (legacy/no traceId) | tag=${tag} | sw_receive_timestamp=${timestamp}`);
+    console.log(`[TRACE_NOTIFICATION] sw_received (legacy/no traceId) | tag=${tag}`);
   }
 
   const options = {
@@ -88,7 +88,12 @@ self.addEventListener('push', function (event) {
     badge: data.badge || '/favicon-32x32.png',
     vibrate: [100, 50, 100],
     tag: tag,
-    renotify: true,
+    // REMOVED: renotify: true
+    // renotify:true is only valid when a prior notification with the SAME tag is
+    // already visible in the notification tray. When no prior notification exists,
+    // mobile browsers (Chrome Android, Samsung Internet) silently swallow the
+    // showNotification() call entirely — no error, no notification. Removing this
+    // lets the browser always show the notification freshly.
     data: {
       ...notificationData,
       traceId,
@@ -96,12 +101,24 @@ self.addEventListener('push', function (event) {
       url: targetUrl,
       timestamp,
     },
-    actions: data.actions || [],
     requireInteraction: false,
   };
 
+  // CRITICAL FIX: Only ONE event.waitUntil() call.
+  // Calling event.waitUntil() twice is valid per spec but on mobile (iOS Safari,
+  // Android Chrome with battery optimization) the SW may be killed after the
+  // FIRST promise resolves. By merging trace reporting + showNotification into a
+  // single async IIFE passed to a single waitUntil(), we guarantee the SW stays
+  // alive for the entire operation.
   event.waitUntil(
     (async () => {
+      // Trace: received + parsed
+      if (traceId) {
+        await reportTrace(traceId, 'SW_RECEIVED', { tag, subscriptionId, sw_receive_timestamp: new Date().toISOString() });
+        await reportTrace(traceId, 'PAYLOAD_PARSED', { tag, subscriptionId, type: data.type });
+      }
+
+      // Show notification
       if (traceId) await reportTrace(traceId, 'SHOW_NOTIFICATION_STARTED', { tag, subscriptionId });
       try {
         await self.registration.showNotification(data.title || 'Linkmate', options);
@@ -110,11 +127,11 @@ self.addEventListener('push', function (event) {
       } catch (err) {
         console.error('[SW] showNotification failed, attempting fallback:', err);
         if (traceId) await reportTrace(traceId, 'DISPLAY_FAILURE', { error: err.message, tag, subscriptionId });
-        // Fallback: drop renotify + actions for stricter browsers (e.g. Safari)
+        // Fallback: minimal options for strict browsers (e.g. Safari)
         const fallbackOptions = {
           body: data.body || '',
           icon: data.icon || '/android-chrome-192x192.png',
-          data: { traceId, subscriptionId, url: targetUrl, timestamp }
+          data: { traceId, subscriptionId, url: targetUrl, timestamp },
         };
         try {
           await self.registration.showNotification(data.title || 'Linkmate', fallbackOptions);
