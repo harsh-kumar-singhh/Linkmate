@@ -247,3 +247,13 @@ model Notification {
 
   @@index([userId, createdAt])
 }
+
+model NotificationTraceEvent {
+  id        String   @id @default(cuid())
+  traceId   String
+  eventType String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([traceId, createdAt])
+}

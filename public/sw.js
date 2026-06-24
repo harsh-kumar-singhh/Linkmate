@@ -2,6 +2,21 @@
 // Linkmate Service Worker — Push + Notification Click
 // ============================================================
 
+async function reportTrace(traceId, eventType, metadata = {}) {
+  if (!traceId) return;
+  try {
+    const metaString = Object.entries(metadata).map(([k,v]) => `${k}=${v}`).join(' | ');
+    console.log(`[TRACE_NOTIFICATION] ${eventType} | traceId=${traceId} ${metaString ? '| ' + metaString : ''}`);
+    await fetch('/api/notifications/trace', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ traceId, eventType, metadata })
+    });
+  } catch (err) {
+    console.error('[SW] Failed to report trace:', err);
+  }
+}
+
 self.addEventListener('install', function (event) {
   // Force the new SW to activate immediately, don't wait for old tabs to close
   self.skipWaiting();
@@ -55,8 +70,16 @@ self.addEventListener('push', function (event) {
   const targetUrl = notificationData.url || data.url || '/dashboard';
   const timestamp = notificationData.timestamp || data.timestamp || new Date().toISOString();
   const tag = data.tag || data.type || 'linkmate-notification';
+  const traceId = data.traceId || notificationData.traceId || null;
 
-  console.log(`[TRACE_NOTIFICATION] service_worker_receive_event | tag=${tag} | sw_receive_timestamp=${timestamp}`);
+  if (traceId) {
+    event.waitUntil((async () => {
+      await reportTrace(traceId, 'SW_RECEIVED', { tag, sw_receive_timestamp: timestamp });
+      await reportTrace(traceId, 'PAYLOAD_PARSED', { tag, type: data.type });
+    })());
+  } else {
+    console.log(`[TRACE_NOTIFICATION] sw_received (legacy/no traceId) | tag=${tag} | sw_receive_timestamp=${timestamp}`);
+  }
 
   const options = {
     body: data.body || '',
@@ -76,12 +99,13 @@ self.addEventListener('push', function (event) {
 
   event.waitUntil(
     self.registration.showNotification(data.title || 'Linkmate', options)
-      .then(() => {
+      .then(async () => {
         console.log('[SW] showNotification called successfully for:', data.type);
-        console.log(`[TRACE_NOTIFICATION] notification_display_event | tag=${tag}`);
+        if (traceId) await reportTrace(traceId, 'DISPLAY_SUCCESS', { tag });
       })
       .catch(async (err) => {
         console.error('[SW] showNotification failed, attempting fallback:', err);
+        if (traceId) await reportTrace(traceId, 'DISPLAY_FAILURE', { error: err.message, tag });
         // Fallback for strict browsers (e.g. Safari) that might throw on renotify or actions
         const fallbackOptions = {
           body: data.body || '',
@@ -90,9 +114,10 @@ self.addEventListener('push', function (event) {
         };
         try {
           await self.registration.showNotification(data.title || 'Linkmate', fallbackOptions);
-          console.log(`[TRACE_NOTIFICATION] notification_display_event_fallback | tag=${tag}`);
+          if (traceId) await reportTrace(traceId, 'DISPLAY_SUCCESS', { tag, fallback: true });
         } catch (fallbackErr) {
           console.error('[SW] Fallback showNotification also failed:', fallbackErr);
+          if (traceId) await reportTrace(traceId, 'DISPLAY_FAILURE', { error: fallbackErr.message, fallback: true, tag });
         }
       })
   );
@@ -102,6 +127,12 @@ self.addEventListener('notificationclick', function (event) {
   event.notification.close();
 
   const rawUrl = event.notification.data?.url || '/dashboard';
+  const traceId = event.notification.data?.traceId || null;
+
+  if (traceId) {
+    event.waitUntil(reportTrace(traceId, 'CLICKED', { url: rawUrl }));
+  }
+
   // Build absolute URL so client.url comparison works cross-origin
   const urlToOpen = new URL(rawUrl, self.location.origin).href;
 

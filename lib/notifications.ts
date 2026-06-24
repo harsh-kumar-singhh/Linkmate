@@ -2,6 +2,25 @@ import webpush from 'web-push';
 import { prisma } from '@/lib/prisma';
 
 // ============================================================
+// Tracing Helper
+// ============================================================
+export async function logNotificationTrace(traceId: string, eventType: string, metadata?: Record<string, any>) {
+  try {
+    const metaString = metadata ? Object.entries(metadata).map(([k, v]) => `${k}=${v}`).join(' | ') : '';
+    console.log(`[TRACE_NOTIFICATION] ${eventType} | traceId=${traceId} ${metaString ? '| ' + metaString : ''}`);
+    await prisma.notificationTraceEvent.create({
+      data: {
+        traceId,
+        eventType,
+        metadata: metadata ? metadata : undefined,
+      }
+    });
+  } catch (error) {
+    console.error('[TRACE_NOTIFICATION] Failed to save trace event to DB:', error);
+  }
+}
+
+// ============================================================
 // VAPID Configuration
 // ============================================================
 let vapidInitialized = false;
@@ -95,9 +114,13 @@ export async function sendPushNotification(
     type: string;
     // Optional: pass a unique tag per post to prevent duplicates
     tag?: string;
+    traceId?: string;
   },
   bypassIntelligence = false
 ) {
+  const traceId = payload.traceId || `TRACE_NOTIFICATION_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+  await logNotificationTrace(traceId, 'PAYLOAD_CREATED', { type: payload.type, userId });
+
   // Ensure VAPID keys are set
   initVapid();
 
@@ -127,18 +150,11 @@ export async function sendPushNotification(
   const segment = await getUserSegment(userId);
   const timestamp = new Date().toISOString();
 
-  // ============================================================
-  // BUG FIX #1 — Diagnostic: log subscription count.
-  // If this logs 0, that's your root cause. No subscriptions = no push.
-  // You need frontend code that calls navigator.serviceWorker + pushManager.subscribe
-  // and POSTs the subscription to /api/push-subscription (see note below).
-  // ============================================================
   const subscriptions = await prisma.pushSubscription.findMany({
     where: { userId },
   });
 
-  console.log(`[NOTIFICATIONS] Found ${subscriptions.length} push subscription(s) for user ${userId}`);
-  console.log(`[TRACE_NOTIFICATION] subscriptions_found | userId=${userId} | count=${subscriptions.length}`);
+  await logNotificationTrace(traceId, 'SUBSCRIPTIONS_FOUND', { count: subscriptions.length, userId });
 
   if (subscriptions.length === 0) {
     console.warn(
@@ -150,6 +166,7 @@ export async function sendPushNotification(
 
   // Build the push payload — this is what sw.js receives as event.data.json()
   const pushPayload = JSON.stringify({
+    traceId,
     title: payload.title,
     body: payload.body,
     url: payload.url || '/dashboard',
@@ -160,6 +177,7 @@ export async function sendPushNotification(
     // Use a unique tag per notification to allow renotify while preventing true duplicates
     tag: payload.tag || payload.type,
     data: {
+      traceId,
       url: payload.url || '/dashboard',
       type: payload.type,
       tag: payload.tag || payload.type,
@@ -168,7 +186,7 @@ export async function sendPushNotification(
   });
 
   // Send to all registered devices in parallel
-  console.log(`[NOTIFICATIONS] Enqueueing push dispatch for user ${userId} | type=${payload.type} | subscriptions=${subscriptions.length}`);
+  await logNotificationTrace(traceId, 'DISPATCH_STARTED', { count: subscriptions.length });
 
   const pushResults = await Promise.allSettled(
     subscriptions.map(async (sub) => {
@@ -189,23 +207,23 @@ export async function sendPushNotification(
             },
           }
         );
-        console.log(`[NOTIFICATIONS] Push sent successfully | subscription=${sub.id} | endpoint=${sub.endpoint.slice(0, 50)}...`);
-        console.log(`[TRACE_NOTIFICATION] dispatch_success | userId=${userId} | subscription=${sub.id} | endpoint=${sub.endpoint.slice(0, 50)}...`);
+        await logNotificationTrace(traceId, 'DISPATCH_SUCCESS', { subscription: sub.id, endpoint: sub.endpoint.slice(0, 50) });
       } catch (error: any) {
         // 410 Gone or 404 = subscription is dead. Clean it up.
         if (error.statusCode === 410 || error.statusCode === 404) {
           await prisma.pushSubscription.delete({ where: { id: sub.id } }).catch(e => 
             console.error('[NOTIFICATIONS] Failed to delete stale subscription:', e)
           );
-          console.log(`[NOTIFICATIONS] Cleaned stale subscription | subscription=${sub.id} | statusCode=${error.statusCode}`);
-          console.log(`[TRACE_NOTIFICATION] dispatch_stale_removed | userId=${userId} | subscription=${sub.id}`);
+          await logNotificationTrace(traceId, 'DISPATCH_STALE_REMOVED', { subscription: sub.id });
         } else {
-          console.error(`[NOTIFICATIONS] Push send failure | subscription=${sub.id}:`, {
-            statusCode: error.statusCode,
+          await logNotificationTrace(traceId, 'DISPATCH_FAILURE', {
+            subscription: sub.id,
+            errorType: error.name || 'Unknown',
             message: error.message,
-            endpoint: sub.endpoint.slice(0, 50),
+            statusCode: error.statusCode,
+            stack: error.stack,
+            endpoint: sub.endpoint.slice(0, 50)
           });
-          console.error(`[TRACE_NOTIFICATION] dispatch_failure | userId=${userId} | subscription=${sub.id} | statusCode=${error.statusCode} | message=${error.message}`);
         }
 
         // Re-throw so Promise.allSettled captures the rejection
@@ -253,7 +271,8 @@ export async function sendPostPublishedNotification({
   postId: string;
 }) {
   console.log(`[NOTIFICATIONS] Triggering publish notification | post=${postId} | user=${userId}`);
-  console.log(`[TRACE_NOTIFICATION] trigger_post_published | postId=${postId} | userId=${userId} | trigger_timestamp=${new Date().toISOString()}`);
+  const traceId = `TRACE_NOTIFICATION_post_${postId}_${Date.now()}`;
+  await logNotificationTrace(traceId, 'TRIGGERED', { postId, userId });
 
   const snippet = postContent.length > 50 ? postContent.substring(0, 47) + '...' : postContent;
   const segment = await getUserSegment(userId);
@@ -275,6 +294,7 @@ export async function sendPostPublishedNotification({
       type: 'scheduled_post_published',
       // Use postId as the tag so each post gets its own notification (no collapsing)
       tag: `post-published-${postId}`,
+      traceId,
     },
     true // bypass intelligence — post publish is always high-value
   );
